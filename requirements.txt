@@ -5,3 +5,4 @@ reportlab
 a2wsgi
 psycopg2-binary
 jinja2
+pymysql
