@@ -1,0 +1,141 @@
+/* ==========================================
+   Estilos Principales - Panel de Control
+   ========================================== */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #0f172a; /* Fondo oscuro elegante en caso de carga */
+}
+
+/* Pantalla principal con la imagen de fondo de la planta */
+.fondo-frame {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background-image: linear-gradient(180deg, rgba(15, 23, 42, 0.4) 0%, rgba(15, 23, 42, 0.2) 100%), url('/static/fondo.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Barra superior / Botonera principal */
+.button-frame {
+    display: flex;
+    width: 100%;
+    padding: 12px 20px;
+    gap: 12px;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Botones principales y disparadores de dropdown */
+.custom-button, .dropdown-btn {
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: #1e293b;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 8px;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+}
+
+/* Efectos Hover y Active */
+.custom-button:hover, .dropdown-btn:hover {
+    background: #ffffff;
+    color: #0284c7; /* Azul profesional */
+    border-color: #38bdf8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+}
+
+.custom-button:active, .dropdown-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Estructura para Menús Desplegables */
+.dropdown {
+    position: relative;
+    flex: 1;
+    display: flex;
+}
+
+.dropdown-btn {
+    width: 100%;
+}
+
+/* Submenús desplegables con tarjeta flotante */
+.dropdown-menu {
+    display: none; /* Oculto por defecto */
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    min-width: 180px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    padding: 6px;
+    z-index: 200;
+}
+
+/* Se muestra únicamente cuando JS activa la clase .show */
+.dropdown-menu.show {
+    display: block;
+    animation: fadeIn 0.18s ease-out;
+}
+
+.dropdown-menu a {
+    display: block;
+    padding: 10px 14px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #334155;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dropdown-menu a:hover {
+    background-color: #f0f9ff;
+    color: #0284c7;
+}
+
+/* Animación de apertura suave */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

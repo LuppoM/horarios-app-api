@@ -1,0 +1,178 @@
+/* modmoivista.css */
+
+body {
+    background-color: #f1f5f9;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* 1. TITULO */
+.titulo-pantalla {
+    text-align: center;
+    font-size: 20pt;
+    font-weight: bold;
+    color: #003366;
+    padding: 20px 0 5px 0;
+}
+
+/* 2. TOOLSTRIP */
+.toolstrip {
+    display: flex;
+    align-items: center;
+    background-color: #dde6ed;
+    height: 70px;
+    padding: 0 10px;
+    gap: 10px;
+}
+
+.btn-toolstrip {
+    font-size: 12pt;
+    font-weight: bold;
+    color: #003366;
+    background-color: #cfe2f3;
+    border: none;
+    width: 120px;
+    height: 40px;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background-color 0.15s;
+}
+
+.btn-toolstrip:hover {
+    background-color: #a4c2f4;
+}
+
+/* 3. FILTRO Y CONTADORES */
+.filtro-frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding-bottom: 10px;
+}
+
+.filtro-label-bold {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #003366;
+}
+
+.filtro-label {
+    font-size: 11pt;
+    color: #000;
+}
+
+.filtro-control {
+    font-size: 10pt;
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+}
+
+.contador-label {
+    text-align: center;
+    font-size: 11pt;
+    font-weight: bold;
+    color: #003366;
+    padding-bottom: 10px;
+}
+
+/* 4. TABLA */
+.tabla-frame {
+    padding: 10px 15px;
+}
+
+.tabla-contenedor {
+    width: 100%;
+    max-height: 550px;
+    overflow: auto;
+    background: white;
+    border: 1px solid #ccc;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+}
+
+th {
+    background-color: #d9e1f2;
+    color: #003366;
+    font-size: 11pt;
+    font-weight: bold;
+    padding: 8px;
+    border: 1px solid #b3c6e7;
+    position: sticky;
+    top: 0;
+}
+
+td {
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+    font-size: 10pt;
+    height: 28px;
+}
+
+tr:hover {
+    background-color: #e6f2ff;
+    cursor: pointer;
+}
+
+tr.selected {
+    background-color: #cce6ff !important;
+}
+
+/* MODAL CONTRASEÑA */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 4px;
+    width: 300px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    font-size: 11pt;
+    color: #000;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.btn-confirm {
+    background-color: #c6efce;
+    color: #006100;
+    border: 1px solid #006100;
+    padding: 5px 12px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.btn-cancel {
+    background-color: #ffc7ce;
+    color: #9c0006;
+    border: 1px solid #9c0006;
+    padding: 5px 12px;
+    font-weight: bold;
+    cursor: pointer;
+}

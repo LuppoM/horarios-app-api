@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horarios Golosinas</title>
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+    <link rel="stylesheet" href="/archivos/hgolovista.css">
+</head>
+<body>
+
+    <div class="top-bar">
+        <button class="btn-accion" onclick="exportarPDF()">Exportar a PDF</button>
+        <button class="btn-accion" onclick="guardarDatos()">Guardar</button>
+        <button class="btn-accion" onclick="irAlistamientoFinde()">Alistamiento / Fin de semana</button>
+        <button class="btn-accion" style="background-color: #ffc7ce; color: #9c0006;" onclick="location.href='/'">Cerrar</button>
+        <span style="font-weight: bold; color: #004080; margin-left: 20px;">Semana actual:</span>
+        <span id="labelSemana" style="font-weight: bold; color: #333; font-size: 11pt; margin-left: 5px;">-</span>
+    </div>
+
+    <div id="gridContenedor" class="grid-sectores"></div>
+
+    <script>
+        let datosGlobales = {};
+        let semanaActualGlobal = "";
+
+        async function init() {
+            await cargarDatos();
+        }
+
+        function irAlistamientoFinde() {
+            let semanaAUsar = semanaActualGlobal;
+            if (!semanaAUsar) {
+                const labelSemana = document.getElementById('labelSemana');
+                if (labelSemana && labelSemana.textContent && labelSemana.textContent !== "-") {
+                    semanaAUsar = labelSemana.textContent.trim();
+                }
+            }
+
+            if (!semanaAUsar) {
+                alert("Espere a que carguen los datos de la semana.");
+                return;
+            }
+            
+            window.location.href = `/hgolo/finde?semana=${semanaAUsar}`;
+        }
+
+        async function cargarDatos() {
+            try {
+                const res = await fetch(`/api/hgolo/datos`);
+                datosGlobales = await res.json();
+                
+                semanaActualGlobal = datosGlobales.semana;
+                const labelSemana = document.getElementById('labelSemana');
+                if (labelSemana) {
+                    labelSemana.textContent = semanaActualGlobal;
+                }
+
+                renderizarUI();
+            } catch (error) {
+                console.error("Error al cargar los datos:", error);
+                alert("Error al conectar con el servidor para cargar los datos.");
+            }
+        }
+
+        function renderizarUI() {
+            const grid = document.getElementById('gridContenedor');
+            grid.innerHTML = "";
+
+            if (!datosGlobales.sectores) return;
+
+            datosGlobales.sectores.forEach(secObj => {
+                const sector = secObj.sector;
+                const tipoHorario = (secObj.tipo_horario || "ROTATIVO").trim().toUpperCase();
+                const esEspecial = (tipoHorario === "CENTRAL");
+                const requiereDotacion = parseInt(secObj.requiere_dotacion) === 1;
+                const esLibre = (requiereDotacion === false || secObj.requiere_dotacion == 0);
+
+                const card = document.createElement('div');
+                card.className = "sector-card";
+                card.innerHTML = `<h3>${sector}</h3>`;
+
+                secObj.turnos.forEach(turno => {
+                    const rawCant = (datosGlobales.dotacion_teorica[sector] && datosGlobales.dotacion_teorica[sector][turno]) || 0;
+                    const cantTeorica = parseInt(rawCant) || 0;
+
+                    let limite = (esEspecial || esLibre) ? 999999 : cantTeorica;
+                    const deshabilitarBoton = (!esEspecial && !esLibre && cantTeorica <= 0);
+
+                    const turnoBox = document.createElement('div');
+                    turnoBox.className = "turno-box";
+                    turnoBox.id = `box_${sector}_${turno}`;
+                    
+                    let etiquetaTexto = esEspecial ? `Horario: ${turno}` : (esLibre ? `Turno: ${turno}` : `Turno: ${turno} | Dotación programada: ${cantTeorica}`);
+
+                    turnoBox.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4>${etiquetaTexto}</h4>
+                            <button class="btn-accion" id="btn_${sector}_${turno}" style="font-size: 8pt; padding: 2px 6px; ${deshabilitarBoton ? 'background-color: #e0e0e0; color: #888; cursor: not-allowed;' : ''}" 
+                                onclick="intentarAgregarFila('${sector}', '${turno}', ${limite}, ${deshabilitarBoton})">
+                                + Agregar operario
+                            </button>
+                        </div>
+                        <div class="filas-container" id="filas_${sector}_${turno}"></div>
+                    `;
+                    card.appendChild(turnoBox);
+                });
+
+                grid.appendChild(card);
+            });
+
+            if (datosGlobales.asignados) {
+                datosGlobales.asignados.forEach(([id_val, operario, horario, sector]) => {
+                    if(sector && horario) {
+                        agregarFila(sector, horario, id_val, operario);
+                    }
+                });
+            }
+
+            actualizarOpcionesSelects();
+        }
+
+        function intentarAgregarFila(sector, turno, limite, deshabilitarBoton) {
+            if (deshabilitarBoton) {
+                alert("No se pueden agregar operarios. La dotación teórica para este turno es 0 o no ha sido cargada.");
+                return;
+            }
+
+            const container = document.getElementById(`filas_${sector}_${turno}`);
+            const filasActuales = container.querySelectorAll('.fila-operario').length;
+
+            if (limite < 999999 && filasActuales >= limite) {
+                alert(`No se pueden agregar más operarios. Se alcanzó el límite de la dotación programada (${limite}).`);
+                return;
+            }
+
+            agregarFila(sector, turno, "", "");
+        }
+
+        function agregarFila(sector, turno, idVal = "", operarioVal = "") {
+            const container = document.getElementById(`filas_${sector}_${turno}`);
+            if(!container) return;
+
+            let nombreFinal = operarioVal;
+            if ((!nombreFinal || nombreFinal.trim() === "") && idVal) {
+                nombreFinal = datosGlobales.operarios[idVal] || "";
+            }
+
+            const filaDiv = document.createElement('div');
+            filaDiv.className = "fila-operario";
+
+            const inputId = document.createElement('input');
+            inputId.type = "text";
+            inputId.value = idVal;
+            inputId.readOnly = true;
+
+            const selectOp = document.createElement('select');
+            selectOp.onchange = (e) => {
+                const nombreSel = e.target.value;
+                const encontrada = Object.entries(datosGlobales.operarios || {}).find(([id, nom]) => nom === nombreSel);
+                inputId.value = encontrada ? encontrada[0] : "";
+                actualizarOpcionesSelects();
+            };
+
+            const btnDel = document.createElement('button');
+            btnDel.className = "btn-eliminar";
+            btnDel.textContent = "Eliminar";
+            btnDel.onclick = () => {
+                filaDiv.remove();
+                actualizarOpcionesSelects();
+            };
+
+            filaDiv.appendChild(inputId);
+            filaDiv.appendChild(selectOp);
+            filaDiv.appendChild(btnDel);
+
+            container.appendChild(filaDiv);
+            actualizarOpcionesSelects();
+
+            if(nombreFinal) {
+                selectOp.value = nombreFinal;
+            }
+        }
+
+        function actualizarOpcionesSelects() {
+            const seleccionadosEnPantalla = new Set();
+            document.querySelectorAll('.fila-operario select').forEach(sel => {
+                if (sel.value) seleccionadosEnPantalla.add(sel.value);
+            });
+
+            document.querySelectorAll('.fila-operario select').forEach(sel => {
+                const valorActual = sel.value; 
+                sel.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
+
+                const listaOperarios = Object.entries(datosGlobales.operarios || {});
+                
+                listaOperarios.forEach(([id_op, nombre]) => {
+                    if (!seleccionadosEnPantalla.has(nombre) || nombre === valorActual) {
+                        const opt = document.createElement('option');
+                        opt.value = nombre;
+                        opt.textContent = nombre;
+                        if (nombre === valorActual) {
+                            opt.selected = true;
+                        }
+                        sel.appendChild(opt);
+                    }
+                });
+                
+                if (valorActual) {
+                    sel.value = valorActual;
+                }
+            });
+        }
+
+        function exportarPDF() {
+            if (!semanaActualGlobal) {
+                alert("No hay una semana seleccionada para exportar.");
+                return;
+            }
+            window.location.href = `/api/hgolo/exportar-pdf?semana=${semanaActualGlobal}`;
+        }
+
+        async function guardarDatos() {
+            let registros = [];
+
+            document.querySelectorAll('.sector-card').forEach(card => {
+                const sector = card.querySelector('h3').textContent.trim();
+                card.querySelectorAll('.turno-box').forEach(box => {
+                    const turnoText = box.querySelector('h4').textContent;
+                    let turno = "";
+                    if (turnoText.includes("Horario:")) {
+                        turno = turnoText.replace('Horario:', '').trim();
+                    } else if (turnoText.includes("Turno:")) {
+                        turno = turnoText.split('|')[0].replace('Turno:', '').trim();
+                    }
+
+                    box.querySelectorAll('.fila-operario').forEach(fila => {
+                        const idVal = fila.querySelector('input').value;
+                        const opNombre = fila.querySelector('select').value;
+                        if(idVal && opNombre) {
+                            registros.push([parseInt(idVal), opNombre, turno, sector]);
+                        }
+                    });
+                });
+            });
+
+            try {
+                const res = await fetch('/api/hgolo/guardar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ semana: semanaActualGlobal, registros: registros })
+                });
+
+                const r = await res.json();
+                if(r.status === 'ok') {
+                    alert("Datos guardados correctamente.");
+                    cargarDatos();
+                } else {
+                    alert("Error al guardar.");
+                }
+            } catch (error) {
+                console.error("Error al guardar:", error);
+                alert("Ocurrió un error al intentar guardar los datos.");
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

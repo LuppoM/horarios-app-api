@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Sectores</title>
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+    <link rel="stylesheet" href="/archivos/modmoivista.css">
+</head>
+<body>
+
+    <!-- 1. TITULO -->
+    <div class="titulo-pantalla">GESTION DE SECTORES</div>
+
+    <!-- 2. TOOLSTRIP -->
+    <div class="toolstrip">
+        <button class="btn-toolstrip" onclick="solicitarAccion('agregar')">Agregar</button>
+        <button class="btn-toolstrip" onclick="solicitarAccion('modificar')">Modificar</button>
+        <button class="btn-toolstrip" onclick="solicitarAccion('eliminar')">Eliminar</button>
+        <button class="btn-toolstrip" onclick="location.href='/'">Cerrar</button>
+    </div>
+
+    <!-- 3. TABLA DE DATOS -->
+    <div class="tabla-frame" style="margin-top: 20px;">
+        <div class="tabla-contenedor">
+            <table>
+                <thead>
+                    <tr id="tablaEncabezados"></tr>
+                </thead>
+                <tbody id="tablaCuerpo"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODAL ABM SECTORES (AGREGAR / MODIFICAR) -->
+    <div id="modalAbm" class="modal-overlay">
+        <div class="modal-content" style="width: 400px;">
+            <h3 id="abmTitulo">Sector</h3>
+            
+            <div style="margin-bottom: 10px;">
+                <label style="display:block; font-size: 10pt; font-weight:bold;">Sector:</label>
+                <input type="text" id="abmNombre" style="width: 95%; padding: 5px; margin-top: 2px;">
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label style="display:block; font-size: 10pt; font-weight:bold;">Planta:</label>
+                <select id="abmPlanta" style="width: 100%; padding: 5px; margin-top: 2px;">
+                    <option value="Chocolate">Chocolate</option>
+                    <option value="Golosinas">Golosinas</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label style="display:block; font-size: 10pt; font-weight:bold;">Tipo Horario:</label>
+                <select id="abmTipoHorario" style="width: 100%; padding: 5px; margin-top: 2px;"></select>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label style="display:block; font-size: 10pt; font-weight:bold;">Requiere Dotación:</label>
+                <select id="abmDotacion" style="width: 100%; padding: 5px; margin-top: 2px;">
+                    <option value="1">Sí</option>
+                    <option value="0">No</option>
+                </select>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-confirm" onclick="guardarAbm()">Guardar</button>
+                <button class="btn-cancel" onclick="cerrarModalAbm()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let filaSeleccionadaIdx = null;
+    let datosOriginales = [];
+    let columnasOriginales = [];
+    let tiposHorarioGlobal = [];
+    let idRegistroActual = null;
+
+    async function cargarDatos() {
+        try {
+            const response = await fetch('/api/sectores/datos');
+            const data = await response.json();
+
+            columnasOriginales = data.columnas || [];
+            datosOriginales = data.datos || [];
+            tiposHorarioGlobal = data.tipos_horario || ["ROTATIVO", "CENTRAL"];
+
+            // Llenar combo de tipos de horario en el modal
+            const comboTipo = document.getElementById('abmTipoHorario');
+            comboTipo.innerHTML = tiposHorarioGlobal.map(t => `<option value="${t}">${t}</option>`).join('');
+
+            // Poblar de forma fija y segura las opciones del combobox de Requiere Dotación
+            const comboDotacion = document.getElementById('abmDotacion');
+            comboDotacion.innerHTML = `
+                <option value="Sí">Sí</option>
+                <option value="No">No</option>
+            `;
+
+            renderizarTabla(datosOriginales);
+            
+            filaSeleccionadaIdx = null;
+        } catch (err) {
+            console.error("Error cargando sectores:", err);
+        }
+    }
+
+    function renderizarTabla(datosAMostrar) {
+        document.getElementById('tablaEncabezados').innerHTML = columnasOriginales.map((c, i) => `
+            <th>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span>${c}</span>
+                    <input type="text" placeholder="Filtrar..." 
+                        onkeyup="filtrarTabla(${i}, this.value)" 
+                        style="font-size: 8pt; padding: 2px; width: 90%; border: 1px solid #b0c4de; border-radius: 3px;">
+                </div>
+            </th>
+        `).join('');
+
+        document.getElementById('tablaCuerpo').innerHTML = datosAMostrar.map((fila) => {
+            let filaVisual = [...fila];
+            filaVisual[4] = filaVisual[4] === 1 ? 'Sí' : 'No';
+
+            let idxOriginal = datosOriginales.indexOf(fila);
+
+            return `<tr onclick="seleccionarFila(${idxOriginal}, this)">
+                ${filaVisual.map(val => `<td>${val !== null ? val : ''}</td>`).join('')}
+            </tr>`;
+        }).join('');
+    }
+
+    function filtrarTabla(colIdx, textoBusqueda) {
+        const texto = textoBusqueda.toLowerCase();
+        const filasFiltradas = datosOriginales.filter(fila => {
+            let val = fila[colIdx];
+            if (colIdx === 4) val = (val === 1) ? 'sí' : 'no';
+            const textoCelda = val !== null ? String(val).toLowerCase() : '';
+            return textoCelda.includes(texto);
+        });
+        renderizarTabla(filasFiltradas);
+    }
+
+    function seleccionarFila(idx, elem) {
+        document.querySelectorAll('#tablaCuerpo tr').forEach(tr => tr.classList.remove('selected'));
+        elem.classList.add('selected');
+        filaSeleccionadaIdx = idx;
+    }
+
+    async function solicitarAccion(accion) {
+        if (accion !== 'agregar' && filaSeleccionadaIdx === null) {
+            alert("Por favor selecciona un sector de la tabla.");
+            return;
+        }
+
+        if (accion === 'agregar') {
+            idRegistroActual = null;
+            document.getElementById('abmTitulo').innerText = "Agregar sector";
+            document.getElementById('abmNombre').value = "";
+            document.getElementById('abmPlanta').value = "Chocolate";
+            if(tiposHorarioGlobal.length > 0) document.getElementById('abmTipoHorario').value = tiposHorarioGlobal[0];
+            document.getElementById('abmDotacion').value = "Sí";
+            document.getElementById('modalAbm').style.display = 'flex';
+
+        } else if (accion === 'modificar') {
+            const fila = datosOriginales[filaSeleccionadaIdx];
+            idRegistroActual = fila[0]; // ID
+
+            const res = await fetch(`/api/sectores/obtener/${idRegistroActual}`);
+            const data = await res.json();
+
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+
+            document.getElementById('abmTitulo').innerText = "Modificar sector";
+            document.getElementById('abmNombre').value = data.nombre_sector || "";
+            document.getElementById('abmPlanta').value = data.planta || "Chocolate";
+            document.getElementById('abmTipoHorario').value = data.tipo_horario || "";
+            
+            // Asignación correcta y validada del valor de requiere_dotacion
+            document.getElementById('abmDotacion').value = (data.requiere_dotacion === 1 || data.requiere_dotacion === "1") ? "Sí" : "No";
+            
+            document.getElementById('modalAbm').style.display = 'flex';
+
+        } else if (accion === 'eliminar') {
+            const fila = datosOriginales[filaSeleccionadaIdx];
+            idRegistroActual = fila[0];
+            if (confirm(`¿Desea eliminar el sector seleccionado?`)) {
+                const res = await fetch(`/api/sectores/eliminar/${idRegistroActual}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    cargarDatos();
+                } else {
+                    alert("Error al eliminar: " + data.message);
+                }
+            }
+        }
+    }
+
+    async function guardarAbm() {
+        const nombre = document.getElementById('abmNombre').value.trim();
+        const planta = document.getElementById('abmPlanta').value;
+        const tipoHorario = document.getElementById('abmTipoHorario').value;
+        const reqText = document.getElementById('abmDotacion').value;
+        const requiereDotacion = (reqText === "Sí") ? 1 : 0;
+
+        if (!nombre || !planta || !tipoHorario) {
+            alert("Complete todos los campos obligatorios");
+            return;
+        }
+
+        const payload = {
+            modo: idRegistroActual ? "modificar" : "insertar",
+            id: idRegistroActual,
+            datos: {
+                nombre_sector: nombre,
+                planta: planta,
+                tipo_horario: tipoHorario,
+                requiere_dotacion: requiereDotacion
+            }
+        };
+
+        const res = await fetch('/api/sectores/guardar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.status === 'ok') {
+            cerrarModalAbm();
+            cargarDatos();
+        } else {
+            alert(data.message || "Error al guardar el sector.");
+        }
+    }
+
+    function cerrarModalAbm() {
+        document.getElementById('modalAbm').style.display = 'none';
+    }
+
+    window.onload = cargarDatos;
+</script>
+</body>
+</html>

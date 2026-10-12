@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alistamiento / Fin de semana - Chocolates</title>
+    <link rel="stylesheet" href="/archivos/hchocofindevista.css"></head>
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+<body>
+
+    <!-- Barra Superior -->
+    <div class="top-bar">
+        <button class="btn-accion" onclick="guardarDatosFinde()">Guardar</button>
+        <button class="btn-accion" onclick="agregarDiaDialogo()">+ Agregar Día</button>
+        <button class="btn-accion btn-cerrar" onclick="cerrarVentana()">Cerrar</button>
+        
+        <span class="semana-label">Semana:</span>
+        <input type="text" id="inputSemana" class="semana-input" readonly>
+    </div>
+
+    <!-- Contenedor Principal de Días -->
+    <div class="grid-dias" id="gridDias"></div>
+<script>
+        const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+        const TURNOS_FINDE = ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00", "00:00 a 06:00"];
+
+        let datosGlobalesFinde = {};
+        let semanaActualGlobal = "";
+
+        async function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            semanaActualGlobal = urlParams.get('semana') || "";
+
+            await cargarDatos();
+        }
+
+        async function cargarDatos() {
+            try {
+                const res = await fetch(`/api/hchoco/finde/datos?semana=${semanaActualGlobal}`);
+                datosGlobalesFinde = await res.json();
+
+                semanaActualGlobal = datosGlobalesFinde.semana || semanaActualGlobal;
+                const inputSemana = document.getElementById('inputSemana');
+                if (inputSemana) {
+                    inputSemana.value = semanaActualGlobal;
+                }
+
+                renderizarUI();
+            } catch (error) {
+                console.error("Error al cargar datos de fin de semana:", error);
+                alert("Error al conectar con el servidor para cargar los datos de Fin de Semana.");
+            }
+        }
+
+        function renderizarUI() {
+            const grid = document.getElementById('gridDias');
+            if (!grid) return;
+            grid.innerHTML = "";
+
+            const registrosPorDia = {};
+
+            if (datosGlobalesFinde.asignados_finde && datosGlobalesFinde.asignados_finde.length > 0) {
+                datosGlobalesFinde.asignados_finde.forEach(([id_op, operario, dia, horario, sector]) => {
+                    const diaNombre = dia || "Sábado";
+                    if (!registrosPorDia[diaNombre]) {
+                        registrosPorDia[diaNombre] = [];
+                    }
+                    registrosPorDia[diaNombre].push({ id_op, operario, horario, sector });
+                });
+            } else {
+                registrosPorDia["Sábado"] = [];
+                registrosPorDia["Domingo"] = [];
+            }
+
+            Object.entries(registrosPorDia).forEach(([diaNombre, filas]) => {
+                crearContenedorDia(diaNombre, filas);
+            });
+        }
+
+        function crearContenedorDia(nombreDia, filas = []) {
+            const grid = document.getElementById('gridDias');
+            if (!grid) return;
+
+            const card = document.createElement('div');
+            card.className = "dia-card";
+            card.dataset.diaOriginal = nombreDia;
+
+            let optionsDias = "";
+            DIAS_SEMANA.forEach(d => {
+                optionsDias += `<option value="${d}" ${nombreDia.startsWith(d) ? 'selected' : ''}>${d}</option>`;
+            });
+
+            card.innerHTML = `
+                <div class="dia-header">
+                    <select class="select-dia-nombre">${optionsDias}</select>
+                    <span class="btn-eliminar-dia" onclick="this.closest('.dia-card').remove(); actualizarComboboxes();" title="Eliminar bloque de día">✕</span>
+                </div>
+                <div class="table-header">
+                    <div class="col-id-head">ID</div>
+                    <div class="col-op-head">OPERARIO</div>
+                    <div class="col-hor-head">HORARIO</div>
+                    <div class="col-sec-head">SECTOR</div>
+                    <div class="col-act-head">ACCIÓN</div>
+                </div>
+                <div class="filas-container" id="container_${nombreDia}"></div>
+                <button class="btn-accion btn-agregar-reg" onclick="agregarFila('${nombreDia}')">+ Agregar Registro</button>
+            `;
+
+            grid.appendChild(card);
+
+            if (filas.length > 0) {
+                filas.forEach(f => {
+                    agregarFila(nombreDia, f.id_op, f.operario, f.horario, f.sector);
+                });
+            } else {
+                agregarFila(nombreDia);
+            }
+        }
+
+        function agregarFila(nombreDia, idVal = "", opVal = "", horVal = "", secVal = "") {
+            const container = document.getElementById(`container_${nombreDia}`);
+            if (!container) return;
+
+            const filaDiv = document.createElement('div');
+            filaDiv.className = "fila-finde";
+
+            const inputId = document.createElement('input');
+            inputId.type = "text";
+            inputId.className = "input-id";
+            inputId.value = idVal;
+            inputId.readOnly = true;
+
+            const selectOp = document.createElement('select');
+            selectOp.className = "select-op";
+            selectOp.onchange = (e) => {
+                const nombreSel = e.target.value;
+                const operarios = datosGlobalesFinde.operarios_disponibles || [];
+                const encontrada = operarios.find(([id, nom]) => nom === nombreSel);
+                inputId.value = encontrada ? encontrada[0] : "";
+                actualizarComboboxes();
+            };
+
+            const selectHor = document.createElement('select');
+            selectHor.className = "select-hor";
+            selectHor.innerHTML = `<option value="">-- Horario --</option>`;
+            TURNOS_FINDE.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                if (t === horVal) opt.selected = true;
+                selectHor.appendChild(opt);
+            });
+        const selectSec = document.createElement('select');
+            selectSec.className = "select-sec";
+            selectSec.innerHTML = `<option value="">-- Sector --</option>`;
+            const sectoresBD = datosGlobalesFinde.sectores || [];
+            
+            sectoresBD.forEach(s => {
+                let nombreSector = "";
+                if (typeof s === 'string') {
+                    nombreSector = s;
+                } else if (Array.isArray(s)) {
+                    nombreSector = s[0];
+                } else if (s && typeof s === 'object') {
+                    nombreSector = s.sector || Object.values(s)[0];
+                }
+                
+                if (nombreSector) {
+                    const opt = document.createElement('option');
+                    opt.value = nombreSector;
+                    opt.textContent = nombreSector;
+                    if (nombreSector === secVal) opt.selected = true;
+                    selectSec.appendChild(opt);
+                }
+            });
+
+            const btnDel = document.createElement('button');
+            btnDel.className = "btn-eliminar-fila";
+            btnDel.textContent = "Eliminar";
+            btnDel.onclick = () => {
+                filaDiv.remove();
+                actualizarComboboxes();
+            };
+
+            filaDiv.appendChild(inputId);
+            filaDiv.appendChild(selectOp);
+            filaDiv.appendChild(selectHor);
+            filaDiv.appendChild(selectSec);
+            filaDiv.appendChild(btnDel);
+
+            container.appendChild(filaDiv);
+
+            poblarSelectOperario(selectOp, opVal);
+        }
+
+        function poblarSelectOperario(selectOp, valorActual = "") {
+            selectOp.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
+            const disponibles = datosGlobalesFinde.operarios_disponibles || [];
+
+            disponibles.forEach(([id_op, nombre]) => {
+                const opt = document.createElement('option');
+                opt.value = nombre;
+                opt.textContent = nombre;
+                if (nombre === valorActual) opt.selected = true;
+                selectOp.appendChild(opt);
+            });
+
+            if (valorActual) selectOp.value = valorActual;
+        }
+
+        function actualizarComboboxes() {
+            document.querySelectorAll('.fila-finde').forEach(fila => {
+                const selectOp = fila.querySelector('.select-op');
+                const valActual = selectOp.value;
+                poblarSelectOperario(selectOp, valActual);
+            });
+        }
+
+        function agregarDiaDialogo() {
+            const diasExistentes = Array.from(document.querySelectorAll('.select-dia-nombre')).map(s => s.value);
+            let nuevoDia = DIAS_SEMANA.find(d => !diasExistentes.includes(d));
+
+            if (!nuevoDia) {
+                nuevoDia = "Sábado";
+            }
+
+            const idUnico = `${nuevoDia}_${Date.now()}`;
+            crearContenedorDia(idUnico);
+        }
+
+        async function guardarDatosFinde() {
+            let registros = [];
+
+            document.querySelectorAll('.dia-card').forEach(card => {
+                const diaReal = card.querySelector('.select-dia-nombre').value;
+
+                card.querySelectorAll('.fila-finde').forEach(fila => {
+                    const idVal = fila.querySelector('.input-id').value;
+                    const horVal = fila.querySelector('.select-hor').value;
+                    const secVal = fila.querySelector('.select-sec').value;
+
+                    if (idVal && (horVal || secVal)) {
+                        registros.push([parseInt(idVal), diaReal, horVal, secVal]);
+                    }
+                });
+            });
+
+            try {
+                const res = await fetch('/api/hchoco/finde/guardar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ semana: semanaActualGlobal, registros: registros })
+                });
+
+                const r = await res.json();
+                if (r.status === 'ok') {
+                    alert("Datos de Fin de Semana guardados correctamente.");
+                    await cargarDatos(); // Recarga limpia desde la API
+                } else {
+                    alert("Error al guardar los datos de Fin de Semana.");
+                }
+            } catch (error) {
+                console.error("Error al guardar:", error);
+                alert("Ocurrió un error al intentar guardar los datos.");
+            }
+        }
+
+        function cerrarVentana() {
+            window.location.href = `/hchoco?semana=${semanaActualGlobal}`;
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+/* ==========================================
+   Estilos de Vista - Módulos de Planta (Chocolates / Golosinas)
+   ========================================== */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f1f5f9;
+    margin: 0;
+    padding: 10px;
+    color: #333;
+}
+
+.top-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 15px;
+}
+
+.btn-accion {
+    background-color: #cfe2f3;
+    color: #003366;
+    border: 1px solid #b0c4de;
+    padding: 6px 14px;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.btn-accion:hover {
+    background-color: #a4c2f4;
+}
+
+.grid-sectores {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    padding: 10px;
+}
+
+.sector-card {
+    background-color: #f0f4f8;
+    border: 2px groove #d0d7de;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.sector-card h3 {
+    margin-top: 0;
+    font-size: 11pt;
+    color: #00264d;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 5px;
+}
+
+.turno-box {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 8px;
+    margin-top: 8px;
+}
+
+.turno-box h4 {
+    margin: 0 0 6px 0;
+    font-size: 9.5pt;
+    color: #004080;
+}
+
+.fila-operario {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.fila-operario input[type="text"] {
+    width: 35px;
+    min-width: 35px;
+    text-align: center;
+    padding: 3px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.fila-operario select {
+    flex: 1;
+    width: 0;
+    padding: 3px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: #ffffff;
+}
+
+.btn-eliminar {
+    background-color: #ffcccc;
+    color: #990000;
+    border: none;
+    padding: 3px 8px;
+    font-weight: bold;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-eliminar:hover {
+    background-color: #ffb3b3;
+}

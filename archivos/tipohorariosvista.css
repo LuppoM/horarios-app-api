@@ -1,0 +1,171 @@
+/* Estilos específicos para Tipos de Horario (tipohorariosvista.css) */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #e06d6d;
+    margin: 0;
+    padding: 15px;
+    color: #333;
+}
+
+.titulo-pantalla {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #003366;
+    margin-bottom: 15px;
+}
+
+/* Toolstrip con altura de 70px tal como en tipohorariosvista_2.py */
+.toolstrip {
+    background-color: #dde6ed;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    border-radius: 6px;
+    gap: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.btn-toolstrip {
+    background-color: #cfe2f3;
+    color: #003366;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 12pt;
+    font-weight: bold;
+    border: none;
+    padding: 8px 16px;
+    width: 140px;
+    height: 40px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-toolstrip:hover {
+    background-color: #a4c2f4;
+}
+
+/* Contenedor y tabla adaptados */
+.tabla-frame {
+    background-color: #ffffff;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    overflow: hidden;
+    margin-top: 15px;
+    padding: 15px;
+}
+
+.tabla-contenedor {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+}
+
+th {
+    background-color: #d9e1f2;
+    color: #003366;
+    font-weight: bold;
+    padding: 10px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+}
+
+td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+tr:hover {
+    background-color: #f5f9fc;
+    cursor: pointer;
+}
+
+tr.selected {
+    background-color: #cfe2f3 !important;
+}
+
+/* Proporciones de columnas exactas: ID (80px), Tipo (250px), Horarios (500px) */
+table th:nth-child(1), table td:nth-child(1) {
+    width: 80px;
+    text-align: center;
+}
+
+table th:nth-child(2), table td:nth-child(2) {
+    width: 250px;
+}
+
+table th:nth-child(3), table td:nth-child(3) {
+    width: 500px;
+}
+
+/* Estilos de Modales Flotantes */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.modal-content {
+    background-color: #ffffff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    color: #003366;
+    font-size: 13pt;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #dde6ed;
+    padding-bottom: 8px;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-confirm {
+    background-color: #cfe2f3;
+    color: #003366;
+    border: 1px solid #b0c4de;
+    padding: 6px 16px;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-confirm:hover {
+    background-color: #a4c2f4;
+}
+
+.btn-cancel {
+    background-color: #ffc7ce;
+    color: #9c0006;
+    border: 1px solid #ffb6c1;
+    padding: 6px 16px;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-cancel:hover {
+    background-color: #ffb1bc;
+}

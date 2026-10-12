@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pydantic
+reportlab
+a2wsgi
+psycopg2-binary

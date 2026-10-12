@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mano de obra directa</title>
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+    <link rel="stylesheet" href="/archivos/modmoivista.css">
+</head>
+<body>
+
+    <div class="titulo-pantalla">GESTION DE MANO DE OBRA DIRECTA</div>
+
+    <!-- TOOLSTRIP -->
+    <div class="toolstrip">
+        <button class="btn-toolstrip" onclick="solicitarAccion('agregar')">Agregar</button>
+        <button class="btn-toolstrip" onclick="solicitarAccion('modificar')">Modificar</button>
+        <button class="btn-toolstrip" onclick="solicitarAccion('eliminar')">Eliminar</button>
+        <button class="btn-toolstrip" onclick="exportarExcel()">Exportar a Excel</button>
+        <button class="btn-toolstrip" onclick="location.href='/'">Cerrar</button>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="filtro-frame">
+        <span class="filtro-label-bold">Ver horarios:</span>
+        <select id="comboVista" class="filtro-control" style="width: 130px;" onchange="document.getElementById('comboColumnas').innerHTML=''; cargarDatos();">
+            <option value="Semana">Semana</option>
+            <option value="Fin de Semana">Fin de Semana</option>
+        </select>
+
+        <span class="filtro-label">Columna:</span>
+        <select id="comboColumnas" class="filtro-control" style="width: 200px;"></select>
+
+        <span class="filtro-label">Filtro:</span>
+        <input type="text" id="inputFiltro" class="filtro-control" style="width: 200px;" onkeyup="if(event.key === 'Enter') cargarDatos()">
+    </div>
+
+    <div class="contador-label" id="contadorLabel">MOD (Directa): 0   |   MOI (Indirecta): 0</div>
+
+    <!-- TABLA DE DATOS -->
+    <div class="tabla-frame">
+        <div class="tabla-contenedor">
+            <table>
+                <thead>
+                    <tr id="tablaEncabezados"></tr>
+                </thead>
+                <tbody id="tablaCuerpo"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONTRASEÑA -->
+    <div id="modalPassword" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Ingrese contraseña</h3>
+            <label style="font-size: 11pt;">Contraseña:</label>
+            <input type="password" id="inputPassword" style="width: 100%; box-sizing: border-box; margin-top: 5px; padding: 4px;" onkeyup="if(event.key==='Enter') verificarPassword()">
+            <div class="modal-buttons">
+                <button class="btn-confirm" onclick="verificarPassword()">Aceptar</button>
+                <button class="btn-cancel" onclick="document.getElementById('modalPassword').style.display='none'">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ABM (FORMULARIO AGREGAR / MODIFICAR) -->
+    <div id="modalAbm" class="modal-overlay">
+        <div class="modal-content" style="width: 380px;">
+            <h3 id="abmTitulo">Orden de Trabajo</h3>
+            
+            <div style="margin-bottom: 10px;">
+                <label style="display:block; font-size: 10pt; font-weight:bold;">Calificación Mano de Obra:</label>
+                <select id="abmTipoMo" style="width: 100%; padding: 5px; margin-top: 2px;">
+                    <option value="MOD">MOD</option>
+                    <option value="MOI">MOI</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label style="display:block; font-size: 10pt; font-weight:bold;">Operario:</label>
+                <input type="text" id="abmOperario" style="width: 95%; padding: 5px; margin-top: 2px;">
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label style="display:block; font-size: 10pt; font-weight:bold;">Horario:</label>
+                <select id="abmHorario" style="width: 100%; padding: 5px; margin-top: 2px;">
+                    <option value="06:00 a 14:00">06:00 a 14:00</option>
+                    <option value="14:00 a 22:00">14:00 a 22:00</option>
+                    <option value="22:00 a 06:00">22:00 a 06:00</option>
+                </select>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-confirm" id="btnGuardarAbm" onclick="guardarAbm()">Guardar</button>
+                <button class="btn-cancel" onclick="cerrarModalAbm()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let accesoAutorizado = false;
+        let accionPendiente = null;
+        let filaSeleccionadaIdx = null;
+        let datosOriginales = [];
+        let columnasOriginales = [];
+        let idRegistroActual = null;
+
+        async function cargarDatos() {
+            const vista = document.getElementById('comboVista').value;
+            const comboCol = document.getElementById('comboColumnas');
+            const columna = comboCol.value || '';
+            const filtro = document.getElementById('inputFiltro').value.trim();
+
+            const url = `/api/modmoi/datos?vista=${encodeURIComponent(vista)}&columna=${encodeURIComponent(columna)}&filtro=${encodeURIComponent(filtro)}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                columnasOriginales = data.columnas || [];
+                datosOriginales = data.datos || [];
+
+                document.getElementById('contadorLabel').innerText = `MOD (Directa): ${data.mod || 0}   |   MOI (Indirecta): ${data.moi || 0}`;
+
+                const colSel = comboCol.value;
+                if (comboCol.options.length <= 1) {
+                    comboCol.innerHTML = '<option value="">-- Todas las columnas --</option>';
+                    columnasOriginales.forEach(col => {
+                        const opt = document.createElement('option');
+                        opt.value = col;
+                        opt.innerText = col;
+                        if (col === colSel) opt.selected = true;
+                        comboCol.appendChild(opt);
+                    });
+                }
+
+                document.getElementById('tablaEncabezados').innerHTML = columnasOriginales.map(c => `<th>${c}</th>`).join('');
+
+                document.getElementById('tablaCuerpo').innerHTML = datosOriginales.map((fila, idx) => {
+                    return `<tr onclick="seleccionarFila(${idx}, this)">
+                        ${fila.map(val => `<td>${val !== null ? val : ''}</td>`).join('')}
+                    </tr>`;
+                }).join('');
+
+                filaSeleccionadaIdx = null;
+
+            } catch (err) {
+                console.error("Error cargando datos:", err);
+            }
+        }
+
+        function seleccionarFila(idx, elem) {
+            document.querySelectorAll('#tablaCuerpo tr').forEach(tr => tr.classList.remove('selected'));
+            elem.classList.add('selected');
+            filaSeleccionadaIdx = idx;
+        }
+
+        function solicitarAccion(accion) {
+            accionPendiente = accion;
+            if (accion !== 'agregar' && filaSeleccionadaIdx === null) {
+                alert("Por favor selecciona una fila de la tabla.");
+                return;
+            }
+
+            if (accesoAutorizado) {
+                ejecutarAccion();
+            } else {
+                document.getElementById('modalPassword').style.display = 'flex';
+                document.getElementById('inputPassword').value = '';
+                document.getElementById('inputPassword').focus();
+            }
+        }
+
+        function verificarPassword() {
+            const pass = document.getElementById('inputPassword').value;
+            if (pass === "Mario456") {
+                accesoAutorizado = true;
+                document.getElementById('modalPassword').style.display = 'none';
+                ejecutarAccion();
+            } else {
+                alert("Contraseña incorrecta");
+            }
+        }
+
+        async function ejecutarAccion() {
+            if (accionPendiente === 'agregar') {
+                idRegistroActual = null;
+                document.getElementById('abmTitulo').innerText = "Agregar Orden de Trabajo";
+                document.getElementById('abmTipoMo').value = "MOD";
+                document.getElementById('abmOperario').value = "";
+                document.getElementById('abmHorario').value = "06:00 a 14:00";
+                document.getElementById('modalAbm').style.display = 'flex';
+
+            } else if (accionPendiente === 'modificar') {
+                const fila = datosOriginales[filaSeleccionadaIdx];
+                idRegistroActual = fila[0]; // ID
+
+                // Obtener datos del servidor
+                const res = await fetch(`/api/modmoi/obtener/${idRegistroActual}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                document.getElementById('abmTitulo').innerText = "Modificar Orden de Trabajo";
+                document.getElementById('abmTipoMo').value = data.calificacion_mano_obra || "MOD";
+                document.getElementById('abmOperario').value = data.operario || "";
+                document.getElementById('abmHorario').value = data.horario || "06:00 a 14:00";
+                document.getElementById('modalAbm').style.display = 'flex';
+
+            } else if (accionPendiente === 'eliminar') {
+                const fila = datosOriginales[filaSeleccionadaIdx];
+                idRegistroActual = fila[0];
+                if (confirm(`¿Seguro que deseas eliminar el operario con ID ${idRegistroActual}?`)) {
+                    const res = await fetch(`/api/modmoi/eliminar/${idRegistroActual}`, { method: 'DELETE' });
+                    const resData = await res.json();
+                    if (resData.status === 'ok') {
+                        cargarDatos();
+                    } else {
+                        alert("Error al eliminar: " + resData.message);
+                    }
+                }
+            }
+        }
+
+        async function guardarAbm() {
+            const tipoMo = document.getElementById('abmTipoMo').value;
+            const operario = document.getElementById('abmOperario').value.trim();
+            const horario = document.getElementById('abmHorario').value;
+
+            if (!operario) {
+                alert("El campo operario no puede estar vacío.");
+                return;
+            }
+
+            const payload = {
+                modo: idRegistroActual ? "modificar" : "insertar",
+                id: idRegistroActual,
+                datos: {
+                    calificacion_mano_obra: tipoMo,
+                    operario: operario,
+                    horario: horario
+                }
+            };
+
+            const res = await fetch('/api/modmoi/guardar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (data.status === 'ok') {
+                cerrarModalAbm();
+                cargarDatos();
+            } else {
+                alert(data.message || "Error al guardar los datos.");
+            }
+        }
+
+        function cerrarModalAbm() {
+            document.getElementById('modalAbm').style.display = 'none';
+        }
+
+        function exportarExcel() {
+            const vista = document.getElementById('comboVista').value;
+            const url = `/api/modmoi/exportar-excel?vista=${encodeURIComponent(vista)}`;
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', '');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        window.onload = cargarDatos;
+    </script>
+</body>
+</html>
