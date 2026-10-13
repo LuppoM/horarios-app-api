@@ -41,16 +41,25 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 app.mount("/archivos", StaticFiles(directory=os.path.join(BASE_DIR, "archivos")), name="archivos")
 
 
+def semana_objetivo_por_defecto() -> str:
+    """Semana activa (la próxima semana) según la regla de la planta."""
+    return str(
+        modelo_dtprog.obtener_numero_semana_personalizado(
+            date.today() + timedelta(days=7)
+        )
+    )
+
+
+# ==========================================
+# 1. VISTAS HTML PRINCIPALES (GENERAL)
+# ==========================================
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     modelo_base = modeloprincipal()
     try:
-        # Calculamos la semana objetivo (próxima semana / activa)
-        fecha_proxima = date.today() + timedelta(days=7)
-        semana_actual = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
-
-        # Ejecutamos la limpieza global al cargar el inicio principal de la app
-        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana_actual)
+        # Limpieza global de semanas anteriores sobre la base local (HORARIOS.db)
+        modelo_base.eliminar_datos_semanas_anteriores_local()
     except Exception as e:
         print(f"Error al ejecutar limpieza automatica en el Inicio: {e}")
     finally:
@@ -58,33 +67,43 @@ def home(request: Request):
             modelo_base.cerrar_conexion()
 
     return templates.TemplateResponse(request, "Principal.html", {})
+
+
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
     return templates.TemplateResponse(request, "modmoi.html", {})
+
 
 @app.get("/sectores", response_class=HTMLResponse)
 def vista_sectores(request: Request):
     return templates.TemplateResponse(request, "sectores.html", {})
 
+
 @app.get("/tipohorarios", response_class=HTMLResponse)
+@app.get("/tiposhorarios", response_class=HTMLResponse)
 def vista_tipos_horario(request: Request):
     return templates.TemplateResponse(request, "tipohorarios.html", {})
+
 
 @app.get("/hchoco", response_class=HTMLResponse)
 def vista_hchoco(request: Request):
     return templates.TemplateResponse(request, "hchoco.html", {})
 
+
 @app.get("/dtprogramada", response_class=HTMLResponse)
 def vista_dotacion_programada(request: Request):
     return templates.TemplateResponse(request, "dtprogramada.html", {})
+
 
 @app.get("/hchocofinde", response_class=HTMLResponse)
 def vista_hchocofinde(request: Request):
     return templates.TemplateResponse(request, "hchocofinde.html", {})
 
+
 @app.get("/hgolo", response_class=HTMLResponse)
 def vista_hgolo(request: Request):
     return templates.TemplateResponse(request, "hgolo.html", {})
+
 
 @app.get("/hgolofinde", response_class=HTMLResponse)
 def vista_hgolo_finde(request: Request):
@@ -331,8 +350,8 @@ def api_eliminar_tipo_horario(tipo_id: int):
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: str = None):
     if not semana:
-        semana = str(modelo_dtprog.obtener_numero_semana_personalizado(date.today() + timedelta(days=7)))
-    
+        semana = semana_objetivo_por_defecto()
+
     sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
     sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
     turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
@@ -353,7 +372,7 @@ def api_guardar_dtprogramada(payload: dict = Body(...)):
     datos = payload.get("datos", {})
     if not semana:
         return {"status": "error", "message": "Semana no especificada"}
-    
+
     exito, mensaje = modelo_dtprog.guardar_dotaciones(semana, datos)
     if exito:
         return {"status": "ok"}
@@ -375,8 +394,8 @@ def api_obtener_hchoco(semana: Optional[str] = None):
             fecha_proxima = date.today() + timedelta(days=7)
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
-        # 2. La API ordena explícitamente la limpieza enviando la semana activa
-        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+        # 2. Limpieza de semanas anteriores (usa siempre la semana activa real)
+        modelo_base.eliminar_datos_semanas_anteriores_local()
 
         # 3. Consulta de datos
         sectores = modelo.obtener_sectores_chocolates()
@@ -398,7 +417,7 @@ def api_obtener_hchoco(semana: Optional[str] = None):
             turnos = modelo.obtener_turnos_por_tipo(t_horario)
             if not turnos:
                 turnos = ["08:00 a 16:00"] if t_horario == "CENTRAL" else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
-            
+
             sectores_info.append({
                 "sector": sec,
                 "tipo_horario": t_horario,
@@ -440,7 +459,7 @@ def api_guardar_hchoco(payload: dict = Body(...)):
 
 
 @app.get("/api/hchoco/finde/datos")
-def api_obtener_hchoco_finde(semana: Optional[str] = "42"):
+def api_obtener_hchoco_finde(semana: Optional[str] = None):
     modelo = ModeloHChocoFindeWeb()
     modelo_main = ModeloHChocoWeb()
     modelo_base = modeloprincipal()
@@ -450,12 +469,12 @@ def api_obtener_hchoco_finde(semana: Optional[str] = "42"):
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
         # Limpieza previa para garantizar datos libres en fin de semana
-        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+        modelo_base.eliminar_datos_semanas_anteriores_local()
 
         datos = modelo.obtener_datos_semana_finde(semana)
         operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
         sectores = modelo_main.obtener_sectores_chocolates()
-        
+
         return {
             "semana": semana,
             "asignados_finde": datos,
@@ -476,7 +495,7 @@ def api_obtener_hchoco_finde(semana: Optional[str] = "42"):
 def api_guardar_hchoco_finde(payload: dict = Body(...)):
     semana = payload.get("semana")
     registros = payload.get("registros", [])
-    
+
     modelo = ModeloHChocoFindeWeb()
     try:
         modelo.guardar_datos_finde(semana, registros)
@@ -491,10 +510,13 @@ def api_guardar_hchoco_finde(payload: dict = Body(...)):
 
 
 @app.get("/api/hchoco/exportar-pdf")
-def api_exportar_pdf_hchoco(semana: str = "42"):
+def api_exportar_pdf_hchoco(semana: Optional[str] = None):
+    if not semana:
+        semana = semana_objetivo_por_defecto()
+
     modelo_main = ModeloHChocoWeb()
     modelo_finde = ModeloHChocoFindeWeb()
-    
+
     try:
         output = BytesIO()
         doc = SimpleDocTemplate(
@@ -633,8 +655,8 @@ def api_obtener_hgolo(semana: Optional[str] = None):
             fecha_proxima = date.today() + timedelta(days=7)
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
-        # 2. La API ordena explícitamente la limpieza enviando la semana activa
-        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+        # 2. Limpieza de semanas anteriores (usa siempre la semana activa real)
+        modelo_base.eliminar_datos_semanas_anteriores_local()
 
         # 3. Consulta de datos
         sectores = modelo.obtener_sectores_golosinas()
@@ -656,7 +678,7 @@ def api_obtener_hgolo(semana: Optional[str] = None):
             turnos = modelo.obtener_turnos_por_tipo(t_horario)
             if not turnos:
                 turnos = ["08:00 a 16:00"] if t_horario == "CENTRAL" else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
-            
+
             sectores_info.append({
                 "sector": sec,
                 "tipo_horario": t_horario,
@@ -707,7 +729,7 @@ def api_hgolo_finde_datos(semana: Optional[str] = ""):
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
         # Limpieza previa para garantizar datos libres en fin de semana
-        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+        modelo_base.eliminar_datos_semanas_anteriores_local()
 
         operarios = modelo.obtener_operarios_disponibles(semana)
         sectores = modelo.obtener_sectores()
@@ -729,7 +751,7 @@ async def api_hgolo_finde_guardar(request: Request):
     data = await request.json()
     semana = data.get("semana")
     registros = data.get("registros")
-    
+
     modelo = ModeloHGoloFindeWeb()
     try:
         modelo.guardar_datos_finde(semana, registros)
@@ -741,10 +763,13 @@ async def api_hgolo_finde_guardar(request: Request):
 
 
 @app.get("/api/hgolo/exportar-pdf")
-def api_exportar_pdf_hgolo(semana: str = "42"):
+def api_exportar_pdf_hgolo(semana: Optional[str] = None):
+    if not semana:
+        semana = semana_objetivo_por_defecto()
+
     modelo_main = ModeloHGoloWeb()
     modelo_finde = ModeloHGoloFindeWeb()
-    
+
     try:
         output = BytesIO()
         doc = SimpleDocTemplate(
@@ -847,7 +872,7 @@ def api_exportar_pdf_hgolo(semana: str = "42"):
                         ("FONTSIZE", (0, 0), (-1, 0), 10),
                         ("ALIGN", (0, 0), (0, -1), "LEFT"),
                         ("ALIGN", (1, 0), (-1, -1), "CENTER"),
-                        ("VALIGN", (0, 0), (-1, -1), "CENTER"),
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                         ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
                         ("FONTSIZE", (0, 1), (-1, -1), 9),
                         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
