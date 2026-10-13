@@ -11,10 +11,10 @@ class ModeloHChocoWeb:
         self.cargar_operarios()
 
     def cargar_operarios(self):
-        cursor = self.conexion_db.cursor()
-        cursor.execute("SELECT id, operario FROM modymoi ORDER BY operario ASC")
-        rows = cursor.fetchall()
-        self.operarios_dict = {row[0]: row[1] for row in rows if row[1]}
+    cursor = self.conexion_db.cursor()
+    cursor.execute("SELECT id, operario FROM modymoi ORDER BY operario ASC")
+    rows = cursor.fetchall()
+    self.operarios_dict = {row["id"]: row["operario"] for row in rows if row["operario"]}
 
     def obtener_operarios(self):
         return self.operarios_dict
