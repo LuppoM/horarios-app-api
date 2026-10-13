@@ -71,7 +71,7 @@ class ModeloHChocoWeb:
             print(f"Error dotación teórica: {e}")
             return {}
 
-        def obtener_operarios_disponibles(self, semana):
+            def obtener_operarios_disponibles(self, semana):
         cursor = self.conexion_db.cursor()
         cursor.execute("""
             SELECT id, operario
@@ -85,7 +85,7 @@ class ModeloHChocoWeb:
             ORDER BY operario ASC
         """, (str(semana),))
         return cursor.fetchall()
-
+        
     def obtener_datos_semana(self, semana):
         cursor = self.conexion_db.cursor()
         cursor.execute(
