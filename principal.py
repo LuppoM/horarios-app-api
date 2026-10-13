@@ -376,11 +376,20 @@ def api_obtener_hchoco(semana: Optional[str] = None):
         todos_operarios = modelo.obtener_operarios()
 
         sectores_info = []
-        for sec, tipo, req in sectores:
+        for row in sectores:
+            # Maneja si viene como diccionario o tupla
+            if isinstance(row, dict):
+                sec = row["nombre_sector"]
+                tipo = row["tipo_horario"]
+                req = row["requiere_dotacion"]
+            else:
+                sec, tipo, req = row[0], row[1], row[2]
+
             t_horario = str(tipo).strip().upper() if tipo else "ROTATIVO"
             turnos = modelo.obtener_turnos_por_tipo(t_horario)
             if not turnos:
                 turnos = ["08:00 a 16:00"] if t_horario == "CENTRAL" else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+            
             sectores_info.append({
                 "sector": sec,
                 "tipo_horario": t_horario,
@@ -401,7 +410,8 @@ def api_obtener_hchoco(semana: Optional[str] = None):
         return {"error": str(e)}
     finally:
         modelo.cerrar_conexion()
-        modelo_base.cerrar_conexion()
+        if hasattr(modelo_base, 'cerrar_conexion'):
+            modelo_base.cerrar_conexion()
     
 
 @app.post("/api/hchoco/guardar")
