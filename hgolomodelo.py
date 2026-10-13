@@ -20,7 +20,6 @@ def _filas(cursor):
 class ModeloHGolo(modeloprincipal):
 
     def __init__(self, conexion=None):
-        # Mantiene la inicialización heredada y/o la instanciación de conexión
         super().__init__()
         if conexion:
             self.conexion_db = conexion
@@ -119,7 +118,13 @@ class ModeloHGolo(modeloprincipal):
         return asignados
 
     def obtener_operarios_disponibles(self, semana=None):
-        """Devuelve los operarios que no tienen sector ni horario cargados"""
+        """Ejecuta la limpieza remota de semanas anteriores y devuelve los operarios 
+        cuyo Horario, Sector y Planta están libres.
+        """
+        if semana:
+            # Invoca a la limpieza heredada de modeloprincipal
+            self.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -134,7 +139,10 @@ class ModeloHGolo(modeloprincipal):
         return _filas(cursor)
 
     def obtener_datos_semana(self, semana):
-        """Devuelve los datos de los operarios para una semana y planta 'Golosinas'"""
+        """Ejecuta la limpieza previa y devuelve los operarios asignados a Golosinas"""
+        if semana:
+            self.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -148,7 +156,7 @@ class ModeloHGolo(modeloprincipal):
         return _filas(cursor)
 
     def guardar_operario(self, id_val, operario, horario, sector, semana):
-        """Realiza el UPDATE directo a la fila fija del operario en modymoi"""
+        """Realiza el UPDATE directo a las columnas "Horario", "Sector", "Planta" y semana"""
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -165,7 +173,7 @@ class ModeloHGolo(modeloprincipal):
             self.operarios_asignados[semana].add(id_val)
 
     def limpiar_operario(self, id_val):
-        """Elimina la asignación de un operario dejando en blanco su horario, sector y planta"""
+        """Elimina la asignación de un operario blanqueando Horario, Sector y Planta"""
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -181,10 +189,7 @@ class ModeloHGolo(modeloprincipal):
             asignados.discard(id_val)
 
     def guardar_datos_semana(self, semana, registros_pantalla):
-        """
-        Guarda la grilla semanal reutilizando limpiar_operario y guardar_operario.
-        `registros_pantalla` es una lista de tuplas: (id_operario, operario_nombre, horario, sector)
-        """
+        """Guarda la grilla semanal reutilizando limpiar_operario y guardar_operario."""
         cursor = self.conexion_db.cursor()
         sem_val = str(semana).strip()
 
