@@ -431,10 +431,18 @@ def api_guardar_hchoco(payload: dict = Body(...)):
 
 
 @app.get("/api/hchoco/finde/datos")
-def api_obtener_hchoco_finde(semana: str = "42"):
+def api_obtener_hchoco_finde(semana: Optional[str] = "42"):
     modelo = ModeloHChocoFindeWeb()
     modelo_main = ModeloHChocoWeb()
+    modelo_base = modeloprincipal()
     try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            fecha_proxima = date.today() + timedelta(days=7)
+            semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
+
+        # Limpieza previa para garantizar datos libres en fin de semana
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
         datos = modelo.obtener_datos_semana_finde(semana)
         operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
         sectores = modelo_main.obtener_sectores_chocolates()
@@ -451,6 +459,8 @@ def api_obtener_hchoco_finde(semana: str = "42"):
     finally:
         modelo.cerrar_conexion()
         modelo_main.cerrar_conexion()
+        if hasattr(modelo_base, 'cerrar_conexion'):
+            modelo_base.cerrar_conexion()
 
 
 @app.post("/api/hchoco/finde/guardar")
@@ -679,9 +689,17 @@ def api_guardar_hgolo(payload: dict = Body(...)):
 
 
 @app.get("/api/hgolo/finde/datos")
-def api_hgolo_finde_datos(semana: str = ""):
+def api_hgolo_finde_datos(semana: Optional[str] = ""):
     modelo = ModeloHGoloFindeWeb()
+    modelo_base = modeloprincipal()
     try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            fecha_proxima = date.today() + timedelta(days=7)
+            semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
+
+        # Limpieza previa para garantizar datos libres en fin de semana
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
         operarios = modelo.obtener_operarios_disponibles(semana)
         sectores = modelo.obtener_sectores()
         asignados = modelo.obtener_datos_semana_finde(semana)
@@ -693,6 +711,8 @@ def api_hgolo_finde_datos(semana: str = ""):
         }
     finally:
         modelo.cerrar_conexion()
+        if hasattr(modelo_base, 'cerrar_conexion'):
+            modelo_base.cerrar_conexion()
 
 
 @app.post("/api/hgolo/finde/guardar")
@@ -818,7 +838,7 @@ def api_exportar_pdf_hgolo(semana: str = "42"):
                         ("FONTSIZE", (0, 0), (-1, 0), 10),
                         ("ALIGN", (0, 0), (0, -1), "LEFT"),
                         ("ALIGN", (1, 0), (-1, -1), "CENTER"),
-                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ("VALIGN", (0, 0), (-1, -1), "CENTER"),
                         ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
                         ("FONTSIZE", (0, 1), (-1, -1), 9),
                         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
