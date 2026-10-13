@@ -143,7 +143,7 @@
 
             let nombreFinal = operarioVal;
             if ((!nombreFinal || nombreFinal.trim() === "") && idVal) {
-                nombreFinal = datosGlobales.operarios[idVal] || "";
+                nombreFinal = (datosGlobales.operarios && datosGlobales.operarios[idVal]) || "";
             }
 
             const filaDiv = document.createElement('div');
@@ -157,8 +157,18 @@
             const selectOp = document.createElement('select');
             selectOp.onchange = (e) => {
                 const nombreSel = e.target.value;
-                const encontrada = Object.entries(datosGlobales.operarios || {}).find(([id, nom]) => nom === nombreSel);
-                inputId.value = encontrada ? encontrada[0] : "";
+                const disponibles = datosGlobales.operarios_disponibles || [];
+                const encontrada = disponibles.find(item => {
+                    const nom = Array.isArray(item) ? item[1] : item.operario;
+                    return nom === nombreSel;
+                });
+
+                if (encontrada) {
+                    inputId.value = Array.isArray(encontrada) ? encontrada[0] : encontrada.id;
+                } else {
+                    const deTodos = Object.entries(datosGlobales.operarios || {}).find(([id, nom]) => nom === nombreSel);
+                    inputId.value = deTodos ? deTodos[0] : "";
+                }
                 actualizarOpcionesSelects();
             };
 
@@ -175,6 +185,7 @@
             filaDiv.appendChild(btnDel);
 
             container.appendChild(filaDiv);
+            
             actualizarOpcionesSelects();
 
             if(nombreFinal) {
@@ -188,13 +199,15 @@
                 if (sel.value) seleccionadosEnPantalla.add(sel.value);
             });
 
+            const libres = datosGlobales.operarios_disponibles || [];
+
             document.querySelectorAll('.fila-operario select').forEach(sel => {
                 const valorActual = sel.value; 
                 sel.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
 
-                const listaOperarios = Object.entries(datosGlobales.operarios || {});
-                
-                listaOperarios.forEach(([id_op, nombre]) => {
+                libres.forEach(item => {
+                    const nombre = Array.isArray(item) ? item[1] : item.operario;
+
                     if (!seleccionadosEnPantalla.has(nombre) || nombre === valorActual) {
                         const opt = document.createElement('option');
                         opt.value = nombre;
@@ -205,7 +218,15 @@
                         sel.appendChild(opt);
                     }
                 });
-                
+
+                if (valorActual && !Array.from(sel.options).some(o => o.value === valorActual)) {
+                    const opt = document.createElement('option');
+                    opt.value = valorActual;
+                    opt.textContent = valorActual;
+                    opt.selected = true;
+                    sel.appendChild(opt);
+                }
+
                 if (valorActual) {
                     sel.value = valorActual;
                 }
