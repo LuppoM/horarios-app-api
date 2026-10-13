@@ -69,9 +69,9 @@ class ModeloHChocoWeb:
             """
             SELECT id, operario
             FROM modymoi
-            WHERE COALESCE(TRIM(horario), '') = ''
-              AND COALESCE(TRIM(sector), '') = ''
-              AND COALESCE(TRIM(planta), '') = ''
+            WHERE COALESCE(TRIM("Horario"), '') = ''
+              AND COALESCE(TRIM("Sector"), '') = ''
+              AND COALESCE(TRIM("Planta"), '') = ''
               AND operario IS NOT NULL AND TRIM(operario) != ''
             ORDER BY operario ASC
             """
@@ -87,10 +87,10 @@ class ModeloHChocoWeb:
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
-            SELECT id, operario, horario, sector
+            SELECT id, operario, "Horario", "Sector"
             FROM modymoi
-            WHERE semana = %s AND (planta = 'Chocolates' OR planta = 'Chocolate')
-            AND sector IS NOT NULL AND TRIM(sector) != ''
+            WHERE semana = %s AND ("Planta" = 'Chocolates' OR "Planta" = 'Chocolate')
+            AND "Sector" IS NOT NULL AND TRIM("Sector") != ''
             """,
             (str(semana),),
         )
@@ -104,7 +104,7 @@ class ModeloHChocoWeb:
             """
             SELECT id
             FROM modymoi
-            WHERE semana = %s AND LOWER(TRIM(planta)) IN ('chocolates', 'chocolate')
+            WHERE semana = %s AND LOWER(TRIM("Planta")) IN ('chocolates', 'chocolate')
             """,
             (sem_val,),
         )
@@ -114,7 +114,7 @@ class ModeloHChocoWeb:
         ids_a_limpiar = ids_previos_en_bd - ids_actuales_en_pantalla
         for id_old in ids_a_limpiar:
             cursor.execute(
-                "UPDATE modymoi SET horario = '', sector = '', planta = '' WHERE id = %s",
+                'UPDATE modymoi SET "Horario" = \'\', "Sector" = \'\', "Planta" = \'\' WHERE id = %s',
                 (id_old,),
             )
 
@@ -122,8 +122,8 @@ class ModeloHChocoWeb:
             cursor.execute(
                 """
                 UPDATE modymoi
-                SET operario = %s, horario = %s, sector = %s,
-                    planta = 'Chocolates', semana = %s
+                SET operario = %s, "Horario" = %s, "Sector" = %s,
+                    "Planta" = 'Chocolates', semana = %s
                 WHERE id = %s
                 """,
                 (operario_nombre, turno, sector, sem_val, id_op),
