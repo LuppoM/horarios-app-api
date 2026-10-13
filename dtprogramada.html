@@ -57,11 +57,9 @@
         let semanaUrl = urlParams.get('semana');
 
         const inputSemana = document.getElementById('inputSemana');
-        if (semanaUrl) {
-            inputSemana.value = semanaUrl;
-        } else {
-            inputSemana.value = "41";
-        }
+         if (semanaUrl) {
+        inputSemana.value = semanaUrl;
+    }
 
         await cargarDatos();
     }
