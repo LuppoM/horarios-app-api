@@ -56,38 +56,35 @@ def home(request: Request):
 
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
-    return templates.TemplateResponse("modmoi.html", {"request": request})
-
+    return templates.TemplateResponse(request, "modmoi.html", {})
 
 @app.get("/sectores", response_class=HTMLResponse)
 def vista_sectores(request: Request):
-    return templates.TemplateResponse("sectores.html", {"request": request})
-
+    return templates.TemplateResponse(request, "sectores.html", {})
 
 @app.get("/tiposhorarios", response_class=HTMLResponse)
 def vista_tipos_horario(request: Request):
-    return templates.TemplateResponse("tipohorarios.html", {"request": request})
+    return templates.TemplateResponse(request, "tipohorarios.html", {})
 
 @app.get("/hchoco", response_class=HTMLResponse)
 def vista_hchoco(request: Request):
-    return templates.TemplateResponse("hchoco.html", {"request": request})
+    return templates.TemplateResponse(request, "hchoco.html", {})
 
 @app.get("/dtprogramada", response_class=HTMLResponse)
 def vista_dotacion_programada(request: Request):
-    return templates.TemplateResponse("dtprogramada.html", {"request": request})
+    return templates.TemplateResponse(request, "dtprogramada.html", {})
 
 @app.get("/hchocofinde", response_class=HTMLResponse)
 def vista_hchocofinde(request: Request):
-    return templates.TemplateResponse("hchocofinde.html", {"request": request})
+    return templates.TemplateResponse(request, "hchocofinde.html", {})
 
 @app.get("/hgolo", response_class=HTMLResponse)
 def vista_hgolo(request: Request):
-    return templates.TemplateResponse("hgolo.html", {"request": request})
+    return templates.TemplateResponse(request, "hgolo.html", {})
 
 @app.get("/hgolofinde", response_class=HTMLResponse)
 def vista_hgolo_finde(request: Request):
-    return templates.TemplateResponse("hgolofinde.html", {"request": request})
-
+    return templates.TemplateResponse(request, "hgolofinde.html", {})
 
 # ==========================================
 # 2. MÓDULO: MANO DE OBRA (MOD/MOI)
