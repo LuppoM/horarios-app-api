@@ -77,7 +77,15 @@ def vista_modmoi(request: Request):
 @app.get("/sectores", response_class=HTMLResponse)
 def vista_sectores(request: Request):
     return templates.TemplateResponse(request, "sectores.html", {})
-
+    
+@app.post("/api/modmoi/limpiar-semanas")
+def api_limpiar_semanas_manual():
+    try:
+        # Usa el método recién agregado que conecta con la limpieza de principalmodelo
+        modmoi_modelo.limpiar_semanas_anteriores()
+        return {"status": "ok", "message": "Puestos blanqueados correctamente en Supabase."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/tipohorarios", response_class=HTMLResponse)
 @app.get("/tiposhorarios", response_class=HTMLResponse)
