@@ -52,8 +52,8 @@ app.mount("/archivos", StaticFiles(directory="."), name="archivos")
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse("principal.html", {"request": request})
-
+    # ✅ AHORA (forma correcta en las versiones actuales):
+return templates.TemplateResponse(request, "principal.html", {})
 
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
