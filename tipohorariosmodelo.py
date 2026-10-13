@@ -15,7 +15,19 @@ def obtener_tipos_horarios():
             ORDER BY id ASC
         """)
         filas = cursor.fetchall()
-        return filas
+
+        # Convertimos RealDictCursor a lista de listas para la tabla web
+        datos = []
+        for f in filas:
+            if isinstance(f, dict):
+                datos.append([
+                    f.get("id"),
+                    f.get("tipo"),
+                    f.get("horarios_definidos")
+                ])
+            else:
+                datos.append(list(f))
+        return datos
     except Exception as e:
         if hasattr(conn, 'rollback'):
             conn.rollback()
