@@ -361,13 +361,15 @@ def api_obtener_hchoco(semana: Optional[str] = None):
     modelo = ModeloHChocoWeb()
     modelo_base = modeloprincipal()
     try:
-        # Ejecuta la limpieza de semanas pasadas en modymoi y otras tablas[cite: 4]
-        modelo_base.eliminar_datos_semanas_anteriores()
-
+        # 1. Resolver la semana solicitada o calcular la próxima
         if not semana or semana.lower() == "none" or semana.strip() == "":
             fecha_proxima = date.today() + timedelta(days=7)
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
+        # 2. La API ordena explícitamente la limpieza enviando la semana activa
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
+        # 3. Consulta de datos
         sectores = modelo.obtener_sectores_chocolates()
         dotacion_teorica = modelo.obtener_dotacion_teorica(semana)
         datos_guardados = modelo.obtener_datos_semana(semana)
@@ -607,13 +609,15 @@ def api_obtener_hgolo(semana: Optional[str] = None):
     modelo = ModeloHGoloWeb()
     modelo_base = modeloprincipal()
     try:
-        # Ejecuta la limpieza de semanas pasadas en modymoi y otras tablas[cite: 4]
-        modelo_base.eliminar_datos_semanas_anteriores()
-
+        # 1. Resolver la semana solicitada o calcular la próxima
         if not semana or semana.lower() == "none" or semana.strip() == "":
             fecha_proxima = date.today() + timedelta(days=7)
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
+        # 2. La API ordena explícitamente la limpieza enviando la semana activa
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
+        # 3. Consulta de datos
         sectores = modelo.obtener_sectores_golosinas()
         dotacion_teorica = modelo.obtener_dotacion_teorica(semana)
         datos_guardados = modelo.obtener_datos_semana(semana)
