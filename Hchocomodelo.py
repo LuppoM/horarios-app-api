@@ -59,7 +59,7 @@ class Modelohchoco(modeloprincipal):
             return []
 
     def obtener_turnos_por_tipo(self, tipo_horario):
-        """Busca en la base de datos los turnos asociados al tipo de horario usando la tabla tipohorario y la columna horarios_definidos"""
+        """Busca en la base de datos los turnos asociados al tipo de horario usando la tabla tipohorario"""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
@@ -119,7 +119,13 @@ class Modelohchoco(modeloprincipal):
         return asignados
 
     def obtener_operarios_disponibles(self, semana=None):
-        """Devuelve los operarios que no tienen sector ni horario cargados"""
+        """Ejecuta la limpieza remota de semanas anteriores y devuelve los operarios
+        cuyo Horario, Sector y Planta están libres.
+        """
+        if semana:
+            # Invoca la limpieza heredada de modeloprincipal
+            self.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -134,7 +140,10 @@ class Modelohchoco(modeloprincipal):
         return _filas(cursor)
 
     def obtener_datos_semana(self, semana):
-        """Devuelve los datos semanales de los operarios para 'Chocolates'"""
+        """Ejecuta la limpieza previa y devuelve los operarios asignados a Chocolates"""
+        if semana:
+            self.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -168,7 +177,7 @@ class Modelohchoco(modeloprincipal):
         return _filas(cursor)
 
     def guardar_operario(self, id_val, operario, horario, sector, semana):
-        """Guarda o actualiza un operario en la base de datos"""
+        """Guarda o actualiza las columnas "Horario", "Sector", "Planta" y semana"""
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -185,7 +194,7 @@ class Modelohchoco(modeloprincipal):
             self.operarios_asignados[semana].add(id_val)
 
     def limpiar_operario(self, id_val):
-        """Elimina la asignación de un operario"""
+        """Elimina la asignación de un operario blanqueando Horario, Sector y Planta"""
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -201,10 +210,7 @@ class Modelohchoco(modeloprincipal):
             asignados.discard(id_val)
 
     def guardar_datos_semana(self, semana, registros_pantalla):
-        """
-        Guarda la grilla semanal reutilizando limpiar_operario y guardar_operario.
-        `registros_pantalla` es una lista de tuplas: (id_operario, operario_nombre, horario, sector)
-        """
+        """Guarda la grilla semanal reutilizando limpiar_operario y guardar_operario."""
         cursor = self.conexion_db.cursor()
         sem_val = str(semana).strip()
 
