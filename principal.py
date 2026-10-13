@@ -62,7 +62,7 @@ def vista_modmoi(request: Request):
 def vista_sectores(request: Request):
     return templates.TemplateResponse(request, "sectores.html", {})
 
-@app.get("/tiposhorarios", response_class=HTMLResponse)
+@app.get("/tipohorarios", response_class=HTMLResponse)
 def vista_tipos_horario(request: Request):
     return templates.TemplateResponse(request, "tipohorarios.html", {})
 
