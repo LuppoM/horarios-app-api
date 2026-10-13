@@ -84,14 +84,26 @@ class ModeloHChocoWeb:
                 (str(semana),),
             )
             resultados = {}
-            for row in cursor.fetchall():
-                sector = row[0] if not isinstance(row, dict) else row["sector"]
-                rango = row[1] if not isinstance(row, dict) else row["rango_horario"]
-                cantidad = row[2] if not isinstance(row, dict) else row["cantidad_operarios"]
+            rows = cursor.fetchall() or []
+            
+            for row in rows:
+                # Manejamos si devuelve tupla o diccionario, tomando los campos exactos
+                if isinstance(row, dict):
+                    sector = row["sector"]
+                    rango = row["rango_horario"]
+                    cantidad = row["cantidad_operarios"]
+                else:
+                    # Si trae más de 3 columnas (por ejemplo id, sector, rango, cantidad),
+                    # tomamos las últimas o las específicas por posición:
+                    if len(row) == 4:
+                        _, sector, rango, cantidad = row
+                    else:
+                        sector, rango, cantidad = row[:3]
 
                 if sector not in resultados:
                     resultados[sector] = {}
                 resultados[sector][rango] = cantidad
+                
             return resultados
         except Exception as e:
             print(f"Error dotación teórica: {e}")
