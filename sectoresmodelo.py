@@ -15,7 +15,21 @@ def obtener_sectores():
             ORDER BY id ASC
         """)
         filas = cursor.fetchall()
-        return filas
+        
+        # Convertimos RealDictCursor a lista de tuplas/listas para el frontend
+        datos = []
+        for f in filas:
+            if isinstance(f, dict):
+                datos.append([
+                    f.get("id"),
+                    f.get("nombre_sector"),
+                    f.get("planta"),
+                    f.get("tipo_horario"),
+                    f.get("requiere_dotacion")
+                ])
+            else:
+                datos.append(list(f))
+        return datos
     except Exception as e:
         if hasattr(conn, 'rollback'):
             conn.rollback()
@@ -37,8 +51,7 @@ def obtener_sector_por_id(sector_id):
         fila = cursor.fetchone()
         if not fila:
             return None
-        
-        # Manejo por si la fila retorna diccionario o tupla
+
         if isinstance(fila, dict):
             return {
                 "id": fila.get("id"),
@@ -69,7 +82,7 @@ def obtener_tipos_horario():
     try:
         cursor.execute("SELECT tipo FROM tipohorario ORDER BY tipo ASC")
         filas = cursor.fetchall()
-        
+
         tipos = []
         for f in filas:
             if isinstance(f, dict):
@@ -114,7 +127,7 @@ def modificar_sector(sector_id, datos):
         nombre_sector = datos.get("nombre_sector") or datos.get("nombre")
         planta = datos.get("planta")
         tipo_horario = datos.get("tipo_horario")
-        
+
         req_dot = datos.get("requiere_dotacion", 1)
         if isinstance(req_dot, str):
             requiere_dotacion = 1 if req_dot.lower() in ["1", "true", "si", "on"] else 0
@@ -126,7 +139,7 @@ def modificar_sector(sector_id, datos):
             SET nombre_sector = %s, planta = %s, tipo_horario = %s, requiere_dotacion = %s
             WHERE id = %s
         """, (nombre_sector, planta, tipo_horario, requiere_dotacion, sector_id))
-        
+
         conn.commit()
         return True, "Modificación exitosa"
     except Exception as e:
