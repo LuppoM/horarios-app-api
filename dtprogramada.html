@@ -13,15 +13,11 @@
         <div class="top-bar-left">
             <h2>DOTACIÓN TEÓRICA - HORARIOS POR SECTOR</h2>
             <label style="font-weight: bold;">Semana:</label>
-            <!-- Agregamos onchange="cargarDatos()" para que cargue solo al cambiar el valor -->
             <input type="text" id="inputSemana" style="width: 50px; text-align: center; font-weight: bold; padding: 4px;" onchange="cargarDatos()">
             <button class="btn-accion" onclick="guardarDatos()">Guardar Cambios</button>
         </div>
         <div>
             <button class="btn-accion" style="background-color: #ffc7ce; color: #9c0006;" onclick="location.href='/'">Cerrar</button>
-        </div>
-    </div>
-        <div>
         </div>
     </div>
 
@@ -57,9 +53,9 @@
         let semanaUrl = urlParams.get('semana');
 
         const inputSemana = document.getElementById('inputSemana');
-         if (semanaUrl) {
-        inputSemana.value = semanaUrl;
-    }
+        if (semanaUrl) {
+            inputSemana.value = semanaUrl;
+        }
 
         await cargarDatos();
     }
@@ -85,7 +81,6 @@
         const turnos = datosGlobales.turnos || ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"];
         const cantTurnos = turnos.length;
 
-        // Armar Encabezados dinámicos con los turnos rotativos de la BD y los 5 días de la semana
         let encabezadoHTML = `
             <tr>
                 <th rowspan="2" class="th-sector-vacio">LÍNEA / SECTOR</th>
@@ -104,7 +99,6 @@
         if (headGolo) headGolo.innerHTML = encabezadoHTML;
 
         const dotaciones = datosGlobales.dotaciones || {};
-        // Renderizar dinámicamente los sectores de Chocolates y Golosinas obtenidos de la BD
         renderizarCuerpo('bodyChoco', datosGlobales.sectores_chocolate || [], dotaciones.Chocolate || {}, turnos);
         renderizarCuerpo('bodyGolo', datosGlobales.sectores_golosinas || [], dotaciones.Golosinas || {}, turnos);
     }
@@ -121,25 +115,59 @@
             return;
         }
 
-        sectores.forEach(sector => {
+        sectores.forEach((sector, filaIdx) => {
             const tr = document.createElement('tr');
             
             let html = `<td class="sector-nombre">${sector}</td>`;
 
-            // Inputs para los turnos rotativos (cargados desde la BD)
-            turnos.forEach(turno => {
+            // Inputs habilitados para Tab (turnos)
+            turnos.forEach((turno, tIdx) => {
                 const val = (dotacionPlanta[sector] && dotacionPlanta[sector][turno] !== undefined) ? dotacionPlanta[sector][turno] : 0;
-                html += `<td><input type="text" class="turno-input" data-sector="${sector}" data-turno="${turno}" value="${val}"></td>`;
+                html += `<td><input type="text" class="turno-input" data-sector="${sector}" data-turno="${turno}" data-fila="${filaIdx}" data-turno-idx="${tIdx}" value="${val}"></td>`;
             });
 
-            // Inputs para los 5 días de la semana (Lunes a Viernes)
+            // Inputs deshabilitados para Tab (días) -> tabindex="-1" hace que Tab se los saltee
             diasKeys.forEach(dia => {
                 const valDia = (dotacionPlanta[sector] && dotacionPlanta[sector][dia] !== undefined) ? dotacionPlanta[sector][dia] : 0;
-                html += `<td><input type="text" class="input-total dia-input" data-dia="${dia}" value="${valDia}"></td>`;
+                html += `<td><input type="text" class="input-total dia-input" data-dia="${dia}" value="${valDia}" tabindex="-1" readonly></td>`;
             });
 
             tr.innerHTML = html;
             tbody.appendChild(tr);
+        });
+
+        // Configurar navegación por teclado para los turnos de esta tabla
+        configurarNavegacionTablas(tbodyId, turnos.length);
+    }
+
+    function configurarNavegacionTablas(tbodyId, cantTurnos) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+
+        tbody.querySelectorAll('.turno-input').forEach(input => {
+            input.addEventListener('keydown', function(e) {
+                const tIdx = parseInt(this.dataset.turnoIdx);
+                const trActual = this.closest('tr');
+
+                // Si se presiona ENTER o si está en el último turno y presiona TAB
+                if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey && tIdx === cantTurnos - 1)) {
+                    e.preventDefault();
+                    const siguienteTr = trActual.nextElementSibling;
+                    if (siguienteTr) {
+                        const primerInputSig = siguienteTr.querySelector('.turno-input[data-turno-idx="0"]');
+                        if (primerInputSig) primerInputSig.focus();
+                    }
+                } 
+                // Si presiona Shift + Tab en el primer turno de la fila, sube a la fila anterior
+                else if (e.key === 'Tab' && e.shiftKey && tIdx === 0) {
+                    const anteriorTr = trActual.previousElementSibling;
+                    if (anteriorTr) {
+                        e.preventDefault();
+                        const ultimoInputAnt = anteriorTr.querySelector(`.turno-input[data-turno-idx="${cantTurnos - 1}"]`);
+                        if (ultimoInputAnt) ultimoInputAnt.focus();
+                    }
+                }
+            });
         });
     }
 
