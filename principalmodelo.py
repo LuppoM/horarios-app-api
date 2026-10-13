@@ -47,54 +47,54 @@ class modeloprincipal:
         return (diferencia_dias // 7) + 1
 
     def eliminar_datos_semanas_anteriores(self):
-        """Aplica la misma lógica a las tablas de planificación:
+        """Limpia los datos al cambiar de semana:
 
-        - En 'modymoi': Blanquea campos para semanas <= semana_actual.
-        - En 'modymoi_finde': Elimina filas completas para semanas <= semana_actual.
-        - En 'dotacion_teorica_horarios': Elimina la dotación teórica para semanas <= semana_actual.
+        - En 'modymoi': Blanquea Horario, Sector, Planta y semana mediante UPDATE para semanas anteriores a la actual.
+        - En 'modymoi_finde': Elimina por completo los registros mediante DELETE al manejarse por INSERT.
+        - En 'dotacion_teorica_horarios': Elimina la dotación teórica para semanas pasadas.
         """
         try:
             cursor = self.conexion_db.cursor()
             semana_actual = self.obtener_numero_semana_personalizado()
 
-            # 1. Blanquear modymoi (semana actual e inferiores)
+            # 1. Blanquear modymoi (UPDATE) para semanas anteriores
             cursor.execute(
                 """
                 UPDATE modymoi
                 SET Horario = '', 
                     Sector = '', 
-                    Planta = ''
+                    Planta = '',
+                    semana = ''
                 WHERE semana IS NOT NULL 
                   AND TRIM(semana) != ''
-                  AND CAST(TRIM(semana) AS INTEGER) <= ?
+                  AND CAST(TRIM(semana) AS INTEGER) < ?
             """,
                 (semana_actual,),
             )
 
-            # 2. Borrar de modymoi_finde filtrando exactamente por la misma condición
+            # 2. Borrar de modymoi_finde (DELETE al manejarse por INSERT) para semanas anteriores
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
                 WHERE semana IS NOT NULL 
-                  AND CAST(semana AS INTEGER) <= ?
+                  AND CAST(semana AS INTEGER) < ?
             """,
                 (semana_actual,),
             )
 
-            # 3. Borrar la dotación teórica de los horarios para semanas pasadas o actuales
+            # 3. Borrar la dotación teórica de los horarios para semanas pasadas
             cursor.execute(
                 """
                 DELETE FROM dotacion_teorica_horarios
                 WHERE semana_inicio IS NOT NULL 
-                  AND CAST(semana_inicio AS INTEGER) <= ?
+                  AND CAST(semana_inicio AS INTEGER) < ?
             """,
                 (semana_actual,),
             )
 
             self.conexion_db.commit()
             print(
-                f"Limpieza basada en semana {semana_actual} completada con"
-                " éxito en todas las tablas."
+                f"Limpieza basada en semana {semana_actual} completada con éxito en todas las tablas."
             )
 
         except Exception as e:
@@ -128,7 +128,8 @@ class modeloprincipal:
                 UPDATE modymoi 
                 SET Horario = '', 
                     Sector = '', 
-                    Planta = '' 
+                    Planta = '',
+                    semana = ''
                 WHERE 1=1
             """
             params_modymoi = []
@@ -217,8 +218,6 @@ class modeloprincipal:
     def obtener_datos_semana(self, semana):
         """Devuelve los datos guardados asegurando traer el nombre del operario"""
         cursor = self.conexion_db.cursor()
-        # Si en tu tabla 'modymoi' el nombre del operario ya está o si guardas el ID, 
-        # nos aseguramos de cruzarlo correctamente:
         cursor.execute(
             """
                 SELECT m.id, m.operario, m.horario, m.sector
@@ -230,14 +229,11 @@ class modeloprincipal:
         )
         rows = cursor.fetchall()
         
-        # Verificamos si la columna 'operario' tiene nombres o IDs numéricos. 
-        # Si es un número (ID), lo resolvemos usando el diccionario de operarios:
-        todos_ops = self.obtener_operarios() # Diccionario {id: nombre}
+        todos_ops = self.obtener_operarios()
         
         datos_procesados = []
         for r_id, r_op, r_horario, r_sector in rows:
             nombre_a_mostrar = r_op
-            # Si el valor guardado es solo un número o coincide con un ID, buscamos su nombre real
             if r_op and str(r_op).isdigit() and int(r_op) in todos_ops:
                 nombre_a_mostrar = todos_ops[int(r_op)]
             elif not r_op and r_id in todos_ops:
