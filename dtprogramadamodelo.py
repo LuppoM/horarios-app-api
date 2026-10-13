@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import json
 import conexion
 
@@ -12,18 +12,22 @@ class ModeloDTProgramadaWeb:
             self.conexion_db = conexion.obtener_conexion()
 
     def obtener_numero_semana_personalizado(self, fecha=None):
+        """Calcula el número de semana de producción personalizado.
+        Idéntico a principalmodelo, HChoco y HGolo.
+        """
         if fecha is None:
             fecha = date.today()
+        elif isinstance(fecha, datetime):
+            fecha = fecha.date()
 
-        def inicio_semana_1(anio):
-            primer_dia = date(anio, 1, 1)
-            return primer_dia + timedelta(days=(7 - primer_dia.weekday()) % 7)
+        # Si el día es domingo, la semana operativa empieza/corresponde al lunes siguiente
+        if fecha.weekday() == 6:
+            fecha_ajustada = fecha + timedelta(days=1)
+        else:
+            fecha_ajustada = fecha
 
-        inicio = inicio_semana_1(fecha.year)
-        if fecha < inicio:
-            inicio = inicio_semana_1(fecha.year - 1)
-
-        return ((fecha - inicio).days // 7) + 1
+        # Obtiene el número de semana de la fecha
+        return fecha_ajustada.isocalendar()[1]
 
     def obtener_sectores_rotativos_por_planta(self, planta):
         try:
@@ -116,7 +120,6 @@ class ModeloDTProgramadaWeb:
             for planta, sectores in datos_completos.items():
                 for sector, horarios in sectores.items():
                     for rango_horario, cantidad in horarios.items():
-                        # Usamos la sintaxis de PostgreSQL (ON CONFLICT) para reemplazar el registro si ya existe
                         cursor.execute("""
                             INSERT INTO dotacion_teorica_horarios 
                                 (semana_inicio, planta, sector, rango_horario, cantidad_operarios)
