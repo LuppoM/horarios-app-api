@@ -47,11 +47,9 @@ class modeloprincipal:
         return (diferencia_dias // 7) + 1
 
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
-        """Aplica la lógica de limpieza a las tablas de planificación:
-
-        - En 'modymoi': Blanquea campos Horario, Sector y Planta de semanas anteriores.
-        - En 'modymoi_finde': Elimina filas completas de semanas anteriores.
-        - En 'dotacion_teorica_horarios': Elimina la dotación teórica de semanas anteriores.
+        """Si los registros de modymoi y modymoi_finde pertenecen a una semana anterior
+        a semana_actual (ej. tienen semana 41 y entramos a la 42), blanquea todas las
+        asignaciones y la columna semana en modymoi, y borra las filas de modymoi_finde.
         """
         try:
             cursor = self.conexion_db.cursor()
@@ -61,43 +59,44 @@ class modeloprincipal:
 
             semana_num = int(semana_actual)
 
-            # 1. Blanquear los campos de asignación en modymoi (semanas estrictamente anteriores a semana_num)
+            # 1. Blanquear Horario, Sector, Planta Y semana en modymoi para registros con semana < semana_num
             cursor.execute(
                 """
                 UPDATE modymoi
                 SET "Horario" = '', 
                     "Sector" = '', 
-                    "Planta" = ''
+                    "Planta" = '',
+                    "semana" = ''
                 WHERE semana IS NOT NULL 
-                  AND TRIM(semana) != ''
+                  AND TRIM(CAST(semana AS TEXT)) != ''
                   AND CASE 
-                        WHEN TRIM(semana) ~ '^[0-9]+$' THEN CAST(TRIM(semana) AS INTEGER) 
+                        WHEN TRIM(CAST(semana AS TEXT)) ~ '^[0-9]+$' THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
                         ELSE 0 
                       END < %s
                 """,
                 (semana_num,),
             )
 
-            # 2. Borrar filas completas en modymoi_finde (semanas estrictamente anteriores)
+            # 2. Borrar filas completas en modymoi_finde de semanas anteriores
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
                 WHERE semana IS NOT NULL 
                   AND CASE 
-                        WHEN CAST(semana AS TEXT) ~ '^[0-9]+$' THEN CAST(semana AS INTEGER) 
+                        WHEN TRIM(CAST(semana AS TEXT)) ~ '^[0-9]+$' THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
                         ELSE 0 
                       END < %s
                 """,
                 (semana_num,),
             )
 
-            # 3. Borrar la dotación teórica de los horarios (semanas estrictamente anteriores)
+            # 3. Borrar la dotación teórica de semanas anteriores
             cursor.execute(
                 """
                 DELETE FROM dotacion_teorica_horarios
                 WHERE semana_inicio IS NOT NULL 
                   AND CASE 
-                        WHEN CAST(semana_inicio AS TEXT) ~ '^[0-9]+$' THEN CAST(semana_inicio AS INTEGER) 
+                        WHEN TRIM(CAST(semana_inicio AS TEXT)) ~ '^[0-9]+$' THEN CAST(TRIM(CAST(semana_inicio AS TEXT)) AS INTEGER) 
                         ELSE 0 
                       END < %s
                 """,
@@ -105,7 +104,7 @@ class modeloprincipal:
             )
 
             self.conexion_db.commit()
-            print(f"Limpieza basada en semana {semana_num} completada con éxito en Supabase.")
+            print(f"Limpieza ejecutada exitosamente para la semana {semana_num}.")
 
         except Exception as e:
             self.conexion_db.rollback()
