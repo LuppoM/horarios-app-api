@@ -1,19 +1,18 @@
 import os
 import sys
-import pymysql
-import pymysql.cursors
+import psycopg2
+import psycopg2.extras
 
 def obtener_conexion():
-    # Conexión local a XAMPP (MySQL)
-    # Por defecto XAMPP usa usuario 'root' sin contraseña y la base de datos la llamaremos 'horarios_db'
-    return pymysql.connect(
-        host='localhost',
-        user='root',
-        password='',
-        database='horarios_db',
-        charset='utf8mb4',
-        cursorclass=pymysql.cursors.DictCursor # Para mantener diccionarios igual que antes
+    # Conexión remota a PostgreSQL en Supabase
+    # Reemplaza [TU-PASSWORD] con la contraseña que creaste para tu base de datos
+    DATABASE_URL = "postgresql://postgres.uczrwceswzarysptefra:[Palmesano2024]@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+    
+    conexion = psycopg2.connect(
+        DATABASE_URL,
+        cursor_factory=psycopg2.extras.RealDictCursor # Mantiene los resultados como diccionarios igual que antes
     )
+    return conexion
 
 def obtener_ruta_icono(nombre_icono="icono.ico"):
     if getattr(sys, "frozen", False):
