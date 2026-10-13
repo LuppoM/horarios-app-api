@@ -71,14 +71,19 @@ class ModeloHChocoWeb:
             print(f"Error dotación teórica: {e}")
             return {}
 
-    def obtener_operarios_disponibles(self, semana):
+        def obtener_operarios_disponibles(self, semana):
         cursor = self.conexion_db.cursor()
         cursor.execute("""
             SELECT id, operario
             FROM modymoi
-            WHERE (sector IS NULL OR sector='') AND operario IS NOT NULL AND TRIM(operario) != ''
+            WHERE operario IS NOT NULL AND TRIM(operario) != ''
+              AND NOT (
+                  semana = ?
+                  AND sector IS NOT NULL AND TRIM(sector) != ''
+                  AND LOWER(TRIM(planta)) NOT IN ('chocolates', 'chocolate')
+              )
             ORDER BY operario ASC
-        """)
+        """, (str(semana),))
         return cursor.fetchall()
 
     def obtener_datos_semana(self, semana):
