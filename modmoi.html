@@ -16,6 +16,10 @@
         <button class="btn-toolstrip" onclick="solicitarAccion('agregar')">Agregar</button>
         <button class="btn-toolstrip" onclick="solicitarAccion('modificar')">Modificar</button>
         <button class="btn-toolstrip" onclick="solicitarAccion('eliminar')">Eliminar</button>
+
+        <!-- BOTÓN DE LIMPIEZA MANUAL -->
+        <button class="btn-toolstrip" style="background-color: #8b0000; color: white;" onclick="solicitarAccion('limpiar_tabla')">Limpiar Semana</button>
+
         <button class="btn-toolstrip" onclick="exportarExcel()">Exportar a Excel</button>
         <button class="btn-toolstrip" onclick="location.href='/'">Cerrar</button>
     </div>
@@ -156,7 +160,7 @@
 
         function solicitarAccion(accion) {
             accionPendiente = accion;
-            if (accion !== 'agregar' && filaSeleccionadaIdx === null) {
+            if (accion !== 'agregar' && accion !== 'limpiar_tabla' && filaSeleccionadaIdx === null) {
                 alert("Por favor selecciona una fila de la tabla.");
                 return;
             }
@@ -182,7 +186,23 @@
         }
 
         async function ejecutarAccion() {
-            if (accionPendiente === 'agregar') {
+            if (accionPendiente === 'limpiar_tabla') {
+                if (confirm("¿Estás seguro de que deseas blanquear las asignaciones de horarios, sectores y plantas de la semana?")) {
+                    try {
+                        const res = await fetch('/api/modmoi/limpiar-semanas', { method: 'POST' });
+                        const resData = await res.json();
+                        if (resData.status === 'ok') {
+                            alert("Se han blanqueado correctamente los puestos de la tabla.");
+                            cargarDatos();
+                        } else {
+                            alert("Error al limpiar: " + resData.message);
+                        }
+                    } catch (e) {
+                        alert("Error de conexión al intentar limpiar la tabla.");
+                    }
+                }
+
+            } else if (accionPendiente === 'agregar') {
                 idRegistroActual = null;
                 document.getElementById('abmTitulo').innerText = "Agregar Orden de Trabajo";
                 document.getElementById('abmTipoMo').value = "MOD";
@@ -194,7 +214,6 @@
                 const fila = datosOriginales[filaSeleccionadaIdx];
                 idRegistroActual = fila[0]; // ID
 
-                // Obtener datos del servidor
                 const res = await fetch(`/api/modmoi/obtener/${idRegistroActual}`);
                 const data = await res.json();
 
