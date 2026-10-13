@@ -242,7 +242,15 @@ def api_eliminar_registro(id_registro: int):
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
-
+@app.post("/api/modmoi/limpiar-semanas")
+def api_limpiar_semanas_manual():
+    try:
+        modelo_base = modeloprincipal()
+        # Forzar la limpieza de puestos en Supabase
+        modelo_base.eliminar_datos_semanas_anteriores()
+        return {"status": "ok", "message": "Puestos blanqueados correctamente."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 # ==========================================
 # 3. MÓDULO: SECTORES
