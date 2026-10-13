@@ -47,6 +47,10 @@ class modeloprincipal:
         return (diferencia_dias // 7) + 1
 
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
+        """Si los registros de modymoi tienen una semana estrictamente anterior a semana_actual,
+        blanquea los campos horario_semana, sector_semana, planta_semana y semana en modymoi,
+        y borra las filas de modymoi_finde.
+        """
         try:
             cursor = self.conexion_db.cursor()
 
@@ -55,14 +59,14 @@ class modeloprincipal:
 
             semana_num = int(semana_actual)
 
-            # 1. Blanquear asignaciones Y el campo semana en modymoi
+            # 1. Blanquear asignaciones usando los nombres de columna REALES de la BD
             cursor.execute(
                 """
                 UPDATE modymoi
-                SET "Horario" = '', 
-                    "Sector" = '', 
-                    "Planta" = '',
-                    "semana" = ''
+                SET horario_semana = '', 
+                    sector_semana = '', 
+                    planta_semana = '',
+                    semana = ''
                 WHERE semana IS NOT NULL 
                   AND TRIM(CAST(semana AS TEXT)) != ''
                   AND CASE 
@@ -73,7 +77,7 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 2. Borrar filas de modymoi_finde
+            # 2. Borrar filas de modymoi_finde de semanas anteriores
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
@@ -86,7 +90,7 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 3. Borrar la dotación teórica de los horarios
+            # 3. Borrar la dotación teórica de semanas anteriores
             cursor.execute(
                 """
                 DELETE FROM dotacion_teorica_horarios
@@ -100,12 +104,11 @@ class modeloprincipal:
             )
 
             self.conexion_db.commit()
-            print(f"Limpieza ejecutada exitosamente para la semana {semana_num}.")
+            print(f"Limpieza ejecutada exitosamente en modymoi para la semana {semana_num}.")
 
         except Exception as e:
             self.conexion_db.rollback()
-            print(f"Error al limpiar semanas anteriores: {e}")
-
+            print(f"Error al limpiar semanas anteriores en modymoi: {e}")
     def vaciar_tabla_finde_por_semana(self, semana):
         """Elimina las filas dinámicas de 'modymoi_finde' correspondientes a una
         semana específica (ideal antes de re-insertar al guardar).
