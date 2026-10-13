@@ -10,13 +10,13 @@
 <body>
 
     <div class="top-bar">
-    <button class="btn-accion" onclick="exportarPDF()">Exportar a PDF</button>
-    <button class="btn-accion" onclick="guardarDatos()">Guardar</button>
-    <button class="btn-accion" onclick="irAlistamientoFinde()">Alistamiento / Fin de semana</button>
-    <button class="btn-accion" style="background-color: #ffc7ce; color: #9c0006;" onclick="location.href='/'">Cerrar</button>
-    <span style="font-weight: bold; color: #004080; margin-left: 20px;">Semana actual:</span>
-    <span id="labelSemana" style="font-weight: bold; color: #333; font-size: 11pt; margin-left: 5px;">-</span>
-</div>
+        <button class="btn-accion" onclick="exportarPDF()">Exportar a PDF</button>
+        <button class="btn-accion" onclick="guardarDatos()">Guardar</button>
+        <button class="btn-accion" onclick="irAlistamientoFinde()">Alistamiento / Fin de semana</button>
+        <button class="btn-accion" style="background-color: #ffc7ce; color: #9c0006;" onclick="location.href='/'">Cerrar</button>
+        <span style="font-weight: bold; color: #004080; margin-left: 20px;">Semana actual:</span>
+        <span id="labelSemana" style="font-weight: bold; color: #333; font-size: 11pt; margin-left: 5px;">-</span>
+    </div>
 
     <div id="gridContenedor" class="grid-sectores"></div>
 
@@ -27,24 +27,24 @@
         async function init() {
             await cargarDatos();
         }
-function irAlistamientoFinde() {
-    // Intentamos rescatar la semana de la variable global o del texto en pantalla por si acaso
-    let semanaAUsar = semanaActualGlobal;
-    if (!semanaAUsar) {
-        const labelSemana = document.getElementById('labelSemana');
-        if (labelSemana && labelSemana.textContent && labelSemana.textContent !== "-") {
-            semanaAUsar = labelSemana.textContent.trim();
-        }
-    }
 
-    if (!semanaAUsar) {
-        alert("Espere a que carguen los datos de la semana.");
-        return;
-    }
-    
-    // Redirige correctamente a la ruta de FastAPI pasándole la semana actual
-    window.location.href = `/hchocofinde?semana=${semanaAUsar}`;
-} 
+        function irAlistamientoFinde() {
+            let semanaAUsar = semanaActualGlobal;
+            if (!semanaAUsar) {
+                const labelSemana = document.getElementById('labelSemana');
+                if (labelSemana && labelSemana.textContent && labelSemana.textContent !== "-") {
+                    semanaAUsar = labelSemana.textContent.trim();
+                }
+            }
+
+            if (!semanaAUsar) {
+                alert("Espere a que carguen los datos de la semana.");
+                return;
+            }
+            
+            window.location.href = `/hchocofinde?semana=${semanaAUsar}`;
+        }
+
         async function cargarDatos() {
             try {
                 const res = await fetch(`/api/hchoco/datos`);
@@ -109,7 +109,6 @@ function irAlistamientoFinde() {
                 grid.appendChild(card);
             });
 
-            // Cargar operarios ya asignados desde la base de datos
             if (datosGlobales.asignados) {
                 datosGlobales.asignados.forEach(([id_val, operario, horario, sector]) => {
                     if(sector && horario) {
@@ -142,10 +141,9 @@ function irAlistamientoFinde() {
             const container = document.getElementById(`filas_${sector}_${turno}`);
             if(!container) return;
 
-            // Si tenemos el ID pero el nombre del operario viene vacío, lo buscamos en el diccionario general
             let nombreFinal = operarioVal;
             if ((!nombreFinal || nombreFinal.trim() === "") && idVal) {
-                nombreFinal = datosGlobales.operarios[idVal] || "";
+                nombreFinal = (datosGlobales.operarios && datosGlobales.operarios[idVal]) || "";
             }
 
             const filaDiv = document.createElement('div');
@@ -159,8 +157,18 @@ function irAlistamientoFinde() {
             const selectOp = document.createElement('select');
             selectOp.onchange = (e) => {
                 const nombreSel = e.target.value;
-                const encontrada = Object.entries(datosGlobales.operarios || {}).find(([id, nom]) => nom === nombreSel);
-                inputId.value = encontrada ? encontrada[0] : "";
+                const disponibles = datosGlobales.operarios_disponibles || [];
+                const encontrada = disponibles.find(item => {
+                    const nom = Array.isArray(item) ? item[1] : item.operario;
+                    return nom === nombreSel;
+                });
+
+                if (encontrada) {
+                    inputId.value = Array.isArray(encontrada) ? encontrada[0] : encontrada.id;
+                } else {
+                    const deTodos = Object.entries(datosGlobales.operarios || {}).find(([id, nom]) => nom === nombreSel);
+                    inputId.value = deTodos ? deTodos[0] : "";
+                }
                 actualizarOpcionesSelects();
             };
 
@@ -180,7 +188,6 @@ function irAlistamientoFinde() {
             
             actualizarOpcionesSelects();
 
-            // Asignamos el nombre resuelto al select
             if(nombreFinal) {
                 selectOp.value = nombreFinal;
             }
@@ -192,14 +199,15 @@ function irAlistamientoFinde() {
                 if (sel.value) seleccionadosEnPantalla.add(sel.value);
             });
 
+            const libres = datosGlobales.operarios_disponibles || [];
+
             document.querySelectorAll('.fila-operario select').forEach(sel => {
                 const valorActual = sel.value; 
                 sel.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
 
-                // Obtenemos la lista completa de operarios desde el diccionario global {id: nombre}
-                const listaOperarios = Object.entries(datosGlobales.operarios || {});
-                
-                listaOperarios.forEach(([id_op, nombre]) => {
+                libres.forEach(item => {
+                    const nombre = Array.isArray(item) ? item[1] : item.operario;
+
                     if (!seleccionadosEnPantalla.has(nombre) || nombre === valorActual) {
                         const opt = document.createElement('option');
                         opt.value = nombre;
@@ -210,19 +218,26 @@ function irAlistamientoFinde() {
                         sel.appendChild(opt);
                     }
                 });
-                
+
+                if (valorActual && !Array.from(sel.options).some(o => o.value === valorActual)) {
+                    const opt = document.createElement('option');
+                    opt.value = valorActual;
+                    opt.textContent = valorActual;
+                    opt.selected = true;
+                    sel.appendChild(opt);
+                }
+
                 if (valorActual) {
                     sel.value = valorActual;
                 }
             });
         }
 
-       function exportarPDF() {
+        function exportarPDF() {
             if (!semanaActualGlobal) {
                 alert("No hay una semana seleccionada para exportar.");
                 return;
             }
-            // Abre directamente la ruta del backend en una nueva pestaña para descargar el PDF
             window.location.href = `/api/hchoco/exportar-pdf?semana=${semanaActualGlobal}`;
         }
 
