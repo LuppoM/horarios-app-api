@@ -65,7 +65,7 @@
     }
 
     async function cargarDatos() {
-        const semana = document.getElementById('inputSemana').value || "41";
+        const semana = document.getElementById('inputSemana').value || "";
         const url = `/api/dtprogramada/datos?semana=${semana}`;
         
         try {
