@@ -40,11 +40,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=BASE_DIR)
 
 # Montar imágenes de la carpeta static
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-# Montar raíz para servir archivos estáticos (CSS, JS)
-app.mount("/archivos", StaticFiles(directory="."), name="archivos")
+# Montar la carpeta archivos para servir CSS y JS
+app.mount("/archivos", StaticFiles(directory=os.path.join(BASE_DIR, "archivos")), name="archivos")
 
 
 # ==========================================
