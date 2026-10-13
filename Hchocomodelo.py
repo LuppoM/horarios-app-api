@@ -21,7 +21,11 @@ class ModeloHChocoWeb:
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
-                "SELECT nombre_sector, tipo_horario, requiere_dotacion FROM sectores WHERE planta='Chocolate'"
+                """
+                SELECT nombre_sector, tipo_horario, requiere_dotacion 
+                FROM sectores 
+                WHERE LOWER(TRIM(planta)) IN ('chocolate', 'chocolates')
+                """
             )
             return cursor.fetchall() or []
         except Exception as e:
