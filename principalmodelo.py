@@ -60,79 +60,8 @@ class modeloprincipal:
         diferencia_dias = (fecha - inicio_semana_1).days
         return (diferencia_dias // 7) + 1
 
-    def eliminar_datos_semanas_anteriores_local(self, semana_actual=None):
-        """Limpieza sobre la base SQLite local (HORARIOS.db), que es la que
-        leen y escriben las pantallas de Golosinas, Chocolates y Dotación.
-
-        - modymoi: blanquea horario, sector y planta de las filas
-          cuya semana sea anterior a la semana activa.
-        - modymoi_finde: borra las filas de semanas anteriores.
-        - dotacion_teorica_horarios: borra las semanas anteriores.
-
-        Si no se indica semana_actual, usa la semana objetivo real
-        (hoy + 7 días), sin depender de lo que se haya tipeado en pantalla.
-        """
-        if semana_actual is None:
-            semana_actual = self.obtener_numero_semana_personalizado(
-                date.today() + timedelta(days=7)
-            )
-        semana_num = int(semana_actual)
-
-        sentencias = [
-            (
-                "modymoi",
-                """
-                UPDATE modymoi
-                SET horario = '', sector = '', planta = ''
-                WHERE semana IS NOT NULL
-                  AND TRIM(CAST(semana AS TEXT)) GLOB '[0-9]*'
-                  AND CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) < ?
-                """,
-            ),
-            (
-                "modymoi_finde",
-                """
-                DELETE FROM modymoi_finde
-                WHERE semana IS NOT NULL
-                  AND TRIM(CAST(semana AS TEXT)) GLOB '[0-9]*'
-                  AND CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) < ?
-                """,
-            ),
-            (
-                "dotacion_teorica_horarios",
-                """
-                DELETE FROM dotacion_teorica_horarios
-                WHERE semana_inicio IS NOT NULL
-                  AND TRIM(CAST(semana_inicio AS TEXT)) GLOB '[0-9]*'
-                  AND CAST(TRIM(CAST(semana_inicio AS TEXT)) AS INTEGER) < ?
-                """,
-            ),
-        ]
-
-        conexion_local = _obtener_conexion_local()
-        try:
-            cursor = conexion_local.cursor()
-            for nombre_tabla, sql in sentencias:
-                try:
-                    cursor.execute(sql, (semana_num,))
-                    print(
-                        f"[limpieza local] {nombre_tabla}: "
-                        f"{cursor.rowcount} fila(s) afectadas (semana < {semana_num})."
-                    )
-                except Exception as e:
-                    print(f"[limpieza local] Error en {nombre_tabla}: {e}")
-            conexion_local.commit()
-        finally:
-            conexion_local.close()
-
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
-        """Si los registros de modymoi pertenecen a una semana estrictamente anterior a semana_actual,
-        blanquea únicamente los campos horario_semana, sector_semana y planta_semana en modymoi
-        (manteniendo intacta la fila del operario para la vista MOD/MOI), y borra las filas
-        dinámicas de modymoi_finde y dotacion_teorica_horarios.
-
-        Trabaja sobre la base remota (PostgreSQL / Supabase).
-        """
+        """Limpieza remota sobre PostgreSQL / Supabase utilizando los nombres exactos de columna."""
         try:
             cursor = self.conexion_db.cursor()
 
@@ -141,13 +70,13 @@ class modeloprincipal:
 
             semana_num = int(semana_actual)
 
-            # 1. Blanquear SOLAMENTE los puestos/horarios sin borrar la semana ni el operario
+            # 1. Blanquear puestos en modymoi usando comillas dobles para respetar mayúsculas
             cursor.execute(
                 """
                 UPDATE modymoi
-                SET horario_semana = '', 
-                    sector_semana = '', 
-                    planta_semana = ''
+                SET "Horario" = '', 
+                    "Sector" = '', 
+                    "Planta" = ''
                 WHERE semana IS NOT NULL 
                   AND TRIM(CAST(semana AS TEXT)) != ''
                   AND CASE 
@@ -158,7 +87,7 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 2. Borrar filas de modymoi_finde de semanas anteriores
+            # 2. Borrar las asignaciones del fin de semana de semanas pasadas
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
@@ -171,21 +100,8 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 3. Borrar la dotación teórica de semanas anteriores
-            cursor.execute(
-                """
-                DELETE FROM dotacion_teorica_horarios
-                WHERE semana_inicio IS NOT NULL 
-                  AND CASE 
-                        WHEN TRIM(CAST(semana_inicio AS TEXT)) ~ '^[0-9]+$' THEN CAST(TRIM(CAST(semana_inicio AS TEXT)) AS INTEGER) 
-                        ELSE 0 
-                      END < %s
-                """,
-                (semana_num,),
-            )
-
             self.conexion_db.commit()
-            print(f"Limpieza de puestos ejecutada exitosamente en Supabase para la semana {semana_num}.")
+            print(f"Limpieza ejecutada con éxito en Supabase para la semana {semana_num}.")
 
         except Exception as e:
             self.conexion_db.rollback()
