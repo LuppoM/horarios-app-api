@@ -13,8 +13,19 @@ def _obtener_conexion_local():
     return sqlite3.connect(db_path, check_same_thread=False)
 
 class ModeloDTProgramadaWeb:
-    def obtener_numero_semana_personalizado(self, fecha):
-        return fecha.isocalendar()[1]
+        def obtener_numero_semana_personalizado(self, fecha=None):
+        if fecha is None:
+            fecha = date.today()
+
+        def inicio_semana_1(anio):
+            primer_dia = date(anio, 1, 1)
+            return primer_dia + timedelta(days=(7 - primer_dia.weekday()) % 7)
+
+        inicio = inicio_semana_1(fecha.year)
+        if fecha < inicio:
+            inicio = inicio_semana_1(fecha.year - 1)
+
+        return ((fecha - inicio).days // 7) + 1
 
     def obtener_sectores_rotativos_por_planta(self, planta):
         conn = _obtener_conexion_local()
