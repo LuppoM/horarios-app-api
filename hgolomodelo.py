@@ -2,6 +2,20 @@
 import conexion
 
 
+def _a_tupla(row):
+    """Convierte una fila a tupla, venga como tupla, dict o sqlite3.Row."""
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return tuple(row.values())
+    return tuple(row)
+
+
+def _filas(cursor):
+    """fetchall() siempre como lista de tuplas."""
+    return [_a_tupla(r) for r in cursor.fetchall()]
+
+
 class ModeloHGoloWeb:
 
     def __init__(self):
@@ -14,7 +28,7 @@ class ModeloHGoloWeb:
     def cargar_operarios(self):
         cursor = self.conexion_db.cursor()
         cursor.execute("SELECT id, operario FROM modymoi ORDER BY operario ASC")
-        rows = cursor.fetchall()
+        rows = _filas(cursor)
         self.operarios_dict = {row[0]: row[1] for row in rows if row[1]}
 
     def obtener_operarios(self):
@@ -24,9 +38,10 @@ class ModeloHGoloWeb:
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
-                "SELECT nombre_sector, tipo_horario, requiere_dotacion FROM sectores WHERE planta='Golosinas'"
+                "SELECT nombre_sector, tipo_horario, requiere_dotacion "
+                "FROM sectores WHERE planta='Golosinas'"
             )
-            return cursor.fetchall() or []
+            return _filas(cursor) or []
         except Exception as e:
             print(f"Error al obtener sectores: {e}")
             return []
@@ -38,7 +53,7 @@ class ModeloHGoloWeb:
                 "SELECT horarios_definidos FROM tipohorario WHERE UPPER(TRIM(tipo)) = ?",
                 (tipo_horario.upper(),),
             )
-            row = cursor.fetchone()
+            row = _a_tupla(cursor.fetchone())
             if row and row[0]:
                 return [t.strip() for t in row[0].split(",")]
         except Exception as e:
@@ -57,7 +72,7 @@ class ModeloHGoloWeb:
                 (str(semana),),
             )
             resultados = {}
-            for sector, rango, cantidad in cursor.fetchall():
+            for sector, rango, cantidad in _filas(cursor):
                 if sector not in resultados:
                     resultados[sector] = {}
                 resultados[sector][rango] = cantidad
@@ -93,7 +108,7 @@ class ModeloHGoloWeb:
         excluidos = {int(i) for i in (excluir_ids or [])}
         return [
             (id_op, nombre)
-            for id_op, nombre in cursor.fetchall()
+            for id_op, nombre in _filas(cursor)
             if id_op not in excluidos
         ]
 
@@ -104,11 +119,11 @@ class ModeloHGoloWeb:
             SELECT id, operario, horario_semana, sector_semana
             FROM modymoi
             WHERE semana=? AND LOWER(TRIM(planta_semana)) = 'golosinas'
-            AND sector_semana IS NOT NULL AND TRIM(sector_semana) != ''
+              AND sector_semana IS NOT NULL AND TRIM(sector_semana) != ''
             """,
             (str(semana),),
         )
-        return cursor.fetchall()
+        return _filas(cursor)
 
     def guardar_datos_semana(self, semana, registros_pantalla):
         cursor = self.conexion_db.cursor()
@@ -122,7 +137,7 @@ class ModeloHGoloWeb:
             """,
             (sem_val,),
         )
-        ids_previos_en_bd = set(row[0] for row in cursor.fetchall())
+        ids_previos_en_bd = set(row[0] for row in _filas(cursor))
         ids_actuales_en_pantalla = set(r[0] for r in registros_pantalla)
 
         # Los que estaban cargados y ya no están en pantalla quedan libres
