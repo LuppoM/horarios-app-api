@@ -1,7 +1,7 @@
+# hchocomodelo.py
 import os
 import sqlite3
 import sys
-
 
 def _obtener_conexion_local():
     if getattr(sys, 'frozen', False):
@@ -10,7 +10,6 @@ def _obtener_conexion_local():
         base_path = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(base_path, "HORARIOS.db")
     return sqlite3.connect(db_path, check_same_thread=False)
-
 
 class ModeloHChocoWeb:
     def __init__(self):
@@ -74,11 +73,8 @@ class ModeloHChocoWeb:
             return {}
 
     def obtener_operarios_disponibles(self, semana):
-        # Libres + los ya asignados a Chocolates; se excluyen los que en esta
-        # misma semana están asignados a otra planta.
         cursor = self.conexion_db.cursor()
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT id, operario
             FROM modymoi
             WHERE operario IS NOT NULL AND TRIM(operario) != ''
@@ -88,9 +84,7 @@ class ModeloHChocoWeb:
                   AND LOWER(TRIM(planta)) NOT IN ('chocolates', 'chocolate')
               )
             ORDER BY operario ASC
-            """,
-            (str(semana),),
-        )
+        """, (str(semana),))
         return cursor.fetchall()
 
     def obtener_datos_semana(self, semana):
@@ -99,7 +93,7 @@ class ModeloHChocoWeb:
             """
                 SELECT id, operario, horario, sector
                 FROM modymoi
-                WHERE semana=? AND (planta='Chocolates' OR planta='Chocolate')
+                WHERE semana=? AND LOWER(TRIM(planta)) IN ('chocolates', 'chocolate')
                   AND sector IS NOT NULL AND TRIM(sector) != ''
             """,
             (str(semana),),
@@ -112,8 +106,8 @@ class ModeloHChocoWeb:
 
         cursor.execute(
             """
-            SELECT id
-            FROM modymoi
+            SELECT id 
+            FROM modymoi 
             WHERE semana = ? AND LOWER(TRIM(planta)) IN ('chocolates', 'chocolate')
             """,
             (sem_val,),
@@ -143,4 +137,3 @@ class ModeloHChocoWeb:
     def cerrar_conexion(self):
         if self.conexion_db:
             self.conexion_db.close()
-
