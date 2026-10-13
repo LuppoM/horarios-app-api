@@ -34,8 +34,10 @@ app = FastAPI(title="ARMADO DE HORARIOS")
 modmoi_modelo = ModMoiModel()
 abm_modelo = abmmodmoimodelo()
 
-# Plantillas desde la carpeta raíz
-templates = Jinja2Templates(directory=".")
+# ✅ AHORA (usa una ruta absoluta segura basada en la ubicación del script)
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "."))
 
 # Montar imágenes de la carpeta static
 if os.path.exists("static"):
