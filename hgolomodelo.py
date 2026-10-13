@@ -1,5 +1,6 @@
 # hgolomodelo.py
-import conexion
+from datetime import date
+from principalmodelo import modeloprincipal
 
 
 def _a_tupla(row):
@@ -16,23 +17,32 @@ def _filas(cursor):
     return [_a_tupla(r) for r in cursor.fetchall()]
 
 
-class ModeloHGoloWeb:
+class ModeloHGolo(modeloprincipal):
 
-    def __init__(self):
-        self.conexion_db = conexion.obtener_conexion()
-        self.operarios_dict = {}
+    def __init__(self, conexion=None):
+        # Mantiene la inicialización heredada y/o la instanciación de conexión
+        super().__init__()
+        if conexion:
+            self.conexion_db = conexion
+        self.conexion = self.conexion_db
+        self.operarios_dict = {}  # {id: nombre}
+        self.operarios_asignados = {}  # {semana: set(IDs operarios)}
+
         self.cargar_operarios()
 
     def cargar_operarios(self):
+        """Carga todos los operarios desde la base de datos"""
         cursor = self.conexion_db.cursor()
         cursor.execute("SELECT id, operario FROM modymoi ORDER BY operario ASC")
         rows = _filas(cursor)
         self.operarios_dict = {row[0]: row[1] for row in rows if row[1]}
 
     def obtener_operarios(self):
+        """Devuelve todos los operarios cargados"""
         return self.operarios_dict
 
     def obtener_sectores_golosinas(self):
+        """Obtiene los sectores, su tipo de horario y si requieren dotación de Golosinas desde la base de datos"""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
@@ -49,6 +59,7 @@ class ModeloHGoloWeb:
             return []
 
     def obtener_turnos_por_tipo(self, tipo_horario):
+        """Busca en la base de datos los turnos asociados al tipo de horario usando la tabla tipohorario"""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
@@ -59,10 +70,11 @@ class ModeloHGoloWeb:
             if row and row[0]:
                 return [t.strip() for t in row[0].split(",")]
         except Exception as e:
-            print(f"Error al obtener turnos: {e}")
+            print(f"Error al obtener turnos por tipo: {e}")
         return []
 
     def obtener_dotacion_teorica(self, semana):
+        """Obtiene la dotación teórica por sector y horario para Golosinas"""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
@@ -85,30 +97,44 @@ class ModeloHGoloWeb:
                 resultados[sector][rango] = cantidad
             return resultados
         except Exception as e:
-            print(f"Error dotación teórica golosinas: {e}")
+            print(f"Error al obtener dotación teórica: {e}")
             return {}
 
-    def obtener_operarios_disponibles(self, semana=None, excluir_ids=None):
+    def obtener_operarios_asignados_en_otro_sector(self, semana):
+        """Devuelve IDs de operarios que ya tienen sector asignado en una semana"""
+        if semana in self.operarios_asignados:
+            return self.operarios_asignados[semana]
+
+        cursor = self.conexion_db.cursor()
+        cursor.execute(
+            """
+            SELECT id
+            FROM modymoi
+            WHERE semana = %s AND operario != '' AND "Sector" != ''
+            """,
+            (str(semana),),
+        )
+        asignados = set(row[0] for row in _filas(cursor))
+        self.operarios_asignados[semana] = asignados
+        return asignados
+
+    def obtener_operarios_disponibles(self, semana=None):
+        """Devuelve los operarios que no tienen sector ni horario cargados"""
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
             SELECT id, operario
             FROM modymoi
-            WHERE COALESCE(TRIM("Horario"), '') = ''
-              AND COALESCE(TRIM("Sector"), '') = ''
-              AND COALESCE(TRIM("Planta"), '') = ''
+            WHERE ("Sector" IS NULL OR TRIM("Sector") = '')
+              AND ("Horario" IS NULL OR TRIM("Horario") = '')
               AND operario IS NOT NULL AND TRIM(operario) != ''
             ORDER BY operario ASC
             """
         )
-        excluidos = {int(i) for i in (excluir_ids or [])}
-        return [
-            (id_op, nombre)
-            for id_op, nombre in _filas(cursor)
-            if id_op not in excluidos
-        ]
+        return _filas(cursor)
 
     def obtener_datos_semana(self, semana):
+        """Devuelve los datos de los operarios para una semana y planta 'Golosinas'"""
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -121,43 +147,72 @@ class ModeloHGoloWeb:
         )
         return _filas(cursor)
 
+    def guardar_operario(self, id_val, operario, horario, sector, semana):
+        """Realiza el UPDATE directo a la fila fija del operario en modymoi"""
+        cursor = self.conexion_db.cursor()
+        cursor.execute(
+            """
+            UPDATE modymoi
+            SET operario = %s, "Horario" = %s, "Sector" = %s, "Planta" = 'Golosinas', semana = %s
+            WHERE id = %s
+            """,
+            (operario, horario, sector, str(semana), id_val),
+        )
+        self.conexion_db.commit()
+
+        self.operarios_dict[id_val] = operario
+        if semana in self.operarios_asignados:
+            self.operarios_asignados[semana].add(id_val)
+
+    def limpiar_operario(self, id_val):
+        """Elimina la asignación de un operario dejando en blanco su horario, sector y planta"""
+        cursor = self.conexion_db.cursor()
+        cursor.execute(
+            """
+            UPDATE modymoi
+            SET "Horario" = '', "Sector" = '', "Planta" = ''
+            WHERE id = %s
+            """,
+            (id_val,),
+        )
+        self.conexion_db.commit()
+
+        for semana, asignados in self.operarios_asignados.items():
+            asignados.discard(id_val)
+
     def guardar_datos_semana(self, semana, registros_pantalla):
+        """
+        Guarda la grilla semanal reutilizando limpiar_operario y guardar_operario.
+        `registros_pantalla` es una lista de tuplas: (id_operario, operario_nombre, horario, sector)
+        """
         cursor = self.conexion_db.cursor()
         sem_val = str(semana).strip()
 
+        # 1. Obtenemos los IDs de los operarios que estaban en Golosinas para esta semana en la BD
         cursor.execute(
             """
-            SELECT id
-            FROM modymoi
+            SELECT id 
+            FROM modymoi 
             WHERE semana = %s AND LOWER(TRIM("Planta")) IN ('golosinas', 'golosina')
             """,
             (sem_val,),
         )
         ids_previos_en_bd = set(row[0] for row in _filas(cursor))
+
+        # 2. Obtenemos los IDs presentes actualmente en la pantalla
         ids_actuales_en_pantalla = set(r[0] for r in registros_pantalla)
 
-        # 1. Blanquear los operarios removidos de la pantalla
+        # 3. Calculamos quiénes fueron reemplazados o quitados
         ids_a_limpiar = ids_previos_en_bd - ids_actuales_en_pantalla
+
+        # 4. Reutilizamos limpiar_operario para los que ya no están
         for id_old in ids_a_limpiar:
-            cursor.execute(
-                'UPDATE modymoi SET "Horario" = \'\', "Sector" = \'\', "Planta" = \'\' WHERE id = %s',
-                (id_old,),
-            )
+            self.limpiar_operario(id_old)
 
-        # 2. Guardar asignaciones actuales
+        # 5. Reutilizamos guardar_operario para asignar los seleccionados
         for id_op, operario_nombre, turno, sector in registros_pantalla:
-            cursor.execute(
-                """
-                UPDATE modymoi
-                SET operario = %s, "Horario" = %s, "Sector" = %s,
-                    "Planta" = 'Golosinas', semana = %s
-                WHERE id = %s
-                """,
-                (operario_nombre, turno, sector, sem_val, id_op),
-            )
+            self.guardar_operario(id_op, operario_nombre, turno, sector, sem_val)
 
-        self.conexion_db.commit()
 
-    def cerrar_conexion(self):
-        if self.conexion_db:
-            self.conexion_db.close()
+# Alias por retrocompatibilidad con importaciones previas en la API
+ModeloHGoloWeb = ModeloHGolo
