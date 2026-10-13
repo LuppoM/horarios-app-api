@@ -47,10 +47,6 @@ class modeloprincipal:
         return (diferencia_dias // 7) + 1
 
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
-        """Si los registros de modymoi y modymoi_finde pertenecen a una semana anterior
-        a semana_actual (ej. tienen semana 41 y entramos a la 42), blanquea todas las
-        asignaciones y la columna semana en modymoi, y borra las filas de modymoi_finde.
-        """
         try:
             cursor = self.conexion_db.cursor()
 
@@ -59,7 +55,7 @@ class modeloprincipal:
 
             semana_num = int(semana_actual)
 
-            # 1. Blanquear Horario, Sector, Planta Y semana en modymoi para registros con semana < semana_num
+            # 1. Blanquear asignaciones Y el campo semana en modymoi
             cursor.execute(
                 """
                 UPDATE modymoi
@@ -77,7 +73,7 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 2. Borrar filas completas en modymoi_finde de semanas anteriores
+            # 2. Borrar filas de modymoi_finde
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
@@ -90,7 +86,7 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 3. Borrar la dotación teórica de semanas anteriores
+            # 3. Borrar la dotación teórica de los horarios
             cursor.execute(
                 """
                 DELETE FROM dotacion_teorica_horarios
