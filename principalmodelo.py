@@ -30,8 +30,8 @@ class modeloprincipal:
 
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
         """Limpieza remota sobre Supabase (PostgreSQL).
-        Blanquea "Horario", "Sector" y "Planta" en la tabla modymoi para todos los registros
-        cuya semana sea menor o igual a la semana parseada (semana activa/pasada).
+        Blanquea "Horario", "Sector" y "Planta" en la tabla modymoi ÚNICAMENTE
+        para las semanas estrictamente ANTERIORES (< semana_actual).
         """
         try:
             cursor = self.conexion_db.cursor()
@@ -41,7 +41,7 @@ class modeloprincipal:
 
             semana_num = int(semana_actual)
 
-            # 1. Blanquear puestos en la tabla modymoi usando comillas dobles para respetar mayúsculas
+            # 1. Blanquear puestos en la tabla modymoi para semanas estrictamente anteriores (<)
             cursor.execute(
                 """
                 UPDATE modymoi
@@ -56,12 +56,12 @@ class modeloprincipal:
                       THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
                       ELSE 0 
                     END
-                  ) <= %s
+                  ) < %s
                 """,
                 (semana_num,),
             )
 
-            # 2. Eliminar asignaciones registradas del fin de semana para semanas pasadas o actuales
+            # 2. Eliminar asignaciones registradas del fin de semana para semanas estrictamente anteriores (<)
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
@@ -72,13 +72,13 @@ class modeloprincipal:
                       THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
                       ELSE 0 
                     END
-                  ) <= %s
+                  ) < %s
                 """,
                 (semana_num,),
             )
 
             self.conexion_db.commit()
-            print(f"Limpieza ejecutada exitosamente en Supabase para semana <= {semana_num}.")
+            print(f"Limpieza ejecutada exitosamente en Supabase para semanas anteriores a la semana {semana_num}.")
 
         except Exception as e:
             if hasattr(self, 'conexion_db') and self.conexion_db:
