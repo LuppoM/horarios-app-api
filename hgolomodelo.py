@@ -81,7 +81,7 @@ class ModeloHGoloWeb:
               AND NOT (
                   semana = ?
                   AND sector IS NOT NULL AND TRIM(sector) != ''
-                  AND LOWER(TRIM(planta)) NOT IN ('chocolates', 'chocolate')
+                  AND LOWER(TRIM(planta)) NOT IN ('golosinas', 'golosina')
               )
             ORDER BY operario ASC
         """, (str(semana),))
