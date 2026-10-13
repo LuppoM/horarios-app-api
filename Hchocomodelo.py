@@ -12,7 +12,6 @@ class ModeloHChocoWeb:
         cursor = self.conexion_db.cursor()
         cursor.execute("SELECT id, operario FROM modymoi ORDER BY operario ASC")
         rows = cursor.fetchall()
-        # Maneja tanto acceso por clave/dict como por índice para mayor seguridad
         self.operarios_dict = {
             (row["id"] if isinstance(row, dict) else row[0]): (row["operario"] if isinstance(row, dict) else row[1])
             for row in rows if (row["operario"] if isinstance(row, dict) else row[1])
@@ -22,7 +21,6 @@ class ModeloHChocoWeb:
         return self.operarios_dict
 
     def obtener_sectores_chocolates(self):
-        """Devuelve los sectores estructurados como objetos/diccionarios con sus turnos asociados."""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
@@ -41,7 +39,6 @@ class ModeloHChocoWeb:
                 tipo_horario = row[1] if not isinstance(row, dict) else row["tipo_horario"]
                 req_dotacion = row[2] if not isinstance(row, dict) else row["requiere_dotacion"]
 
-                # Obtenemos los turnos correspondientes a cada tipo de horario del sector
                 turnos = self.obtener_turnos_por_tipo(tipo_horario)
 
                 sectores_list.append({
@@ -87,18 +84,16 @@ class ModeloHChocoWeb:
             rows = cursor.fetchall() or []
             
             for row in rows:
-                # Manejamos si devuelve tupla o diccionario, tomando los campos exactos
                 if isinstance(row, dict):
                     sector = row["sector"]
                     rango = row["rango_horario"]
                     cantidad = row["cantidad_operarios"]
                 else:
-                    # Si trae más de 3 columnas (por ejemplo id, sector, rango, cantidad),
-                    # tomamos las últimas o las específicas por posición:
+                    # Desempaquetado seguro sin importar la cantidad de columnas devueltas
                     if len(row) == 4:
                         _, sector, rango, cantidad = row
                     else:
-                        sector, rango, cantidad = row[:3]
+                        sector, rango, cantidad = row[0], row[1], row[2]
 
                 if sector not in resultados:
                     resultados[sector] = {}
@@ -123,7 +118,7 @@ class ModeloHChocoWeb:
             """
         )
         excluidos = {int(i) for i in (excluir_ids or [])}
-        rows = cursor.fetchall()
+        rows = cursor.fetchall() or []
         return [
             (
                 row[0] if not isinstance(row, dict) else row["id"],
@@ -144,7 +139,16 @@ class ModeloHChocoWeb:
             """,
             (str(semana),),
         )
-        return cursor.fetchall()
+        rows = cursor.fetchall() or []
+        
+        # Formateamos estrictamente a 4 valores por fila: (id, operario, horario, sector)
+        datos = []
+        for r in rows:
+            if isinstance(r, dict):
+                datos.append((r["id"], r["operario"], r["Horario"], r["Sector"]))
+            else:
+                datos.append((r[0], r[1], r[2], r[3]))
+        return datos
 
     def guardar_datos_semana(self, semana, registros_pantalla):
         cursor = self.conexion_db.cursor()
@@ -158,7 +162,7 @@ class ModeloHChocoWeb:
             """,
             (sem_val,),
         )
-        rows_previos = cursor.fetchall()
+        rows_previos = cursor.fetchall() or []
         ids_previos_en_bd = set(
             row[0] if not isinstance(row, dict) else row["id"] for row in rows_previos
         )
