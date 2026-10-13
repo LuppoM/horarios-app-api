@@ -19,8 +19,6 @@ def _filas(cursor):
 class ModeloHGoloWeb:
 
     def __init__(self):
-        # Misma conexión que usa principalmodelo, para ver la misma tabla
-        # modymoi (y por lo tanto la misma limpieza semanal).
         self.conexion_db = conexion.obtener_conexion()
         self.operarios_dict = {}
         self.cargar_operarios()
@@ -38,20 +36,24 @@ class ModeloHGoloWeb:
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
-                "SELECT nombre_sector, tipo_horario, requiere_dotacion "
-                "FROM sectores WHERE planta='Golosinas'"
+                """
+                SELECT nombre_sector, tipo_horario, requiere_dotacion 
+                FROM sectores 
+                WHERE LOWER(TRIM(planta)) IN ('golosinas', 'golosina')
+                ORDER BY id ASC
+                """
             )
             return _filas(cursor) or []
         except Exception as e:
-            print(f"Error al obtener sectores: {e}")
+            print(f"Error al obtener sectores de golosinas: {e}")
             return []
 
     def obtener_turnos_por_tipo(self, tipo_horario):
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
-                "SELECT horarios_definidos FROM tipohorario WHERE UPPER(TRIM(tipo)) = ?",
-                (tipo_horario.upper(),),
+                "SELECT horarios_definidos FROM tipohorario WHERE UPPER(TRIM(tipo)) = %s",
+                (str(tipo_horario).upper().strip(),),
             )
             row = _a_tupla(cursor.fetchone())
             if row and row[0]:
@@ -67,40 +69,34 @@ class ModeloHGoloWeb:
                 """
                 SELECT sector, rango_horario, cantidad_operarios
                 FROM dotacion_teorica_horarios
-                WHERE semana_inicio=? AND planta='Golosinas'
+                WHERE semana_inicio = %s AND LOWER(TRIM(planta)) IN ('golosinas', 'golosina')
                 """,
                 (str(semana),),
             )
             resultados = {}
-            for sector, rango, cantidad in _filas(cursor):
+            for row in _filas(cursor):
+                if len(row) == 4:
+                    _, sector, rango, cantidad = row
+                else:
+                    sector, rango, cantidad = row[0], row[1], row[2]
+
                 if sector not in resultados:
                     resultados[sector] = {}
                 resultados[sector][rango] = cantidad
             return resultados
         except Exception as e:
-            print(f"Error dotación teórica: {e}")
+            print(f"Error dotación teórica golosinas: {e}")
             return {}
 
     def obtener_operarios_disponibles(self, semana=None, excluir_ids=None):
-        """Operarios libres para las listas desplegables: los que NO tienen
-        horario, sector ni planta cargados en modymoi (ni en esta planta ni en
-        Chocolates).
-
-        excluir_ids: ids que ya fueron puestos en la grilla de la pantalla pero
-        todavía no se guardaron. Se sacan de la lista a medida que se cargan.
-
-        'semana' no filtra: un operario libre es el que no tiene asignación, y
-        al guardar se le asigna la semana (guardar_datos_semana). Se mantiene
-        el parámetro por compatibilidad con quien ya llama al método.
-        """
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
             SELECT id, operario
             FROM modymoi
-            WHERE COALESCE(TRIM(horario_semana), '') = ''
-              AND COALESCE(TRIM(sector_semana), '') = ''
-              AND COALESCE(TRIM(planta_semana), '') = ''
+            WHERE COALESCE(TRIM("Horario"), '') = ''
+              AND COALESCE(TRIM("Sector"), '') = ''
+              AND COALESCE(TRIM("Planta"), '') = ''
               AND operario IS NOT NULL AND TRIM(operario) != ''
             ORDER BY operario ASC
             """
@@ -116,10 +112,10 @@ class ModeloHGoloWeb:
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
-            SELECT id, operario, horario_semana, sector_semana
+            SELECT id, operario, "Horario", "Sector"
             FROM modymoi
-            WHERE semana=? AND LOWER(TRIM(planta_semana)) = 'golosinas'
-              AND sector_semana IS NOT NULL AND TRIM(sector_semana) != ''
+            WHERE semana = %s AND LOWER(TRIM("Planta")) IN ('golosinas', 'golosina')
+              AND "Sector" IS NOT NULL AND TRIM("Sector") != ''
             """,
             (str(semana),),
         )
@@ -133,29 +129,29 @@ class ModeloHGoloWeb:
             """
             SELECT id
             FROM modymoi
-            WHERE semana = ? AND LOWER(TRIM(planta_semana)) = 'golosinas'
+            WHERE semana = %s AND LOWER(TRIM("Planta")) IN ('golosinas', 'golosina')
             """,
             (sem_val,),
         )
         ids_previos_en_bd = set(row[0] for row in _filas(cursor))
         ids_actuales_en_pantalla = set(r[0] for r in registros_pantalla)
 
-        # Los que estaban cargados y ya no están en pantalla quedan libres
+        # 1. Blanquear los operarios removidos de la pantalla
         ids_a_limpiar = ids_previos_en_bd - ids_actuales_en_pantalla
         for id_old in ids_a_limpiar:
             cursor.execute(
-                "UPDATE modymoi SET horario_semana='', sector_semana='', planta_semana='' WHERE id=?",
+                'UPDATE modymoi SET "Horario" = \'\', "Sector" = \'\', "Planta" = \'\' WHERE id = %s',
                 (id_old,),
             )
 
-        # Los que están en pantalla quedan asignados (y dejan de ser disponibles)
+        # 2. Guardar asignaciones actuales
         for id_op, operario_nombre, turno, sector in registros_pantalla:
             cursor.execute(
                 """
                 UPDATE modymoi
-                SET operario=?, horario_semana=?, sector_semana=?,
-                    planta_semana='Golosinas', semana=?
-                WHERE id=?
+                SET operario = %s, "Horario" = %s, "Sector" = %s,
+                    "Planta" = 'Golosinas', semana = %s
+                WHERE id = %s
                 """,
                 (operario_nombre, turno, sector, sem_val, id_op),
             )
