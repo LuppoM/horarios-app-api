@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date
 from io import BytesIO
 import os
 from typing import Optional
@@ -42,11 +42,9 @@ app.mount("/archivos", StaticFiles(directory=os.path.join(BASE_DIR, "archivos"))
 
 
 def semana_objetivo_por_defecto() -> str:
-    """Semana activa (la próxima semana) según la regla de la planta."""
+    """Obtiene la semana activa actual según la regla operativa."""
     return str(
-        modelo_dtprog.obtener_numero_semana_personalizado(
-            date.today() + timedelta(days=7)
-        )
+        modelo_dtprog.obtener_numero_semana_personalizado(date.today())
     )
 
 
@@ -58,7 +56,7 @@ def semana_objetivo_por_defecto() -> str:
 def home(request: Request):
     modelo_base = modeloprincipal()
     try:
-        # Limpieza global de semanas anteriores en Supabase
+        # Limpieza global de semanas anteriores en Supabase (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores()
     except Exception as e:
         print(f"Error al ejecutar limpieza automatica en el Inicio: {e}")
@@ -139,8 +137,7 @@ def api_obtener_modmoi(
 def api_exportar_excel(vista: str = "Semana"):
     es_finde = vista == "Fin de Semana"
 
-    fecha_proxima = date.today() + timedelta(days=7)
-    semana_actual = modmoi_modelo.obtener_numero_semana_personalizado(fecha_proxima)
+    semana_actual = modmoi_modelo.obtener_numero_semana_personalizado(date.today())
 
     if es_finde:
         columnas, datos = modmoi_modelo.obtener_datos_finde()
@@ -398,12 +395,11 @@ def api_obtener_hchoco(semana: Optional[str] = None):
     modelo = ModeloHChocoWeb()
     modelo_base = modeloprincipal()
     try:
-        # 1. Resolver la semana solicitada o calcular la próxima
+        # 1. Resolver la semana solicitada o calcular la actual
         if not semana or semana.lower() == "none" or semana.strip() == "":
-            fecha_proxima = date.today() + timedelta(days=7)
-            semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # 2. Limpieza de semanas anteriores en Supabase
+        # 2. Limpieza de semanas anteriores en Supabase (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         # 3. Consulta de datos
@@ -474,10 +470,9 @@ def api_obtener_hchoco_finde(semana: Optional[str] = None):
     modelo_base = modeloprincipal()
     try:
         if not semana or semana.lower() == "none" or semana.strip() == "":
-            fecha_proxima = date.today() + timedelta(days=7)
-            semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # Limpieza previa para garantizar datos libres en fin de semana
+        # Limpieza previa para garantizar datos libres en fin de semana (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         datos = modelo.obtener_datos_semana_finde(semana)
@@ -659,12 +654,11 @@ def api_obtener_hgolo(semana: Optional[str] = None):
     modelo = ModeloHGoloWeb()
     modelo_base = modeloprincipal()
     try:
-        # 1. Resolver la semana solicitada o calcular la próxima
+        # 1. Resolver la semana solicitada o calcular la actual
         if not semana or semana.lower() == "none" or semana.strip() == "":
-            fecha_proxima = date.today() + timedelta(days=7)
-            semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # 2. Limpieza de semanas anteriores en Supabase
+        # 2. Limpieza de semanas anteriores en Supabase (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         # 3. Consulta de datos
@@ -734,10 +728,9 @@ def api_hgolo_finde_datos(semana: Optional[str] = ""):
     modelo_base = modeloprincipal()
     try:
         if not semana or semana.lower() == "none" or semana.strip() == "":
-            fecha_proxima = date.today() + timedelta(days=7)
-            semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # Limpieza previa para garantizar datos libres en fin de semana
+        # Limpieza previa para garantizar datos libres en fin de semana (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         operarios = modelo.obtener_operarios_disponibles(semana)
