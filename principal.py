@@ -612,11 +612,19 @@ def api_obtener_hgolo(semana: Optional[str] = None):
         todos_operarios = modelo.obtener_operarios()
 
         sectores_info = []
-        for sec, tipo, req in sectores:
+        for row in sectores:
+            if isinstance(row, dict):
+                sec = row.get("nombre_sector") or row.get("sector")
+                tipo = row.get("tipo_horario")
+                req = row.get("requiere_dotacion")
+            else:
+                sec, tipo, req = row[0], row[1], row[2]
+
             t_horario = str(tipo).strip().upper() if tipo else "ROTATIVO"
             turnos = modelo.obtener_turnos_por_tipo(t_horario)
             if not turnos:
                 turnos = ["08:00 a 16:00"] if t_horario == "CENTRAL" else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+            
             sectores_info.append({
                 "sector": sec,
                 "tipo_horario": t_horario,
