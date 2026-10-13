@@ -19,8 +19,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from fastapi import Query
-from datetime import date, timedelta
-from principalmodelo import modeloprincipal  # o principalmodelo dependiendo de cómo nombraste la clase
+from principalmodelo import modeloprincipal 
 from typing import Optional
 from hchocofindemodelo import ModeloHChocoFindeWeb
 from hgolomodelo import ModeloHGoloWeb
@@ -52,8 +51,8 @@ app.mount("/archivos", StaticFiles(directory="."), name="archivos")
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    # ✅ AHORA (forma correcta en las versiones actuales):
-return templates.TemplateResponse(request, "principal.html", {})
+    # ✅ Indentación corregida correctamente
+    return templates.TemplateResponse(request, "principal.html", {})
 
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
@@ -76,6 +75,7 @@ def vista_hchoco(request: Request):
 @app.get("/dtprogramada", response_class=HTMLResponse)
 def vista_dotacion_programada(request: Request):
     return templates.TemplateResponse("dtprogramada.html", {"request": request})
+
 @app.get("/hchocofinde", response_class=HTMLResponse)
 def vista_hchocofinde(request: Request):
     return templates.TemplateResponse("hchocofinde.html", {"request": request})
@@ -271,21 +271,11 @@ def api_eliminar_sector(id_sector: int):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-    # Vista HTML: Tipos de Horario
-@app.get("/api/tipohorarios", response_class=HTMLResponse)
-def vista_tipos_horario(request: Request):
-    return templates.TemplateResponse("tipohorarios.html", {"request": request})
 
 # ==========================================
 # 4. MÓDULO: TIPOS DE HORARIO
 # ==========================================
 
-# Vista HTML: Tipos de Horario (Sin el prefijo /api/)
-@app.get("/tipohorarios", response_class=HTMLResponse)
-def vista_tipos_horario(request: Request):
-    return templates.TemplateResponse("tipohorarios.html", {"request": request})
-
-# API: Obtener listado de Tipos de Horario
 @app.get("/api/tipohorarios/datos")
 def api_obtener_tipos_horarios():
     filas = modelo_tipohorarios.obtener_tipos_horarios()
@@ -295,7 +285,7 @@ def api_obtener_tipos_horarios():
         "datos": filas
     }
 
-# API: Obtener Tipo de Horario por ID
+
 @app.get("/api/tipohorarios/obtener/{tipo_id}")
 def api_obtener_tipo_horario(tipo_id: int):
     data = modelo_tipohorarios.obtener_tipo_horario_por_id(tipo_id)
@@ -303,7 +293,7 @@ def api_obtener_tipo_horario(tipo_id: int):
         return {"error": "Tipo de horario no encontrado"}
     return data
 
-# API: Guardar (Insertar / Modificar)
+
 @app.post("/api/tipohorarios/guardar")
 def api_guardar_tipo_horario(payload: dict = Body(...)):
     modo = payload.get("modo")
@@ -322,7 +312,7 @@ def api_guardar_tipo_horario(payload: dict = Body(...)):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-# API: Eliminar Tipo de Horario
+
 @app.delete("/api/tipohorarios/eliminar/{tipo_id}")
 def api_eliminar_tipo_horario(tipo_id: int):
     try:
@@ -331,9 +321,10 @@ def api_eliminar_tipo_horario(tipo_id: int):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@app.get("/dotacion-programada", response_class=HTMLResponse)
-def vista_dotacion_programada(request: Request):
-    return templates.TemplateResponse("dtprogramada.html", {"request": request})
+
+# ==========================================
+# 5. MÓDULO: DOTACIÓN PROGRAMADA
+# ==========================================
 
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: str = None):
@@ -353,6 +344,7 @@ def api_obtener_dtprogramada(semana: str = None):
         "dotaciones": dotaciones
     }
 
+
 @app.post("/api/dtprogramada/guardar")
 def api_guardar_dtprogramada(payload: dict = Body(...)):
     semana = payload.get("semana")
@@ -364,11 +356,12 @@ def api_guardar_dtprogramada(payload: dict = Body(...)):
     if exito:
         return {"status": "ok"}
     else:
-        return {"status": "error", "message": mensaje}   
+        return {"status": "error", "message": mensaje}
 
-@app.get("/hchoco", response_class=HTMLResponse)
-def vista_hchoco(request: Request):
-    return templates.TemplateResponse("hchoco.html", {"request": request})
+
+# ==========================================
+# 6. MÓDULO: CHOCOLATES (SEMANAL Y FINDE)
+# ==========================================
 
 @app.get("/api/hchoco/datos")
 def api_obtener_hchoco(semana: Optional[str] = None):
@@ -402,9 +395,9 @@ def api_obtener_hchoco(semana: Optional[str] = None):
             "semana": semana,
             "sectores": sectores_info,
             "dotacion_teorica": dotacion_teorica,
-            "asignados": datos_guardados, # Devuelve [id, operario_nombre, horario, sector]
-            "operarios": todos_operarios, # Diccionario {id: nombre}
-            "operarios_disponibles": operarios_disponibles # Lista [[id, nombre], ...]
+            "asignados": datos_guardados,
+            "operarios": todos_operarios,
+            "operarios_disponibles": operarios_disponibles
         }
     except Exception as e:
         print(f"Error en endpoint /api/hchoco/datos: {e}")
@@ -413,12 +406,14 @@ def api_obtener_hchoco(semana: Optional[str] = None):
         modelo.cerrar_conexion()
         modelo_base.cerrar_conexion()
     
+
 @app.post("/api/hchoco/guardar")
 def api_guardar_hchoco(payload: dict = Body(...)):
     semana = payload.get("semana")
-    registros = payload.get("registros", []) # [ [id_op, nombre, turno, sector], ... ]
+    registros = payload.get("registros", [])
     modelo_hchoco.guardar_datos_semana(semana, registros)
     return {"status": "ok"}
+
 
 @app.get("/api/hchoco/finde/datos")
 def api_obtener_hchoco_finde(semana: str = "42"):
@@ -442,6 +437,23 @@ def api_obtener_hchoco_finde(semana: str = "42"):
         print(f"Error en /api/hchoco/finde/datos: {e}")
         return {"error": str(e)}
 
+
+@app.post("/api/hchoco/finde/guardar")
+def api_guardar_hchoco_finde(payload: dict = Body(...)):
+    semana = payload.get("semana")
+    registros = payload.get("registros", [])
+    
+    modelo = ModeloHChocoFindeWeb()
+    try:
+        modelo.guardar_datos_finde(semana, registros)
+        modelo.cerrar_conexion()
+        return {"status": "ok"}
+    except Exception as e:
+        modelo.cerrar_conexion()
+        import traceback
+        traceback.print_exc()
+        print(f"Error detallado en /api/hchoco/finde/guardar: {e}")
+        return {"status": "error", "mensaje": str(e)}
 
 
 @app.get("/api/hchoco/exportar-pdf")
@@ -470,7 +482,6 @@ def api_exportar_pdf_hchoco(semana: str = "42"):
         )
         elements.append(Spacer(1, 12))
 
-        # 1. Obtener asignaciones semanales de chocolates
         datos_guardados = modelo_main.obtener_datos_semana(semana)
         sectores_operarios = {}
 
@@ -514,7 +525,6 @@ def api_exportar_pdf_hchoco(semana: str = "42"):
             elements.append(table)
             elements.append(Spacer(1, 12))
 
-        # 2. Añadir sección de Fin de Semana desde el modelo correcto
         registros_finde = modelo_finde.obtener_datos_semana_finde(semana)
         if registros_finde:
             elements.append(PageBreak())
@@ -571,59 +581,13 @@ def api_exportar_pdf_hchoco(semana: str = "42"):
         return StreamingResponse(output, headers=headers, media_type="application/pdf")
 
     finally:
-        # Cerramos conexiones siempre
         modelo_main.cerrar_conexion()
         modelo_finde.cerrar_conexion()
 
-## ==========================================
-# MÓDULO: CHOCOLATES FIN DE SEMANA
+
 # ==========================================
-
-
-
-@app.get("/api/hchoco/finde/datos")
-def api_obtener_hchoco_finde(semana: str):
-    modelo = ModeloHChocoFindeWeb()
-    modelo_main = ModeloHChocoWeb()
-    try:
-        datos = modelo.obtener_datos_semana_finde(semana)
-        operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
-        sectores = modelo_main.obtener_sectores_chocolates()
-        
-        modelo.cerrar_conexion()
-        modelo_main.cerrar_conexion()
-        
-        return {
-            "semana": semana,
-            "asignados_finde": datos,
-            "operarios_disponibles": operarios_disponibles,
-            "sectores": sectores
-        }
-    except Exception as e:
-        print(f"Error en /api/hchoco/finde/datos: {e}")
-        return {"error": str(e)}
-
-@app.post("/api/hchoco/finde/guardar")
-def api_guardar_hchoco_finde(payload: dict = Body(...)):
-    semana = payload.get("semana")
-    registros = payload.get("registros", [])
-    
-    # Instanciamos explícitamente el modelo de fin de semana
-    modelo = ModeloHChocoFindeWeb()
-    try:
-        modelo.guardar_datos_finde(semana, registros)
-        modelo.cerrar_conexion()
-        return {"status": "ok"}
-    except Exception as e:
-        modelo.cerrar_conexion()
-        import traceback
-        traceback.print_exc()
-        print(f"Error detallado en /api/hchoco/finde/guardar: {e}")
-        return {"status": "error", "mensaje": str(e)}
-
-@app.get("/hgolo", response_class=HTMLResponse)
-def vista_hgolo(request: Request):
-    return templates.TemplateResponse("hgolo.html", {"request": request})
+# 7. MÓDULO: GOLOSINAS (SEMANAL Y FINDE)
+# ==========================================
 
 @app.get("/api/hgolo/datos")
 def api_obtener_hgolo(semana: Optional[str] = None):
@@ -669,6 +633,7 @@ def api_obtener_hgolo(semana: Optional[str] = None):
         if hasattr(modelo_base, 'cerrar_conexion'):
             modelo_base.cerrar_conexion()
 
+
 @app.post("/api/hgolo/guardar")
 def api_guardar_hgolo(payload: dict = Body(...)):
     semana = payload.get("semana")
@@ -683,8 +648,6 @@ def api_guardar_hgolo(payload: dict = Body(...)):
         return {"status": "error", "mensaje": str(e)}
     finally:
         modelo.cerrar_conexion()
-
-
 
 
 @app.get("/api/hgolo/finde/datos")
@@ -703,6 +666,7 @@ def api_hgolo_finde_datos(semana: str = ""):
     finally:
         modelo.cerrar_conexion()
 
+
 @app.post("/api/hgolo/finde/guardar")
 async def api_hgolo_finde_guardar(request: Request):
     data = await request.json()
@@ -717,6 +681,8 @@ async def api_hgolo_finde_guardar(request: Request):
         return {"status": "error", "message": str(e)}
     finally:
         modelo.cerrar_conexion()
+
+
 @app.get("/api/hgolo/exportar-pdf")
 def api_exportar_pdf_hgolo(semana: str = "42"):
     modelo_main = ModeloHGoloWeb()
@@ -743,7 +709,6 @@ def api_exportar_pdf_hgolo(semana: str = "42"):
         )
         elements.append(Spacer(1, 12))
 
-        # 1. Obtener asignaciones semanales de golosinas
         datos_guardados = modelo_main.obtener_datos_semana(semana)
         sectores_operarios = {}
 
@@ -787,7 +752,6 @@ def api_exportar_pdf_hgolo(semana: str = "42"):
             elements.append(table)
             elements.append(Spacer(1, 12))
 
-        # 2. Añadir sección de Fin de Semana desde el modelo correcto de Golosinas
         registros_finde = modelo_finde.obtener_datos_semana_finde(semana)
         if registros_finde:
             elements.append(PageBreak())
