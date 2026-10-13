@@ -11,27 +11,22 @@ class modeloprincipal:
             self.conexion_db = conexion.obtener_conexion()
 
     def obtener_numero_semana_personalizado(self, fecha=None):
-        """Calcula el número de semana de producción personalizado.
-        Ajusta según las reglas operativas internas.
-        """
+        """Calcula el número de semana de producción personalizado."""
         if fecha is None:
             fecha = date.today()
         elif isinstance(fecha, datetime):
             fecha = fecha.date()
 
-        # Si el día es domingo, la semana operativa empieza/corresponde al lunes siguiente
         if fecha.weekday() == 6:
             fecha_ajustada = fecha + timedelta(days=1)
         else:
             fecha_ajustada = fecha
 
-        # Obtiene el número de semana ISO de la fecha
         return fecha_ajustada.isocalendar()[1]
 
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
         """Limpieza remota sobre Supabase (PostgreSQL).
-        Blanquea "Horario", "Sector" y "Planta" en la tabla modymoi ÚNICAMENTE
-        para las semanas estrictamente ANTERIORES (< semana_actual).
+        Blanquea asignaciones y limites teoricos de semanas estrictamente ANTERIORES (< semana_actual).
         """
         try:
             cursor = self.conexion_db.cursor()
@@ -41,7 +36,7 @@ class modeloprincipal:
 
             semana_num = int(semana_actual)
 
-            # 1. Blanquear puestos en la tabla modymoi para semanas estrictamente anteriores (<)
+            # 1. Blanquear puestos en la tabla modymoi para semanas anteriores (<)
             cursor.execute(
                 """
                 UPDATE modymoi
@@ -61,7 +56,7 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 2. Eliminar asignaciones registradas del fin de semana para semanas estrictamente anteriores (<)
+            # 2. Eliminar asignaciones registradas del fin de semana para semanas anteriores (<)
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
@@ -77,8 +72,24 @@ class modeloprincipal:
                 (semana_num,),
             )
 
+            # 3. Eliminar limites de dotacion programada/teorica de semanas anteriores (<)
+            cursor.execute(
+                """
+                DELETE FROM dotacion_teorica_horarios
+                WHERE semana_inicio IS NOT NULL 
+                  AND (
+                    CASE 
+                      WHEN TRIM(CAST(semana_inicio AS TEXT)) ~ '^[0-9]+$' 
+                      THEN CAST(TRIM(CAST(semana_inicio AS TEXT)) AS INTEGER) 
+                      ELSE 0 
+                    END
+                  ) < %s
+                """,
+                (semana_num,),
+            )
+
             self.conexion_db.commit()
-            print(f"Limpieza ejecutada exitosamente en Supabase para semanas anteriores a la semana {semana_num}.")
+            print(f"Limpieza ejecutada exitosamente para semanas anteriores a la semana {semana_num}.")
 
         except Exception as e:
             if hasattr(self, 'conexion_db') and self.conexion_db:
