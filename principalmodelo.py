@@ -64,7 +64,7 @@ class modeloprincipal:
         """Limpieza sobre la base SQLite local (HORARIOS.db), que es la que
         leen y escriben las pantallas de Golosinas, Chocolates y Dotación.
 
-        - modymoi: blanquea horario, sector, planta y semana de las filas
+        - modymoi: blanquea horario, sector y planta de las filas
           cuya semana sea anterior a la semana activa.
         - modymoi_finde: borra las filas de semanas anteriores.
         - dotacion_teorica_horarios: borra las semanas anteriores.
@@ -83,7 +83,7 @@ class modeloprincipal:
                 "modymoi",
                 """
                 UPDATE modymoi
-                SET horario = '', sector = '', planta = '', semana = ''
+                SET horario = '', sector = '', planta = ''
                 WHERE semana IS NOT NULL
                   AND TRIM(CAST(semana AS TEXT)) GLOB '[0-9]*'
                   AND CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) < ?
@@ -126,11 +126,12 @@ class modeloprincipal:
             conexion_local.close()
 
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
-        """Si los registros de modymoi tienen una semana estrictamente anterior a semana_actual,
-        blanquea los campos horario_semana, sector_semana, planta_semana y semana en modymoi,
-        y borra las filas de modymoi_finde.
+        """Si los registros de modymoi pertenecen a una semana estrictamente anterior a semana_actual,
+        blanquea únicamente los campos horario_semana, sector_semana y planta_semana en modymoi
+        (manteniendo intacta la fila del operario para la vista MOD/MOI), y borra las filas
+        dinámicas de modymoi_finde y dotacion_teorica_horarios.
 
-        OJO: esta versión trabaja sobre la base remota (PostgreSQL/Supabase).
+        Trabaja sobre la base remota (PostgreSQL / Supabase).
         """
         try:
             cursor = self.conexion_db.cursor()
@@ -140,14 +141,13 @@ class modeloprincipal:
 
             semana_num = int(semana_actual)
 
-            # 1. Blanquear asignaciones usando los nombres de columna REALES de la BD
+            # 1. Blanquear SOLAMENTE los puestos/horarios sin borrar la semana ni el operario
             cursor.execute(
                 """
                 UPDATE modymoi
                 SET horario_semana = '', 
                     sector_semana = '', 
-                    planta_semana = '',
-                    semana = ''
+                    planta_semana = ''
                 WHERE semana IS NOT NULL 
                   AND TRIM(CAST(semana AS TEXT)) != ''
                   AND CASE 
@@ -185,11 +185,11 @@ class modeloprincipal:
             )
 
             self.conexion_db.commit()
-            print(f"Limpieza ejecutada exitosamente en modymoi para la semana {semana_num}.")
+            print(f"Limpieza de puestos ejecutada exitosamente en Supabase para la semana {semana_num}.")
 
         except Exception as e:
             self.conexion_db.rollback()
-            print(f"Error al limpiar semanas anteriores en modymoi: {e}")
+            print(f"Error al limpiar semanas anteriores en Supabase: {e}")
 
     def vaciar_tabla_finde_por_semana(self, semana):
         """Elimina las filas dinámicas de 'modymoi_finde' correspondientes a una
@@ -208,17 +208,17 @@ class modeloprincipal:
 
     def limpiar_operario(self, id_operario=None, semana=None):
         """Resetea 'modymoi' y borra las filas de 'modymoi_finde' respetando los
-        filtros de ID y/o semana.
+        filtros de ID y/o semana en Supabase.
         """
         try:
             cursor = self.conexion_db.cursor()
 
-            # 1. Resetear modymoi
+            # 1. Resetear asignaciones en modymoi
             sql_modymoi = """
                 UPDATE modymoi 
-                SET "Horario" = '', 
-                    "Sector" = '', 
-                    "Planta" = '' 
+                SET horario_semana = '', 
+                    sector_semana = '', 
+                    planta_semana = '' 
                 WHERE 1=1
             """
             params_modymoi = []
@@ -246,11 +246,11 @@ class modeloprincipal:
             cursor.execute(sql_finde, params_finde)
 
             self.conexion_db.commit()
-            print("Operación de limpieza completada con éxito.")
+            print("Operación de limpieza completada con éxito en Supabase.")
 
         except Exception as e:
             self.conexion_db.rollback()
-            print(f"Error al limpiar operario: {e}")
+            print(f"Error al limpiar operario en Supabase: {e}")
 
     def cerrar_conexion(self):
         if self.conexion_db:
