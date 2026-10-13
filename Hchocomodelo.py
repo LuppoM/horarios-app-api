@@ -12,12 +12,17 @@ class ModeloHChocoWeb:
         cursor = self.conexion_db.cursor()
         cursor.execute("SELECT id, operario FROM modymoi ORDER BY operario ASC")
         rows = cursor.fetchall()
-        self.operarios_dict = {row["id"]: row["operario"] for row in rows if row["operario"]}
+        # Maneja tanto acceso por clave/dict como por índice para mayor seguridad
+        self.operarios_dict = {
+            (row["id"] if isinstance(row, dict) else row[0]): (row["operario"] if isinstance(row, dict) else row[1])
+            for row in rows if (row["operario"] if isinstance(row, dict) else row[1])
+        }
 
     def obtener_operarios(self):
         return self.operarios_dict
 
     def obtener_sectores_chocolates(self):
+        """Devuelve los sectores estructurados como objetos/diccionarios con sus turnos asociados."""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
@@ -25,9 +30,28 @@ class ModeloHChocoWeb:
                 SELECT nombre_sector, tipo_horario, requiere_dotacion 
                 FROM sectores 
                 WHERE LOWER(TRIM(planta)) IN ('chocolate', 'chocolates')
+                ORDER BY id ASC
                 """
             )
-            return cursor.fetchall() or []
+            rows = cursor.fetchall() or []
+            sectores_list = []
+
+            for row in rows:
+                nom_sector = row[0] if not isinstance(row, dict) else row["nombre_sector"]
+                tipo_horario = row[1] if not isinstance(row, dict) else row["tipo_horario"]
+                req_dotacion = row[2] if not isinstance(row, dict) else row["requiere_dotacion"]
+
+                # Obtenemos los turnos correspondientes a cada tipo de horario del sector
+                turnos = self.obtener_turnos_por_tipo(tipo_horario)
+
+                sectores_list.append({
+                    "sector": nom_sector,
+                    "tipo_horario": tipo_horario,
+                    "requiere_dotacion": req_dotacion,
+                    "turnos": turnos
+                })
+
+            return sectores_list
         except Exception as e:
             print(f"Error al obtener sectores: {e}")
             return []
@@ -37,11 +61,13 @@ class ModeloHChocoWeb:
         try:
             cursor.execute(
                 "SELECT horarios_definidos FROM tipohorario WHERE UPPER(TRIM(tipo)) = %s",
-                (tipo_horario.upper(),),
+                (str(tipo_horario).upper().strip(),),
             )
             row = cursor.fetchone()
-            if row and row[0]:
-                return [t.strip() for t in row[0].split(",")]
+            if row:
+                val = row[0] if not isinstance(row, dict) else row["horarios_definidos"]
+                if val:
+                    return [t.strip() for t in val.split(",")]
         except Exception as e:
             print(f"Error al obtener turnos: {e}")
         return []
@@ -53,12 +79,16 @@ class ModeloHChocoWeb:
                 """
                 SELECT sector, rango_horario, cantidad_operarios
                 FROM dotacion_teorica_horarios
-                WHERE semana_inicio = %s AND planta = 'Chocolate'
+                WHERE semana_inicio = %s AND LOWER(TRIM(planta)) IN ('chocolate', 'chocolates')
                 """,
                 (str(semana),),
             )
             resultados = {}
-            for sector, rango, cantidad in cursor.fetchall():
+            for row in cursor.fetchall():
+                sector = row[0] if not isinstance(row, dict) else row["sector"]
+                rango = row[1] if not isinstance(row, dict) else row["rango_horario"]
+                cantidad = row[2] if not isinstance(row, dict) else row["cantidad_operarios"]
+
                 if sector not in resultados:
                     resultados[sector] = {}
                 resultados[sector][rango] = cantidad
@@ -81,10 +111,14 @@ class ModeloHChocoWeb:
             """
         )
         excluidos = {int(i) for i in (excluir_ids or [])}
+        rows = cursor.fetchall()
         return [
-            (id_op, nombre)
-            for id_op, nombre in cursor.fetchall()
-            if id_op not in excluidos
+            (
+                row[0] if not isinstance(row, dict) else row["id"],
+                row[1] if not isinstance(row, dict) else row["operario"]
+            )
+            for row in rows
+            if (row[0] if not isinstance(row, dict) else row["id"]) not in excluidos
         ]
 
     def obtener_datos_semana(self, semana):
@@ -93,7 +127,7 @@ class ModeloHChocoWeb:
             """
             SELECT id, operario, "Horario", "Sector"
             FROM modymoi
-            WHERE semana = %s AND ("Planta" = 'Chocolates' OR "Planta" = 'Chocolate')
+            WHERE semana = %s AND LOWER(TRIM("Planta")) IN ('chocolates', 'chocolate')
             AND "Sector" IS NOT NULL AND TRIM("Sector") != ''
             """,
             (str(semana),),
@@ -112,7 +146,10 @@ class ModeloHChocoWeb:
             """,
             (sem_val,),
         )
-        ids_previos_en_bd = set(row[0] for row in cursor.fetchall())
+        rows_previos = cursor.fetchall()
+        ids_previos_en_bd = set(
+            row[0] if not isinstance(row, dict) else row["id"] for row in rows_previos
+        )
         ids_actuales_en_pantalla = set(r[0] for r in registros_pantalla)
 
         ids_a_limpiar = ids_previos_en_bd - ids_actuales_en_pantalla
