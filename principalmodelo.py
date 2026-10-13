@@ -50,59 +50,68 @@ class modeloprincipal:
         return (diferencia_dias // 7) + 1
 
     def eliminar_datos_semanas_anteriores(self):
-        """Limpia los datos al cambiar de semana:
-
-        - En 'modymoi': Blanquea Horario, Sector, Planta y semana mediante UPDATE para semanas anteriores a la actual.
-        - En 'modymoi_finde': Elimina por completo los registros mediante DELETE al manejarse por INSERT.
-        - En 'dotacion_teorica_horarios': Elimina la dotación teórica para semanas pasadas.
+        """Libera a los operarios cuando la planta pasa a una semana nueva.
+ 
+        - modymoi (carga semanal por UPDATE, mano de obra fija): NO se borran
+          filas. Se vacían horario_semana, sector_semana y planta_semana de las
+          semanas ANTERIORES y se pasa la fila a la semana actual, así el
+          operario aparece libre en obtener_operarios_disponibles(semana_actual).
+        - modymoi_finde (carga por INSERT): se borran las filas de semanas
+          anteriores.
+        - dotacion_teorica_horarios: se borran las filas de semanas anteriores.
+ 
+        Es idempotente: se puede llamar al iniciar la carga semanal o al abrir
+        la app sin riesgo de duplicar efectos.
         """
         try:
             cursor = self.conexion_db.cursor()
             semana_actual = self.obtener_numero_semana_personalizado()
-
-            # 1. Blanquear modymoi (UPDATE) para semanas anteriores
+ 
+            # 1. Liberar operarios en modymoi (semanas < actual)
             cursor.execute(
                 """
                 UPDATE modymoi
-                SET Horario = '', 
-                    Sector = '', 
-                    Planta = '',
-                    semana = ''
-                WHERE semana IS NOT NULL 
+                SET horario_semana = '',
+                    sector_semana = '',
+                    planta_semana = '',
+                    semana = ?
+                WHERE semana IS NOT NULL
                   AND TRIM(semana) != ''
                   AND CAST(TRIM(semana) AS INTEGER) < ?
-            """,
-                (semana_actual,),
+                """,
+                (str(semana_actual), semana_actual),
             )
-
-            # 2. Borrar de modymoi_finde (DELETE al manejarse por INSERT) para semanas anteriores
+ 
+            # 2. Despejar modymoi_finde (semanas < actual)
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
-                WHERE semana IS NOT NULL 
+                WHERE semana IS NOT NULL
                   AND CAST(semana AS INTEGER) < ?
-            """,
+                """,
                 (semana_actual,),
             )
-
-            # 3. Borrar la dotación teórica de los horarios para semanas pasadas
+ 
+            # 3. Despejar la dotación teórica (semanas < actual)
             cursor.execute(
                 """
                 DELETE FROM dotacion_teorica_horarios
-                WHERE semana_inicio IS NOT NULL 
+                WHERE semana_inicio IS NOT NULL
                   AND CAST(semana_inicio AS INTEGER) < ?
-            """,
+                """,
                 (semana_actual,),
             )
-
+ 
             self.conexion_db.commit()
             print(
-                f"Limpieza basada en semana {semana_actual} completada con éxito en todas las tablas."
+                f"Liberación semanal completada: operarios libres en la "
+                f"semana {semana_actual}."
             )
-
+ 
         except Exception as e:
             self.conexion_db.rollback()
-            print(f"Error al limpiar semanas anteriores: {e}")
+            print(f"Error al liberar semanas anteriores: {e}")
+ 
 
     def vaciar_tabla_finde_por_semana(self, semana):
         """Elimina las filas dinámicas de 'modymoi_finde' correspondientes a una
