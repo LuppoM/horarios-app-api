@@ -14,11 +14,22 @@ class ModMoiModel:
     def obtener_numero_semana_personalizado(self, fecha=None):
         return self._modelo_principal.obtener_numero_semana_personalizado(fecha)
 
+    def limpiar_semanas_anteriores(self, semana_actual=None):
+        """Ejecuta la limpieza sobre Supabase reutilizando la conexión activa."""
+        try:
+            self._modelo_principal.conexion_db = self.conexion_db
+            self._modelo_principal.eliminar_datos_semanas_anteriores(semana_actual=semana_actual)
+        except Exception as e:
+            print(f"Error al ejecutar limpieza desde ModMoiModel: {e}")
+
     def obtener_datos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Obtiene la lista de operarios desde Supabase leyendo las columnas con mayúscula inicial
         'Horario', 'Sector', 'Planta' de la tabla modymoi.
         """
         try:
+            # Ejecutamos la limpieza automática antes de consultar
+            self.limpiar_semanas_anteriores(semana_actual=semana_actual)
+
             cursor = self.conexion_db.cursor()
 
             columnas = [
@@ -31,7 +42,6 @@ class ModMoiModel:
                 "planta_semana"
             ]
 
-            # Seleccionamos las columnas con comillas dobles para que PostgreSQL respete la mayúscula
             query_base = """
                 SELECT 
                     id,
