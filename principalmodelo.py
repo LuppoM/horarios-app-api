@@ -1,5 +1,4 @@
 from datetime import date, timedelta
-
 import conexion
 
 
@@ -10,6 +9,7 @@ class modeloprincipal:
 
     def obtener_numero_semana_personalizado(self, fecha=None):
         """Calcula el número de semana bajo la regla de la planta:
+
         - Si el 1 de enero es Lunes, esa es la Semana 1.
         - Si el 1 de enero NO es Lunes, esa semana incompleta se descarta.
           La Semana 1 comenzará oficialmente en el primer lunes de enero.
@@ -47,67 +47,59 @@ class modeloprincipal:
         return (diferencia_dias // 7) + 1
 
     def eliminar_datos_semanas_anteriores(self):
-        """Libera a los operarios cuando la planta pasa a una semana nueva.
+        """Aplica la misma lógica a las tablas de planificación:
 
-        - modymoi (carga semanal por UPDATE, mano de obra fija): NO se borran
-          filas. Se vacían "Horario", "Sector" y "Planta" de las
-          semanas ANTERIORES y se pasa la fila a la semana actual, así el
-          operario aparece libre en obtener_operarios_disponibles(semana_actual).
-        - modymoi_finde (carga por INSERT): se borran las filas de semanas
-          anteriores.
-        - dotacion_teorica_horarios: se borran las filas de semanas anteriores.
-
-        Es idempotente: se puede llamar al iniciar la carga semanal o al abrir
-        la app sin riesgo de duplicar efectos.
+        - En 'modymoi': Blanquea campos para semanas <= semana_actual.
+        - En 'modymoi_finde': Elimina filas completas para semanas <= semana_actual.
+        - En 'dotacion_teorica_horarios': Elimina la dotación teórica para semanas <= semana_actual.
         """
         try:
             cursor = self.conexion_db.cursor()
             semana_actual = self.obtener_numero_semana_personalizado()
 
-            # 1. Liberar operarios en modymoi (semanas < actual)
+            # 1. Blanquear modymoi (semana actual e inferiores)
             cursor.execute(
                 """
                 UPDATE modymoi
-                SET "Horario" = '',
-                    "Sector" = '',
-                    "Planta" = '',
-                    semana = %s
-                WHERE semana IS NOT NULL
+                SET "Horario" = '', 
+                    "Sector" = '', 
+                    "Planta" = ''
+                WHERE semana IS NOT NULL 
                   AND TRIM(semana) != ''
-                  AND CAST(TRIM(semana) AS INTEGER) < %s
-                """,
-                (str(semana_actual), semana_actual),
-            )
-
-            # 2. Despejar modymoi_finde (semanas < actual)
-            cursor.execute(
-                """
-                DELETE FROM modymoi_finde
-                WHERE semana IS NOT NULL
-                  AND CAST(semana AS INTEGER) < %s
-                """,
+                  AND CAST(TRIM(semana) AS INTEGER) <= %s
+            """,
                 (semana_actual,),
             )
 
-            # 3. Despejar la dotación teórica (semanas < actual)
+            # 2. Borrar de modymoi_finde filtrando exactamente por la misma condición
+            cursor.execute(
+                """
+                DELETE FROM modymoi_finde
+                WHERE semana IS NOT NULL 
+                  AND CAST(semana AS INTEGER) <= %s
+            """,
+                (semana_actual,),
+            )
+
+            # 3. Borrar la dotación teórica de los horarios para semanas pasadas o actuales
             cursor.execute(
                 """
                 DELETE FROM dotacion_teorica_horarios
-                WHERE semana_inicio IS NOT NULL
-                  AND CAST(semana_inicio AS INTEGER) < %s
-                """,
+                WHERE semana_inicio IS NOT NULL 
+                  AND CAST(semana_inicio AS INTEGER) <= %s
+            """,
                 (semana_actual,),
             )
 
             self.conexion_db.commit()
             print(
-                f"Liberación semanal completada: operarios libres en la "
-                f"semana {semana_actual}."
+                f"Limpieza basada en semana {semana_actual} completada con"
+                " éxito en todas las tablas."
             )
 
         except Exception as e:
             self.conexion_db.rollback()
-            print(f"Error al liberar semanas anteriores: {e}")
+            print(f"Error al limpiar semanas anteriores: {e}")
 
     def vaciar_tabla_finde_por_semana(self, semana):
         """Elimina las filas dinámicas de 'modymoi_finde' correspondientes a una
@@ -133,10 +125,10 @@ class modeloprincipal:
 
             # 1. Resetear modymoi
             sql_modymoi = """
-                UPDATE modymoi
-                SET "Horario" = '',
-                    "Sector" = '',
-                    "Planta" = ''
+                UPDATE modymoi 
+                SET "Horario" = '', 
+                    "Sector" = '', 
+                    "Planta" = '' 
                 WHERE 1=1
             """
             params_modymoi = []
@@ -165,134 +157,10 @@ class modeloprincipal:
 
             self.conexion_db.commit()
             print("Operación de limpieza completada con éxito.")
+
         except Exception as e:
             self.conexion_db.rollback()
             print(f"Error al limpiar operario: {e}")
-
-    # --- MÉTODOS DE NEGOCIO PARA CHOCOLATES ---
-
-    def obtener_sectores_chocolates(self):
-        """Obtiene los sectores y tipos de horario para la planta de Chocolates"""
-        cursor = self.conexion_db.cursor()
-        try:
-            cursor.execute(
-                "SELECT nombre_sector, tipo_horario, requiere_dotacion FROM sectores WHERE LOWER(TRIM(planta)) IN ('chocolate', 'chocolates')"
-            )
-            rows = cursor.fetchall()
-            return rows if rows else []
-        except Exception as e:
-            print(f"Error al obtener sectores de chocolates: {e}")
-            return []
-
-    def obtener_turnos_por_tipo(self, tipo_horario):
-        """Busca los turnos definidos según el tipo de horario"""
-        cursor = self.conexion_db.cursor()
-        try:
-            cursor.execute(
-                "SELECT horarios_definidos FROM tipohorario WHERE UPPER(TRIM(tipo)) = %s",
-                (str(tipo_horario).upper(),),
-            )
-            row = cursor.fetchone()
-            if row and row[0]:
-                return [t.strip() for t in row[0].split(",")]
-        except Exception as e:
-            print(f"Error al obtener turnos por tipo: {e}")
-        return []
-
-    def obtener_dotacion_teorica(self, semana):
-        """Obtiene la dotación teórica por sector y horario para la semana"""
-        cursor = self.conexion_db.cursor()
-        try:
-            cursor.execute(
-                """
-                SELECT sector, rango_horario, cantidad_operarios
-                FROM dotacion_teorica_horarios
-                WHERE semana_inicio=%s AND LOWER(TRIM(planta)) IN ('chocolate', 'chocolates')
-                """,
-                (str(semana),),
-            )
-            resultados = {}
-            for row in cursor.fetchall():
-                if len(row) == 4:
-                    _, sector, rango, cantidad = row
-                else:
-                    sector, rango, cantidad = row[0], row[1], row[2]
-
-                if sector not in resultados:
-                    resultados[sector] = {}
-                resultados[sector][rango] = cantidad
-            return resultados
-        except Exception as e:
-            print(f"Error al obtener dotación teórica: {e}")
-            return {}
-
-    def obtener_datos_semana(self, semana):
-        """Devuelve los datos guardados asegurando traer el nombre del operario"""
-        cursor = self.conexion_db.cursor()
-
-        cursor.execute(
-            """
-            SELECT m.id, m.operario, m."Horario", m."Sector"
-            FROM modymoi m
-            WHERE m.semana=%s AND LOWER(TRIM(m."Planta")) IN ('chocolates', 'chocolate')
-            AND m."Sector" IS NOT NULL AND TRIM(m."Sector") != ''
-            """,
-            (str(semana),),
-        )
-        rows = cursor.fetchall()
-
-        todos_ops = self.obtener_operarios()
-
-        datos_procesados = []
-        for r_id, r_op, r_horario, r_sector in rows:
-            nombre_a_mostrar = r_op
-
-            if r_op and str(r_op).isdigit() and int(r_op) in todos_ops:
-                nombre_a_mostrar = todos_ops[int(r_op)]
-            elif not r_op and r_id in todos_ops:
-                nombre_a_mostrar = todos_ops[r_id]
-
-            datos_procesados.append(
-                (r_id, nombre_a_mostrar, r_horario, r_sector)
-            )
-
-        return datos_procesados
-
-    def obtener_operarios_disponibles(self, semana):
-        """Filtra y devuelve los operarios que no tienen sector, horario y planta cargados en la semana"""
-        cursor = self.conexion_db.cursor()
-        sem_val = str(semana).strip()
-
-        cursor.execute(
-            """
-            SELECT id, operario, "Horario", "Sector", "Planta"
-            FROM modymoi
-            WHERE semana = %s
-            """,
-            (sem_val,),
-        )
-        rows = cursor.fetchall()
-
-        disponibles = []
-        for id_val, nombre, horario, sector, planta in rows:
-            ocupado = bool(
-                horario and str(horario).strip()
-                and sector and str(sector).strip()
-                and planta and str(planta).strip()
-            )
-            if not ocupado and nombre and str(nombre).strip() != "":
-                disponibles.append((id_val, nombre))
-
-        return disponibles
-
-    def obtener_operarios(self):
-        """Devuelve todos los operarios válidos ordenados alfabéticamente"""
-        cursor = self.conexion_db.cursor()
-        cursor.execute(
-            "SELECT id, operario FROM modymoi WHERE operario IS NOT NULL AND TRIM(operario) != '' ORDER BY operario ASC"
-        )
-        rows = cursor.fetchall()
-        return {row[0]: row[1] for row in rows}
 
     def cerrar_conexion(self):
         if self.conexion_db:
