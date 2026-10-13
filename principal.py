@@ -37,7 +37,7 @@ abm_modelo = abmmodmoimodelo()
 # ✅ AHORA (usa una ruta absoluta segura basada en la ubicación del script)
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "."))
+templates = Jinja2Templates(directory=BASE_DIR)
 
 # Montar imágenes de la carpeta static
 if os.path.exists("static"):
