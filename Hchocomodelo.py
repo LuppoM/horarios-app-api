@@ -143,3 +143,4 @@ class ModeloHChocoWeb:
     def cerrar_conexion(self):
         if self.conexion_db:
             self.conexion_db.close()
+
