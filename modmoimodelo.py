@@ -15,8 +15,8 @@ class ModMoiModel:
         return self._modelo_principal.obtener_numero_semana_personalizado(fecha)
 
     def obtener_datos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
-        """Obtiene el listado completo de operarios desde Supabase (PostgreSQL),
-        mostrando sus asignaciones actuales sin filtrar la lista completa.
+        """Obtiene la lista de operarios desde Supabase leyendo las columnas con mayúscula inicial
+        'Horario', 'Sector', 'Planta' de la tabla modymoi.
         """
         try:
             cursor = self.conexion_db.cursor()
@@ -31,29 +31,31 @@ class ModMoiModel:
                 "planta_semana"
             ]
 
+            # Seleccionamos las columnas con comillas dobles para que PostgreSQL respete la mayúscula
             query_base = """
                 SELECT 
                     id,
                     calificacion_mano_obra,
                     operario,
                     semana,
-                    horario_semana,
-                    sector_semana,
-                    planta_semana
+                    COALESCE("Horario"::text, '') AS horario_semana,
+                    COALESCE("Sector"::text, '') AS sector_semana,
+                    COALESCE("Planta"::text, '') AS planta_semana
                 FROM modymoi
                 WHERE 1=1
             """
             params = []
 
             if filtro_columna and filtro_valor:
-                # Mapeo de columnas para el filtro si vienen con nombres viejos
-                col_mapeo = {
-                    "horario": "horario_semana",
-                    "sector": "sector_semana",
-                    "planta": "planta_semana"
-                }
-                col_filtro = col_mapeo.get(filtro_columna.lower(), filtro_columna)
-                query_base += f" AND {col_filtro} ILIKE %s"
+                col_filtro = filtro_columna
+                if filtro_columna.lower() in ["horario", "horario_semana"]:
+                    col_filtro = '"Horario"'
+                elif filtro_columna.lower() in ["sector", "sector_semana"]:
+                    col_filtro = '"Sector"'
+                elif filtro_columna.lower() in ["planta", "planta_semana"]:
+                    col_filtro = '"Planta"'
+
+                query_base += f" AND {col_filtro}::text ILIKE %s"
                 params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY operario ASC"
@@ -78,11 +80,13 @@ class ModMoiModel:
 
             return columnas, datos
         except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
             print(f"Error en obtener_datos de modymoi: {e}")
             raise Exception(f"Error de SQL: {e}")
 
     def obtener_datos_finde(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
-        """Obtiene las filas registradas en modymoi_finde desde Supabase."""
+        """Consulta la tabla modymoi_finde usando sus columnas minúsculas."""
         try:
             cursor = self.conexion_db.cursor()
 
@@ -112,12 +116,12 @@ class ModMoiModel:
                     f.planta
                 FROM modymoi_finde f
                 INNER JOIN modymoi m ON f.id_operario = m.id
-                WHERE f.semana = %s
+                WHERE f.semana::text = %s
             """
             params = [str(semana_actual)]
 
             if filtro_columna and filtro_valor:
-                query_base += f" AND f.{filtro_columna} ILIKE %s"
+                query_base += f" AND f.{filtro_columna}::text ILIKE %s"
                 params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY m.operario ASC, f.dia ASC"
@@ -143,38 +147,12 @@ class ModMoiModel:
 
             return columnas, datos
         except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
             print(f"Error al consultar fin de semana en Supabase: {e}")
             raise Exception(f"Error al consultar fin de semana: {e}")
 
-    def limpiar_semanas_antiguas(self, semana_actual):
-        """Limpia automáticamente las asignaciones de semanas anteriores en Supabase."""
-        try:
-            cursor = self.conexion_db.cursor()
-            cursor.execute(
-                """
-                UPDATE modymoi 
-                SET horario_semana = '', sector_semana = '', planta_semana = '' 
-                WHERE semana IS NOT NULL 
-                  AND TRIM(CAST(semana AS TEXT)) != %s
-                """,
-                (str(semana_actual),)
-            )
-            self.conexion_db.commit()
-        except Exception as e:
-            self.conexion_db.rollback()
-            print(f"Error al limpiar semanas antiguas: {e}")
-
-    def eliminar_ot(self, id_ot):
-        try:
-            cursor = self.conexion_db.cursor()
-            cursor.execute("DELETE FROM modymoi WHERE id = %s", (id_ot,))
-            self.conexion_db.commit()
-        except Exception as e:
-            self.conexion_db.rollback()
-            raise Exception(f"No se pudo eliminar el registro: {e}")
-
     def contar_mano_de_obra(self, es_finde=False, semana_actual=None):
-        """Cuenta únicamente los registros MOD y MOI de la tabla."""
         try:
             cursor = self.conexion_db.cursor()
 
@@ -185,7 +163,7 @@ class ModMoiModel:
                     SELECT m.calificacion_mano_obra 
                     FROM modymoi_finde f
                     INNER JOIN modymoi m ON f.id_operario = m.id
-                    WHERE f.semana = %s
+                    WHERE f.semana::text = %s
                 """
                 cursor.execute(query, (str(semana_actual),))
             else:
@@ -206,6 +184,8 @@ class ModMoiModel:
 
             return mod_count, moi_count
         except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
             print(f"Error al contar mano de obra: {e}")
             return 0, 0
 
