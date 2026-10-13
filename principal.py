@@ -53,8 +53,7 @@ app.mount("/archivos", StaticFiles(directory="."), name="archivos")
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    # ✅ Indentación corregida correctamente
-    return templates.TemplateResponse(request, "principal.html", {})
+    return templates.TemplateResponse(request, "Principal.html", {})
 
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
