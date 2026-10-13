@@ -58,8 +58,8 @@ def semana_objetivo_por_defecto() -> str:
 def home(request: Request):
     modelo_base = modeloprincipal()
     try:
-        # Limpieza global de semanas anteriores sobre la base local (HORARIOS.db)
-        modelo_base.eliminar_datos_semanas_anteriores_local()
+        # Limpieza global de semanas anteriores en Supabase
+        modelo_base.eliminar_datos_semanas_anteriores()
     except Exception as e:
         print(f"Error al ejecutar limpieza automatica en el Inicio: {e}")
     finally:
@@ -77,15 +77,7 @@ def vista_modmoi(request: Request):
 @app.get("/sectores", response_class=HTMLResponse)
 def vista_sectores(request: Request):
     return templates.TemplateResponse(request, "sectores.html", {})
-    
-@app.post("/api/modmoi/limpiar-semanas")
-def api_limpiar_semanas_manual():
-    try:
-        # Usa el método recién agregado que conecta con la limpieza de principalmodelo
-        modmoi_modelo.limpiar_semanas_anteriores()
-        return {"status": "ok", "message": "Puestos blanqueados correctamente en Supabase."}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+
 
 @app.get("/tipohorarios", response_class=HTMLResponse)
 @app.get("/tiposhorarios", response_class=HTMLResponse)
@@ -250,15 +242,16 @@ def api_eliminar_registro(id_registro: int):
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
 @app.post("/api/modmoi/limpiar-semanas")
 def api_limpiar_semanas_manual():
     try:
-        modelo_base = modeloprincipal()
-        # Forzar la limpieza de puestos en Supabase
-        modelo_base.eliminar_datos_semanas_anteriores()
-        return {"status": "ok", "message": "Puestos blanqueados correctamente."}
+        modmoi_modelo.limpiar_semanas_anteriores()
+        return {"status": "ok", "message": "Puestos blanqueados correctamente en Supabase."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 # ==========================================
 # 3. MÓDULO: SECTORES
@@ -410,8 +403,8 @@ def api_obtener_hchoco(semana: Optional[str] = None):
             fecha_proxima = date.today() + timedelta(days=7)
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
-        # 2. Limpieza de semanas anteriores (usa siempre la semana activa real)
-        modelo_base.eliminar_datos_semanas_anteriores_local()
+        # 2. Limpieza de semanas anteriores en Supabase
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         # 3. Consulta de datos
         sectores = modelo.obtener_sectores_chocolates()
@@ -485,7 +478,7 @@ def api_obtener_hchoco_finde(semana: Optional[str] = None):
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
         # Limpieza previa para garantizar datos libres en fin de semana
-        modelo_base.eliminar_datos_semanas_anteriores_local()
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         datos = modelo.obtener_datos_semana_finde(semana)
         operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
@@ -671,8 +664,8 @@ def api_obtener_hgolo(semana: Optional[str] = None):
             fecha_proxima = date.today() + timedelta(days=7)
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
-        # 2. Limpieza de semanas anteriores (usa siempre la semana activa real)
-        modelo_base.eliminar_datos_semanas_anteriores_local()
+        # 2. Limpieza de semanas anteriores en Supabase
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         # 3. Consulta de datos
         sectores = modelo.obtener_sectores_golosinas()
@@ -745,7 +738,7 @@ def api_hgolo_finde_datos(semana: Optional[str] = ""):
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
         # Limpieza previa para garantizar datos libres en fin de semana
-        modelo_base.eliminar_datos_semanas_anteriores_local()
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         operarios = modelo.obtener_operarios_disponibles(semana)
         sectores = modelo.obtener_sectores()
