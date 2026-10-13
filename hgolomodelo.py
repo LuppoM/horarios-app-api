@@ -73,15 +73,23 @@ class ModeloHGoloWeb:
             return {}
 
     def obtener_operarios_disponibles(self, semana):
+        """
+        Trae los operarios que NO tienen asignado horario, sector ni planta 
+        para esta semana específica (están libres o ya limpiaron sus datos).
+        """
         cursor = self.conexion_db.cursor()
         cursor.execute("""
             SELECT id, operario
             FROM modymoi
             WHERE operario IS NOT NULL AND TRIM(operario) != ''
-              AND NOT (
-                  semana = ?
-                  AND sector IS NOT NULL AND TRIM(sector) != ''
-                  AND LOWER(TRIM(planta)) NOT IN ('golosinas', 'golosina')
+              AND (
+                  semana IS NULL 
+                  OR semana != ? 
+                  OR (
+                      (horario IS NULL OR TRIM(horario) = '')
+                      AND (sector IS NULL OR TRIM(sector) = '')
+                      AND (planta IS NULL OR TRIM(planta) = '')
+                  )
               )
             ORDER BY operario ASC
         """, (str(semana),))
@@ -118,7 +126,7 @@ class ModeloHGoloWeb:
 
         for id_old in ids_a_limpiar:
             cursor.execute(
-                "UPDATE modymoi SET horario='', sector='', planta='' WHERE id=?",
+                "UPDATE modymoi SET horario='', sector='', planta='', semana='' WHERE id=?",
                 (id_old,)
             )
 
