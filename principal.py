@@ -1,48 +1,43 @@
 from datetime import date, timedelta
 from io import BytesIO
 import os
+from typing import Optional
+
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from modmoimodelo import ModMoiModel
-from abmmodelo import abmmodmoimodelo
-import sectoresmodelo as modelo_sectores
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-import tipohorariosmodelo as modelo_tipohorarios
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from abmmodelo import abmmodmoimodelo
 from dtprogramadamodelo import ModeloDTProgramadaWeb
 from Hchocomodelo import ModeloHChocoWeb
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-from fastapi import Query
-from principalmodelo import modeloprincipal 
-from typing import Optional
 from hchocofindemodelo import ModeloHChocoFindeWeb
-from hgolomodelo import ModeloHGoloWeb
 from hgolofindemodelo import ModeloHGoloFindeWeb
+from hgolomodelo import ModeloHGoloWeb
+from modmoimodelo import ModMoiModel
+from principalmodelo import modeloprincipal
+import sectoresmodelo as modelo_sectores
+import tipohorariosmodelo as modelo_tipohorarios
 
-
-modelo_hchoco = ModeloHChocoWeb()
 modelo_dtprog = ModeloDTProgramadaWeb()
 app = FastAPI(title="ARMADO DE HORARIOS")
 
-# Instanciamos los modelos
+# Instanciamos los modelos generales
 modmoi_modelo = ModMoiModel()
 abm_modelo = abmmodmoimodelo()
 
-# ✅ AHORA (usa una ruta absoluta segura basada en la ubicación del script)
-import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=BASE_DIR)
 
-# Montar imágenes de la carpeta static
+# Montar archivos estáticos
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-
-# Montar la carpeta archivos para servir CSS y JS
 app.mount("/archivos", StaticFiles(directory=os.path.join(BASE_DIR, "archivos")), name="archivos")
 
 
@@ -85,6 +80,7 @@ def vista_hgolo(request: Request):
 @app.get("/hgolofinde", response_class=HTMLResponse)
 def vista_hgolo_finde(request: Request):
     return templates.TemplateResponse(request, "hgolofinde.html", {})
+
 
 # ==========================================
 # 2. MÓDULO: MANO DE OBRA (MOD/MOI)
@@ -365,6 +361,9 @@ def api_obtener_hchoco(semana: Optional[str] = None):
     modelo = ModeloHChocoWeb()
     modelo_base = modeloprincipal()
     try:
+        # Ejecuta la limpieza de semanas pasadas en modymoi y otras tablas[cite: 4]
+        modelo_base.eliminar_datos_semanas_anteriores()
+
         if not semana or semana.lower() == "none" or semana.strip() == "":
             fecha_proxima = date.today() + timedelta(days=7)
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
@@ -377,11 +376,10 @@ def api_obtener_hchoco(semana: Optional[str] = None):
 
         sectores_info = []
         for row in sectores:
-            # Maneja si viene como diccionario o tupla
             if isinstance(row, dict):
-                sec = row["nombre_sector"]
-                tipo = row["tipo_horario"]
-                req = row["requiere_dotacion"]
+                sec = row.get("nombre_sector") or row.get("sector")
+                tipo = row.get("tipo_horario")
+                req = row.get("requiere_dotacion")
             else:
                 sec, tipo, req = row[0], row[1], row[2]
 
@@ -412,14 +410,22 @@ def api_obtener_hchoco(semana: Optional[str] = None):
         modelo.cerrar_conexion()
         if hasattr(modelo_base, 'cerrar_conexion'):
             modelo_base.cerrar_conexion()
-    
+
 
 @app.post("/api/hchoco/guardar")
 def api_guardar_hchoco(payload: dict = Body(...)):
     semana = payload.get("semana")
     registros = payload.get("registros", [])
-    modelo_hchoco.guardar_datos_semana(semana, registros)
-    return {"status": "ok"}
+    modelo = ModeloHChocoWeb()
+    try:
+        registros_tuplas = [(r[0], r[1], r[2], r[3]) for r in registros]
+        modelo.guardar_datos_semana(semana, registros_tuplas)
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"Error en /api/hchoco/guardar: {e}")
+        return {"status": "error", "mensaje": str(e)}
+    finally:
+        modelo.cerrar_conexion()
 
 
 @app.get("/api/hchoco/finde/datos")
@@ -431,9 +437,6 @@ def api_obtener_hchoco_finde(semana: str = "42"):
         operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
         sectores = modelo_main.obtener_sectores_chocolates()
         
-        modelo.cerrar_conexion()
-        modelo_main.cerrar_conexion()
-        
         return {
             "semana": semana,
             "asignados_finde": datos,
@@ -443,6 +446,9 @@ def api_obtener_hchoco_finde(semana: str = "42"):
     except Exception as e:
         print(f"Error en /api/hchoco/finde/datos: {e}")
         return {"error": str(e)}
+    finally:
+        modelo.cerrar_conexion()
+        modelo_main.cerrar_conexion()
 
 
 @app.post("/api/hchoco/finde/guardar")
@@ -453,14 +459,14 @@ def api_guardar_hchoco_finde(payload: dict = Body(...)):
     modelo = ModeloHChocoFindeWeb()
     try:
         modelo.guardar_datos_finde(semana, registros)
-        modelo.cerrar_conexion()
         return {"status": "ok"}
     except Exception as e:
-        modelo.cerrar_conexion()
         import traceback
         traceback.print_exc()
         print(f"Error detallado en /api/hchoco/finde/guardar: {e}")
         return {"status": "error", "mensaje": str(e)}
+    finally:
+        modelo.cerrar_conexion()
 
 
 @app.get("/api/hchoco/exportar-pdf")
@@ -601,6 +607,9 @@ def api_obtener_hgolo(semana: Optional[str] = None):
     modelo = ModeloHGoloWeb()
     modelo_base = modeloprincipal()
     try:
+        # Ejecuta la limpieza de semanas pasadas en modymoi y otras tablas[cite: 4]
+        modelo_base.eliminar_datos_semanas_anteriores()
+
         if not semana or semana.lower() == "none" or semana.strip() == "":
             fecha_proxima = date.today() + timedelta(days=7)
             semana = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
