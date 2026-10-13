@@ -6,7 +6,7 @@ import psycopg2.extras
 def obtener_conexion():
     # Conexión remota a PostgreSQL en Supabase
     # Reemplaza [TU-PASSWORD] con la contraseña que creaste para tu base de datos
-    DATABASE_URL = "postgresql://postgres.uczrwceswzarysptefra:[Palmesano2024]@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+    DATABASE_URL = "postgresql://postgres.uczrwceswzarysptefra:[palmesano2024]@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
     
     conexion = psycopg2.connect(
         DATABASE_URL,
