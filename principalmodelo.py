@@ -1,5 +1,19 @@
 from datetime import date, timedelta
+import os
+import sqlite3
+import sys
+
 import conexion
+
+
+def _obtener_conexion_local():
+    """Misma base SQLite (HORARIOS.db) que usan hgolomodelo y Hchocomodelo."""
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(base_path, "HORARIOS.db")
+    return sqlite3.connect(db_path)
 
 
 class modeloprincipal:
@@ -46,10 +60,77 @@ class modeloprincipal:
         diferencia_dias = (fecha - inicio_semana_1).days
         return (diferencia_dias // 7) + 1
 
+    def eliminar_datos_semanas_anteriores_local(self, semana_actual=None):
+        """Limpieza sobre la base SQLite local (HORARIOS.db), que es la que
+        leen y escriben las pantallas de Golosinas, Chocolates y Dotación.
+
+        - modymoi: blanquea horario, sector, planta y semana de las filas
+          cuya semana sea anterior a la semana activa.
+        - modymoi_finde: borra las filas de semanas anteriores.
+        - dotacion_teorica_horarios: borra las semanas anteriores.
+
+        Si no se indica semana_actual, usa la semana objetivo real
+        (hoy + 7 días), sin depender de lo que se haya tipeado en pantalla.
+        """
+        if semana_actual is None:
+            semana_actual = self.obtener_numero_semana_personalizado(
+                date.today() + timedelta(days=7)
+            )
+        semana_num = int(semana_actual)
+
+        sentencias = [
+            (
+                "modymoi",
+                """
+                UPDATE modymoi
+                SET horario = '', sector = '', planta = '', semana = ''
+                WHERE semana IS NOT NULL
+                  AND TRIM(CAST(semana AS TEXT)) GLOB '[0-9]*'
+                  AND CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) < ?
+                """,
+            ),
+            (
+                "modymoi_finde",
+                """
+                DELETE FROM modymoi_finde
+                WHERE semana IS NOT NULL
+                  AND TRIM(CAST(semana AS TEXT)) GLOB '[0-9]*'
+                  AND CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) < ?
+                """,
+            ),
+            (
+                "dotacion_teorica_horarios",
+                """
+                DELETE FROM dotacion_teorica_horarios
+                WHERE semana_inicio IS NOT NULL
+                  AND TRIM(CAST(semana_inicio AS TEXT)) GLOB '[0-9]*'
+                  AND CAST(TRIM(CAST(semana_inicio AS TEXT)) AS INTEGER) < ?
+                """,
+            ),
+        ]
+
+        conexion_local = _obtener_conexion_local()
+        try:
+            cursor = conexion_local.cursor()
+            for nombre_tabla, sql in sentencias:
+                try:
+                    cursor.execute(sql, (semana_num,))
+                    print(
+                        f"[limpieza local] {nombre_tabla}: "
+                        f"{cursor.rowcount} fila(s) afectadas (semana < {semana_num})."
+                    )
+                except Exception as e:
+                    print(f"[limpieza local] Error en {nombre_tabla}: {e}")
+            conexion_local.commit()
+        finally:
+            conexion_local.close()
+
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
         """Si los registros de modymoi tienen una semana estrictamente anterior a semana_actual,
         blanquea los campos horario_semana, sector_semana, planta_semana y semana en modymoi,
         y borra las filas de modymoi_finde.
+
+        OJO: esta versión trabaja sobre la base remota (PostgreSQL/Supabase).
         """
         try:
             cursor = self.conexion_db.cursor()
@@ -109,6 +190,7 @@ class modeloprincipal:
         except Exception as e:
             self.conexion_db.rollback()
             print(f"Error al limpiar semanas anteriores en modymoi: {e}")
+
     def vaciar_tabla_finde_por_semana(self, semana):
         """Elimina las filas dinámicas de 'modymoi_finde' correspondientes a una
         semana específica (ideal antes de re-insertar al guardar).
