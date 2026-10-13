@@ -11,7 +11,7 @@ class ModeloHChocoWeb:
     def cargar_operarios(self):
         cursor = self.conexion_db.cursor()
         cursor.execute("SELECT id, operario FROM modymoi ORDER BY operario ASC")
-        rows = cursor.fetchall()
+        rows = cursor.fetchall() or []
         self.operarios_dict = {
             (row["id"] if isinstance(row, dict) else row[0]): (row["operario"] if isinstance(row, dict) else row[1])
             for row in rows if (row["operario"] if isinstance(row, dict) else row[1])
@@ -31,24 +31,7 @@ class ModeloHChocoWeb:
                 ORDER BY id ASC
                 """
             )
-            rows = cursor.fetchall() or []
-            sectores_list = []
-
-            for row in rows:
-                nom_sector = row[0] if not isinstance(row, dict) else row["nombre_sector"]
-                tipo_horario = row[1] if not isinstance(row, dict) else row["tipo_horario"]
-                req_dotacion = row[2] if not isinstance(row, dict) else row["requiere_dotacion"]
-
-                turnos = self.obtener_turnos_por_tipo(tipo_horario)
-
-                sectores_list.append({
-                    "sector": nom_sector,
-                    "tipo_horario": tipo_horario,
-                    "requiere_dotacion": req_dotacion,
-                    "turnos": turnos
-                })
-
-            return sectores_list
+            return cursor.fetchall() or []
         except Exception as e:
             print(f"Error al obtener sectores: {e}")
             return []
@@ -89,7 +72,6 @@ class ModeloHChocoWeb:
                     rango = row["rango_horario"]
                     cantidad = row["cantidad_operarios"]
                 else:
-                    # Desempaquetado seguro sin importar la cantidad de columnas devueltas
                     if len(row) == 4:
                         _, sector, rango, cantidad = row
                     else:
@@ -141,7 +123,6 @@ class ModeloHChocoWeb:
         )
         rows = cursor.fetchall() or []
         
-        # Formateamos estrictamente a 4 valores por fila: (id, operario, horario, sector)
         datos = []
         for r in rows:
             if isinstance(r, dict):
