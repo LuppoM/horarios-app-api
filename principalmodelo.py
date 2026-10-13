@@ -61,16 +61,20 @@ class modeloprincipal:
         return (diferencia_dias // 7) + 1
 
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
-        """Limpieza remota sobre PostgreSQL / Supabase utilizando los nombres exactos de columna."""
+        """Limpieza remota sobre PostgreSQL / Supabase.
+        Blanquea Horario, Sector y Planta en modymoi y borra modymoi_finde
+        para todas las semanas menores a semana_actual.
+        """
         try:
             cursor = self.conexion_db.cursor()
 
             if semana_actual is None:
+                # Si no se especifica, calculamos la semana objetivo
                 semana_actual = self.obtener_numero_semana_personalizado()
 
             semana_num = int(semana_actual)
 
-            # 1. Blanquear puestos en modymoi usando comillas dobles para respetar mayúsculas
+            # 1. Blanquear asignaciones en modymoi de semanas anteriores
             cursor.execute(
                 """
                 UPDATE modymoi
@@ -79,32 +83,39 @@ class modeloprincipal:
                     "Planta" = ''
                 WHERE semana IS NOT NULL 
                   AND TRIM(CAST(semana AS TEXT)) != ''
-                  AND CASE 
-                        WHEN TRIM(CAST(semana AS TEXT)) ~ '^[0-9]+$' THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
-                        ELSE 0 
-                      END < %s
+                  AND (
+                    CASE 
+                      WHEN TRIM(CAST(semana AS TEXT)) ~ '^[0-9]+$' 
+                      THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
+                      ELSE 0 
+                    END
+                  ) < %s
                 """,
                 (semana_num,),
             )
 
-            # 2. Borrar las asignaciones del fin de semana de semanas pasadas
+            # 2. Borrar fin de semana de semanas pasadas
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
                 WHERE semana IS NOT NULL 
-                  AND CASE 
-                        WHEN TRIM(CAST(semana AS TEXT)) ~ '^[0-9]+$' THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
-                        ELSE 0 
-                      END < %s
+                  AND (
+                    CASE 
+                      WHEN TRIM(CAST(semana AS TEXT)) ~ '^[0-9]+$' 
+                      THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
+                      ELSE 0 
+                    END
+                  ) < %s
                 """,
                 (semana_num,),
             )
 
             self.conexion_db.commit()
-            print(f"Limpieza ejecutada con éxito en Supabase para la semana {semana_num}.")
+            print(f"Limpieza de puestos ejecutada exitosamente en Supabase para la semana < {semana_num}.")
 
         except Exception as e:
-            self.conexion_db.rollback()
+            if hasattr(self, 'conexion_db') and self.conexion_db:
+                self.conexion_db.rollback()
             print(f"Error al limpiar semanas anteriores en Supabase: {e}")
 
     def vaciar_tabla_finde_por_semana(self, semana):
