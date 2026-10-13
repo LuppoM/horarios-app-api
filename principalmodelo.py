@@ -49,7 +49,7 @@ class modeloprincipal:
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
         """Aplica la lógica de limpieza a las tablas de planificación:
 
-        - En 'modymoi': Blanquea campos Horario, Sector y Planta.
+        - En 'modymoi': Blanquea campos Horario, Sector y Planta de semanas anteriores.
         - En 'modymoi_finde': Elimina filas completas de semanas anteriores.
         - En 'dotacion_teorica_horarios': Elimina la dotación teórica de semanas anteriores.
         """
@@ -59,7 +59,6 @@ class modeloprincipal:
             if semana_actual is None:
                 semana_actual = self.obtener_numero_semana_personalizado()
 
-            # Convertimos a entero para asegurar la comparación numérica
             semana_num = int(semana_actual)
 
             # 1. Blanquear los campos de asignación en modymoi (semanas estrictamente anteriores a semana_num)
