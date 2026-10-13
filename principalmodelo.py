@@ -4,9 +4,12 @@ import conexion
 
 class modeloprincipal:
 
+    class modeloprincipal:
+
     def __init__(self):
         self.conexion_db = conexion.obtener_conexion()
-
+        # 🟢 Agregas esto para que se ejecute solo al iniciar
+        self.eliminar_datos_semanas_anteriores()
     def obtener_numero_semana_personalizado(self, fecha=None):
         """Calcula el número de semana bajo la regla de la planta:
 
