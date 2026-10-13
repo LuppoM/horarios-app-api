@@ -50,7 +50,7 @@ class modeloprincipal:
         """Libera a los operarios cuando la planta pasa a una semana nueva.
 
         - modymoi (carga semanal por UPDATE, mano de obra fija): NO se borran
-          filas. Se vacían horario_semana, sector_semana y planta_semana de las
+          filas. Se vacían "Horario", "Sector" y "Planta" de las
           semanas ANTERIORES y se pasa la fila a la semana actual, así el
           operario aparece libre en obtener_operarios_disponibles(semana_actual).
         - modymoi_finde (carga por INSERT): se borran las filas de semanas
@@ -68,13 +68,13 @@ class modeloprincipal:
             cursor.execute(
                 """
                 UPDATE modymoi
-                SET horario_semana = '',
-                    sector_semana = '',
-                    planta_semana = '',
-                    semana = ?
+                SET "Horario" = '',
+                    "Sector" = '',
+                    "Planta" = '',
+                    semana = %s
                 WHERE semana IS NOT NULL
                   AND TRIM(semana) != ''
-                  AND CAST(TRIM(semana) AS INTEGER) < ?
+                  AND CAST(TRIM(semana) AS INTEGER) < %s
                 """,
                 (str(semana_actual), semana_actual),
             )
@@ -84,7 +84,7 @@ class modeloprincipal:
                 """
                 DELETE FROM modymoi_finde
                 WHERE semana IS NOT NULL
-                  AND CAST(semana AS INTEGER) < ?
+                  AND CAST(semana AS INTEGER) < %s
                 """,
                 (semana_actual,),
             )
@@ -94,7 +94,7 @@ class modeloprincipal:
                 """
                 DELETE FROM dotacion_teorica_horarios
                 WHERE semana_inicio IS NOT NULL
-                  AND CAST(semana_inicio AS INTEGER) < ?
+                  AND CAST(semana_inicio AS INTEGER) < %s
                 """,
                 (semana_actual,),
             )
@@ -116,7 +116,7 @@ class modeloprincipal:
         try:
             cursor = self.conexion_db.cursor()
             cursor.execute(
-                "DELETE FROM modymoi_finde WHERE semana = ?", (semana,)
+                "DELETE FROM modymoi_finde WHERE semana = %s", (str(semana),)
             )
             self.conexion_db.commit()
             print(f"Registros de fin de semana purgados para semana {semana}.")
@@ -134,19 +134,19 @@ class modeloprincipal:
             # 1. Resetear modymoi
             sql_modymoi = """
                 UPDATE modymoi
-                SET horario_semana = '',
-                    sector_semana = '',
-                    planta_semana = ''
+                SET "Horario" = '',
+                    "Sector" = '',
+                    "Planta" = ''
                 WHERE 1=1
             """
             params_modymoi = []
 
             if id_operario is not None:
-                sql_modymoi += " AND id=?"
+                sql_modymoi += " AND id=%s"
                 params_modymoi.append(id_operario)
             if semana is not None:
-                sql_modymoi += " AND semana=?"
-                params_modymoi.append(semana)
+                sql_modymoi += " AND semana=%s"
+                params_modymoi.append(str(semana))
 
             cursor.execute(sql_modymoi, params_modymoi)
 
@@ -155,11 +155,11 @@ class modeloprincipal:
             params_finde = []
 
             if id_operario is not None:
-                sql_finde += " AND id_operario=?"
+                sql_finde += " AND id_operario=%s"
                 params_finde.append(id_operario)
             if semana is not None:
-                sql_finde += " AND semana=?"
-                params_finde.append(semana)
+                sql_finde += " AND semana=%s"
+                params_finde.append(str(semana))
 
             cursor.execute(sql_finde, params_finde)
 
@@ -176,7 +176,7 @@ class modeloprincipal:
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
-                "SELECT nombre_sector, tipo_horario, requiere_dotacion FROM sectores WHERE planta='Chocolate'"
+                "SELECT nombre_sector, tipo_horario, requiere_dotacion FROM sectores WHERE LOWER(TRIM(planta)) IN ('chocolate', 'chocolates')"
             )
             rows = cursor.fetchall()
             return rows if rows else []
@@ -189,8 +189,8 @@ class modeloprincipal:
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
-                "SELECT horarios_definidos FROM tipohorario WHERE UPPER(TRIM(tipo)) = ?",
-                (tipo_horario.upper(),),
+                "SELECT horarios_definidos FROM tipohorario WHERE UPPER(TRIM(tipo)) = %s",
+                (str(tipo_horario).upper(),),
             )
             row = cursor.fetchone()
             if row and row[0]:
@@ -207,12 +207,17 @@ class modeloprincipal:
                 """
                 SELECT sector, rango_horario, cantidad_operarios
                 FROM dotacion_teorica_horarios
-                WHERE semana_inicio=? AND planta='Chocolate'
+                WHERE semana_inicio=%s AND LOWER(TRIM(planta)) IN ('chocolate', 'chocolates')
                 """,
                 (str(semana),),
             )
             resultados = {}
-            for sector, rango, cantidad in cursor.fetchall():
+            for row in cursor.fetchall():
+                if len(row) == 4:
+                    _, sector, rango, cantidad = row
+                else:
+                    sector, rango, cantidad = row[0], row[1], row[2]
+
                 if sector not in resultados:
                     resultados[sector] = {}
                 resultados[sector][rango] = cantidad
@@ -227,17 +232,15 @@ class modeloprincipal:
 
         cursor.execute(
             """
-            SELECT m.id, m.operario, m.horario_semana, m.sector_semana
+            SELECT m.id, m.operario, m."Horario", m."Sector"
             FROM modymoi m
-            WHERE m.semana=? AND (m.planta_semana='Chocolates' OR m.planta_semana='Chocolate')
-            AND m.sector_semana IS NOT NULL AND TRIM(m.sector_semana) != ''
+            WHERE m.semana=%s AND LOWER(TRIM(m."Planta")) IN ('chocolates', 'chocolate')
+            AND m."Sector" IS NOT NULL AND TRIM(m."Sector") != ''
             """,
             (str(semana),),
         )
         rows = cursor.fetchall()
 
-        # Si la columna 'operario' tiene un ID numérico, lo resolvemos con el
-        # diccionario de operarios {id: nombre}
         todos_ops = self.obtener_operarios()
 
         datos_procesados = []
@@ -262,9 +265,9 @@ class modeloprincipal:
 
         cursor.execute(
             """
-            SELECT id, operario, horario_semana, sector_semana, planta_semana
+            SELECT id, operario, "Horario", "Sector", "Planta"
             FROM modymoi
-            WHERE semana = ?
+            WHERE semana = %s
             """,
             (sem_val,),
         )
