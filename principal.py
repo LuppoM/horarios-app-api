@@ -41,14 +41,23 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), na
 app.mount("/archivos", StaticFiles(directory=os.path.join(BASE_DIR, "archivos")), name="archivos")
 
 
-# ==========================================
-# 1. VISTAS HTML PRINCIPALES (GENERAL)
-# ==========================================
-
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse(request, "Principal.html", {})
+    modelo_base = modeloprincipal()
+    try:
+        # Calculamos la semana objetivo (próxima semana / activa)
+        fecha_proxima = date.today() + timedelta(days=7)
+        semana_actual = str(modelo_base.obtener_numero_semana_personalizado(fecha_proxima))
 
+        # Ejecutamos la limpieza global al cargar el inicio principal de la app
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana_actual)
+    except Exception as e:
+        print(f"Error al ejecutar limpieza automatica en el Inicio: {e}")
+    finally:
+        if hasattr(modelo_base, 'cerrar_conexion'):
+            modelo_base.cerrar_conexion()
+
+    return templates.TemplateResponse(request, "Principal.html", {})
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
     return templates.TemplateResponse(request, "modmoi.html", {})
