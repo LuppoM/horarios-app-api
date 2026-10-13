@@ -13,7 +13,8 @@ def _obtener_conexion_local():
     return sqlite3.connect(db_path, check_same_thread=False)
 
 class ModeloDTProgramadaWeb:
-        def obtener_numero_semana_personalizado(self, fecha=None):
+
+    def obtener_numero_semana_personalizado(self, fecha=None):
         if fecha is None:
             fecha = date.today()
 
