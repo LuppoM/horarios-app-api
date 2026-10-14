@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Horarios de Mecánicos</title>
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
-    <link rel="stylesheet" href="/archivos/mecanicosvista.css?v=2">
+    <link rel="stylesheet" href="/archivos/mecanicosvista.css?v=3">
 </head>
 <body>
 
-    <!-- Top bar identica a HGolo -->
+    <!-- Top bar -->
     <div class="top-bar">
         <button class="btn-accion btn-guardar" onclick="guardarMecanicos()">Guardar</button>
         <button class="btn-accion btn-cerrar" onclick="location.href='/'">Cerrar</button>
@@ -18,10 +18,21 @@
         <input type="text" id="inputSemana" class="semana-input" readonly>
     </div>
 
-    <!-- Contenedor general de Carga de Datos -->
-    <div class="card-carga">
-        <h3 class="card-titulo">CARGA DATOS</h3>
-        <div id="bloquesHorarios"></div>
+    <!-- Contenedor General con dos tarjetas de planta -->
+    <div class="plantas-container">
+        
+        <!-- CARGA DATOS - GOLOSINAS -->
+        <div class="card-carga">
+            <h3 class="card-titulo">CARGA DATOS - GOLOSINAS</h3>
+            <div id="bloquesGolosinas"></div>
+        </div>
+
+        <!-- CARGA DATOS - CHOCOLATES -->
+        <div class="card-carga">
+            <h3 class="card-titulo">CARGA DATOS - CHOCOLATES</h3>
+            <div id="bloquesChocolates"></div>
+        </div>
+
     </div>
 
     <script>
@@ -39,7 +50,6 @@
         async function init() {
             const urlParams = new URLSearchParams(window.location.search);
             semanaActualGlobal = urlParams.get('semana') || "";
-
             await cargarDatos();
         }
 
@@ -52,39 +62,43 @@
                 document.getElementById('inputSemana').value = semanaActualGlobal;
                 mecanicosDisponibles = data.disponibles || [];
 
-                renderizarUI(data.asignados || []);
+                renderizarPlanta('Golosinas', 'bloquesGolosinas', data.asignados || []);
+                renderizarPlanta('Chocolates', 'bloquesChocolates', data.asignados || []);
+
             } catch (error) {
                 console.error("Error al cargar mecánicos:", error);
                 alert("Error al obtener los datos de mecánicos.");
             }
         }
 
-        function renderizarUI(asignados) {
-            const contenedor = document.getElementById('bloquesHorarios');
+        function renderizarPlanta(nombrePlanta, idContenedor, asignados) {
+            const contenedor = document.getElementById(idContenedor);
             contenedor.innerHTML = "";
 
             HORARIOS_DEFINIDOS.forEach(horario => {
                 const blockDiv = document.createElement('div');
                 blockDiv.className = "horario-block";
                 blockDiv.dataset.horario = horario;
+                blockDiv.dataset.planta = nombrePlanta;
 
                 blockDiv.innerHTML = `
                     <div class="horario-header">
                         <strong>Horario: ${horario}</strong>
-                        <button class="btn-agregar-op" onclick="agregarFilaOperario('${horario}')">+ Agregar operario</button>
+                        <button class="btn-agregar-op" onclick="agregarFilaOperario('${nombrePlanta}', '${horario}')">+ Agregar operario</button>
                     </div>
-                    <div class="rows-container" id="container_${limpiarId(horario)}"></div>
+                    <div class="rows-container" id="container_${limpiarId(nombrePlanta)}_${limpiarId(horario)}"></div>
                 `;
 
                 contenedor.appendChild(blockDiv);
 
-                // Filtrar mecánicos asignados a este horario
-                const asignadosEnHorario = asignados.filter(a => a[2] === horario);
-                if (asignadosEnHorario.length > 0) {
-                    asignadosEnHorario.forEach(a => {
-                        agregarFilaOperario(horario, a[0], a[1]);
-                    });
-                }
+                // Filtrar mecánicos asignados a esta planta y a este horario
+                const asignadosEnBloque = asignados.filter(a => 
+                    (a[2] === horario) && (a[3] && a[3].toLowerCase() === nombrePlanta.toLowerCase())
+                );
+
+                asignadosEnBloque.forEach(a => {
+                    agregarFilaOperario(nombrePlanta, horario, a[0], a[1]);
+                });
             });
         }
 
@@ -92,21 +106,21 @@
             return cadena.replace(/[^a-zA-Z0-9]/g, '_');
         }
 
-        function agregarFilaOperario(horario, idVal = "", nombreVal = "") {
-            const container = document.getElementById(`container_${limpiarId(horario)}`);
+        function agregarFilaOperario(nombrePlanta, horario, idVal = "", nombreVal = "") {
+            const container = document.getElementById(`container_${limpiarId(nombrePlanta)}_${limpiarId(horario)}`);
             if (!container) return;
 
             const filaDiv = document.createElement('div');
             filaDiv.className = "fila-operario";
 
-            // Box pequeño para el ID
+            // Box ID
             const inputId = document.createElement('input');
             inputId.type = "text";
             inputId.className = "input-id-box";
             inputId.value = idVal;
             inputId.readOnly = true;
 
-            // Combobox para seleccionar operario
+            // Combobox Operarios
             const selectOp = document.createElement('select');
             selectOp.className = "select-operario-mecanico";
             selectOp.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
@@ -144,11 +158,13 @@
 
             document.querySelectorAll('.horario-block').forEach(bloque => {
                 const horario = bloque.dataset.horario;
+                const planta = bloque.dataset.planta;
 
                 bloque.querySelectorAll('.fila-operario').forEach(fila => {
                     const idOp = fila.querySelector('.input-id-box').value;
                     if (idOp) {
-                        registros.push([parseInt(idOp), horario, 'Mantenimiento', 'General']);
+                        // [id_mecanico, horario, planta]
+                        registros.push([parseInt(idOp), horario, planta]);
                     }
                 });
             });
