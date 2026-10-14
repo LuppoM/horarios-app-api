@@ -895,7 +895,7 @@ def api_exportar_pdf_hgolo(semana: Optional[str] = None):
         headers = {"Content-Disposition": f'attachment; filename="{nombre_archivo}"'}
         return StreamingResponse(output, headers=headers, media_type="application/pdf")
 
-    @app.get("/api/mecanicos/datos")
+@app.get("/api/mecanicos/datos")
 def api_mecanicos_datos(semana: Optional[str] = ""):
     modelo = ModeloMecanicosWeb()
     modelo_base = modeloprincipal()
