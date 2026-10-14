@@ -167,3 +167,19 @@ body {
     background-color: #9c0006;
     color: #ffffff;
 }
+.plantas-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.card-carga {
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 15px;
+    flex: 1;
+    min-width: 320px;
+    max-width: 600px;
+}
