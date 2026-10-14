@@ -904,13 +904,13 @@ def api_mecanicos_datos(semana: Optional[str] = ""):
         if not semana or semana.lower() == "none" or semana.strip() == "":
             semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # Purga automática de semanas anteriores (< semana actual)
-        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+        mecanicos_disponibles = modelo.obtener_mecanicos_disponibles()
+        asignados = modelo.obtener_asignaciones_semana(semana)
 
-        mecanicos = modelo.obtener_mecanicos_asignados(semana)
         return {
             "semana": semana,
-            "mecanicos": mecanicos
+            "disponibles": mecanicos_disponibles,
+            "asignados": asignados
         }
     finally:
         modelo.cerrar_conexion()
@@ -922,7 +922,7 @@ def api_mecanicos_datos(semana: Optional[str] = ""):
 async def api_mecanicos_guardar(request: Request):
     data = await request.json()
     semana = data.get("semana")
-    registros = data.get("registros")
+    registros = data.get("registros", [])
 
     modelo = ModeloMecanicosWeb()
     try:
