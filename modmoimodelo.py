@@ -95,6 +95,74 @@ class ModMoiModel:
             print(f"Error en obtener_datos de modymoi: {e}")
             raise Exception(f"Error de SQL: {e}")
 
+
+    def obtener_datos_mecanicos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
+        """Consulta la tabla mecanicos usando sus columnas: id, operario, horario, planta, semana."""
+        try:
+            cursor = self.conexion_db.cursor()
+
+            if not semana_actual:
+                semana_actual = str(self.obtener_numero_semana_personalizado())
+
+            columnas = [
+                "id",
+                "calificacion_mano_obra",
+                "operario",
+                "semana",
+                "horario_semana",
+                "planta_semana"
+            ]
+
+            query_base = """
+                SELECT 
+                    id,
+                    'MOI' AS calificacion_mano_obra,
+                    operario,
+                    semana,
+                    COALESCE(horario::text, '') AS horario_semana,
+                    COALESCE(planta::text, '') AS planta_semana
+                FROM mecanicos
+                WHERE (semana::text = %s OR horario IS NOT NULL)
+            """
+            params = [str(semana_actual)]
+
+            if filtro_columna and filtro_valor:
+                col_filtro = filtro_columna
+                if filtro_columna.lower() in ["horario", "horario_semana"]:
+                    col_filtro = "horario"
+                elif filtro_columna.lower() in ["planta", "planta_semana"]:
+                    col_filtro = "planta"
+
+                query_base += f" AND {col_filtro}::text ILIKE %s"
+                params.append("%" + str(filtro_valor) + "%")
+
+            query_base += " ORDER BY operario ASC"
+            cursor.execute(query_base, params)
+
+            filas = cursor.fetchall()
+
+            datos = []
+            for f in filas:
+                if isinstance(f, dict):
+                    datos.append([
+                        f.get("id"),
+                        f.get("calificacion_mano_obra"),
+                        f.get("operario"),
+                        f.get("semana"),
+                        f.get("horario_semana"),
+                        f.get("planta_semana")
+                    ])
+                else:
+                    datos.append(list(f))
+
+            return columnas, datos
+        except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+            print(f"Error al consultar mecánicos en Supabase: {e}")
+            raise Exception(f"Error al consultar mecánicos: {e}")
+
+    
     def obtener_datos_finde(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Consulta la tabla modymoi_finde usando sus columnas minúsculas."""
         try:
