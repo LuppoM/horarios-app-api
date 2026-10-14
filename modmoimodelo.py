@@ -95,7 +95,6 @@ class ModMoiModel:
             print(f"Error en obtener_datos de modymoi: {e}")
             raise Exception(f"Error de SQL: {e}")
 
-
     def obtener_datos_mecanicos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Consulta la tabla mecanicos usando sus columnas: id, operario, horario, planta, semana."""
         try:
@@ -162,7 +161,6 @@ class ModMoiModel:
             print(f"Error al consultar mecánicos en Supabase: {e}")
             raise Exception(f"Error al consultar mecánicos: {e}")
 
-    
     def obtener_datos_finde(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Consulta la tabla modymoi_finde usando sus columnas minúsculas."""
         try:
@@ -230,11 +228,15 @@ class ModMoiModel:
             print(f"Error al consultar fin de semana en Supabase: {e}")
             raise Exception(f"Error al consultar fin de semana: {e}")
 
-    def contar_mano_de_obra(self, es_finde=False, semana_actual=None):
+    def contar_mano_de_obra(self, es_finde=False, semana_actual=None, vista=None):
         try:
+            # Si se elige la vista de Mecánicos, retornamos 0, 0
+            if vista == "Mecanicos":
+                return 0, 0
+
             cursor = self.conexion_db.cursor()
 
-            if es_finde:
+            if es_finde or vista == "Fin de Semana":
                 if not semana_actual:
                     semana_actual = str(self.obtener_numero_semana_personalizado())
                 query = """
@@ -269,4 +271,7 @@ class ModMoiModel:
 
     def cerrar_conexion(self):
         if hasattr(self, 'conexion_db') and self.conexion_db:
-            self.conexion_db.close()
+            try:
+                self.conexion_db.close()
+            except Exception:
+                pass
