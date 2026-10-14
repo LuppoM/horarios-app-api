@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horarios de Mecánicos / Mantenimiento</title>
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+    <link rel="stylesheet" href="/archivos/mecanicosvista.css">
+</head>
+<body>
+
+    <!-- Barra Superior -->
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <h2>HORARIOS - MECÁNICOS Y MANTENIMIENTO</h2>
+            <label class="semana-label">Semana:</label>
+            <input type="text" id="inputSemana" class="semana-input" onchange="cargarDatos()">
+            <button class="btn-accion btn-guardar" onclick="guardarMecanicos()">Guardar Cambios</button>
+        </div>
+        <div>
+            <button class="btn-accion btn-cerrar" onclick="location.href='/'">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal de la Tabla -->
+    <div class="tabla-container">
+        <table class="tabla-mecanicos" id="tablaMecanicos">
+            <thead>
+                <tr>
+                    <th class="col-id">ID</th>
+                    <th class="col-op">MECÁNICO / OPERARIO</th>
+                    <th class="col-hor">HORARIO ASIGNADO</th>
+                    <th class="col-sec">SECTOR</th>
+                    <th class="col-pla">PLANTA</th>
+                </tr>
+            </thead>
+            <tbody id="bodyMecanicos">
+                <!-- Se puebla dinámicamente -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const OPCIONES_HORARIO = [
+            "06:00 a 14:00",
+            "07:00 a 15:00",
+            "08:30 a 16:30",
+            "14:00 a 22:00",
+            "22:00 a 06:00"
+        ];
+
+        const OPCIONES_SECTOR = [
+            "Mantenimiento",
+            "Mantenimiento Chocolate",
+            "Mantenimiento Golosinas",
+            "Taller Mecánico"
+        ];
+
+        const OPCIONES_PLANTA = [
+            "Chocolate",
+            "Golosinas",
+            "General"
+        ];
+
+        let datosGlobales = {};
+
+        async function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let semanaUrl = urlParams.get('semana');
+
+            const inputSemana = document.getElementById('inputSemana');
+            if (semanaUrl) {
+                inputSemana.value = semanaUrl;
+            }
+
+            await cargarDatos();
+        }
+
+        async function cargarDatos() {
+            const semana = document.getElementById('inputSemana').value || "";
+            const url = `/api/mecanicos/datos?semana=${semana}`;
+            
+            try {
+                const res = await fetch(url);
+                datosGlobales = await res.json();
+
+                if (datosGlobales && datosGlobales.semana) {
+                    document.getElementById('inputSemana').value = datosGlobales.semana;
+                }
+                renderizarTabla();
+            } catch (error) {
+                console.error("Error al cargar datos de mecánicos:", error);
+                alert("Error al conectar con el servidor para obtener los datos.");
+            }
+        }
+
+        function renderizarTabla() {
+            const tbody = document.getElementById('bodyMecanicos');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const mecanicos = datosGlobales.mecanicos || [];
+
+            if (mecanicos.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="5" style="text-align: center; padding: 15px; color: #666;">No hay personal de mantenimiento registrado.</td>`;
+                tbody.appendChild(tr);
+                return;
+            }
+
+            mecanicos.forEach((mec, idx) => {
+                // mec: [id, operario, horario, sector, planta]
+                const [idOp, nombreOp, horVal, secVal, plaVal] = mec;
+
+                const tr = document.createElement('tr');
+                tr.className = "fila-mecanico";
+
+                // ID e Input Readonly
+                let html = `<td class="col-id">${idOp}</td>`;
+                html += `<td class="col-op"><strong>${nombreOp}</strong></td>`;
+
+                // Select Horario
+                let optionsHor = `<option value="">-- Seleccionar Horario --</option>`;
+                OPCIONES_HORARIO.forEach(h => {
+                    optionsHor += `<option value="${h}" ${h === horVal ? 'selected' : ''}>${h}</option>`;
+                });
+                html += `<td class="col-hor"><select class="select-horario" data-id="${idOp}">${optionsHor}</select></td>`;
+
+                // Select Sector
+                let optionsSec = `<option value="">-- Seleccionar Sector --</option>`;
+                OPCIONES_SECTOR.forEach(s => {
+                    optionsSec += `<option value="${s}" ${s === secVal ? 'selected' : ''}>${s}</option>`;
+                });
+                html += `<td class="col-sec"><select class="select-sector">${optionsSec}</select></td>`;
+
+                // Select Planta
+                let optionsPla = `<option value="">-- Seleccionar Planta --</option>`;
+                OPCIONES_PLANTA.forEach(p => {
+                    optionsPla += `<option value="${p}" ${p === plaVal ? 'selected' : ''}>${p}</option>`;
+                });
+                html += `<td class="col-pla"><select class="select-planta">${optionsPla}</select></td>`;
+
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function guardarMecanicos() {
+            const semana = document.getElementById('inputSemana').value;
+            let registros = [];
+
+            document.querySelectorAll('#bodyMecanicos tr.fila-mecanico').forEach(tr => {
+                const selHor = tr.querySelector('.select-horario');
+                const selSec = tr.querySelector('.select-sector');
+                const selPla = tr.querySelector('.select-planta');
+
+                if (selHor) {
+                    const idOp = parseInt(selHor.dataset.id);
+                    const horario = selHor.value;
+                    const sector = selSec.value;
+                    const planta = selPla.value;
+
+                    registros.push([idOp, horario, sector, planta]);
+                }
+            });
+
+            try {
+                const res = await fetch('/api/mecanicos/guardar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ semana: semana, registros: registros })
+                });
+
+                const r = await res.json();
+                if (r.status === 'ok') {
+                    alert("Horarios de mecánicos guardados correctamente.");
+                    await cargarDatos();
+                } else {
+                    alert("Error al guardar: " + r.message);
+                }
+            } catch (error) {
+                console.error("Error al guardar:", error);
+                alert("Ocurrió un error al intentar guardar los datos.");
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
