@@ -5,7 +5,7 @@ class ModeloMecanicosWeb:
     def __init__(self):
         self.conexion_db = conexion.obtener_conexion()
 
-    def obtener_mecanicos_disponibles((self)):
+    def obtener_mecanicos_disponibles(self):
         """Obtiene el listado completo de personal de mantenimiento desde la tabla modymoi."""
         cursor = self.conexion_db.cursor()
         cursor.execute(
