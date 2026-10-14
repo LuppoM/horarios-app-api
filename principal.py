@@ -106,6 +106,10 @@ def vista_hgolo(request: Request):
 @app.get("/hgolofinde", response_class=HTMLResponse)
 def vista_hgolo_finde(request: Request):
     return templates.TemplateResponse(request, "hgolofinde.html", {})
+    
+@app.get("/mecanicos", response_class=HTMLResponse)
+def vista_mecanicos(request: Request):
+    return templates.TemplateResponse(request, "mecanicos.html", {})
 
 
 # ==========================================
