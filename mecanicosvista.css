@@ -6,71 +6,47 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #ffffff;
-    color: #1a252f;
-    padding: 20px;
+    background-color: #f1f5f9;
+    color: #333;
+    padding: 15px;
 }
 
-/* Barra Superior */
+/* Barra Superior idéntica a HGolo */
 .top-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 15px;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #e2e8f0;
-}
-
-.top-bar-left {
+    background-color: #ffffff;
+    padding: 10px 15px;
     display: flex;
     align-items: center;
     gap: 12px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
 }
 
-.top-bar h2 {
-    font-size: 12pt;
-    color: #004080;
-    text-transform: uppercase;
-}
-
-.semana-label {
-    font-weight: bold;
-    color: #004080;
-}
-
-.semana-input {
-    width: 45px;
-    font-size: 10pt;
-    font-weight: bold;
-    text-align: center;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    padding: 3px;
-}
-
-/* Botones */
+/* Botones con los tonos celestes y rosados de HGolo */
 .btn-accion {
-    padding: 6px 14px;
-    font-size: 9pt;
+    padding: 6px 16px;
+    font-size: 9.5pt;
     font-weight: bold;
     border-radius: 4px;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 
 .btn-guardar {
-    background-color: #004080;
-    color: #ffffff;
-    border: none;
+    background-color: #d0e1f9;
+    color: #004080;
+    border: 1px solid #a6c8f0;
 }
 
 .btn-guardar:hover {
-    background-color: #00264d;
+    background-color: #004080;
+    color: #ffffff;
 }
 
 .btn-cerrar {
     background-color: #ffc7ce;
     color: #9c0006;
-    border: 1px solid #9c0006;
+    border: 1px solid #f5b0b7;
 }
 
 .btn-cerrar:hover {
@@ -78,16 +54,38 @@ body {
     color: #ffffff;
 }
 
-/* Contenedor de Listado Simplificado */
+.semana-label {
+    font-weight: bold;
+    color: #004080;
+    font-size: 10.5pt;
+    margin-left: 10px;
+}
+
+.semana-input {
+    width: 45px;
+    font-size: 10.5pt;
+    font-weight: bold;
+    text-align: center;
+    border: none;
+    background: transparent;
+    color: #00264d;
+}
+
+/* Estructura del listado */
 .contenedor-mecanicos {
-    max-width: 650px;
+    max-width: 680px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 22px;
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
 }
 
 .grupo-card {
-    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
 }
 
 .grupo-titulo {
@@ -95,17 +93,15 @@ body {
     font-weight: bold;
     color: #00264d;
     margin-bottom: 10px;
-    border-bottom: 1px solid #cbd5e1;
-    padding-bottom: 4px;
 }
 
 .lista-mecanicos {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 
-/* Fila de Mecánico limpia */
+/* Filas con los guiones de separación y selector de horario */
 .mecanico-item {
     display: flex;
     align-items: center;
@@ -113,31 +109,38 @@ body {
 }
 
 .mecanico-nombre {
-    font-weight: 600;
-    color: #2c3e50;
+    font-weight: bold;
+    color: #00264d;
     white-space: nowrap;
+    text-transform: uppercase;
 }
 
 .mecanico-puntos {
     color: #94a3b8;
-    margin: 0 8px;
+    margin: 0 10px;
     letter-spacing: 1px;
     overflow: hidden;
     white-space: nowrap;
 }
 
 .select-horario-simple {
-    font-size: 9.5pt;
+    font-size: 9pt;
     font-weight: bold;
-    color: #1e293b;
-    border: 1px solid #cbd5e1;
+    color: #333;
+    border: 1px solid #ccc;
     border-radius: 4px;
-    padding: 3px 6px;
-    background-color: #f8fafc;
+    padding: 3px 8px;
+    background-color: #ffffff;
     cursor: pointer;
 }
 
 .select-horario-simple:focus {
     border-color: #004080;
     outline: none;
+}
+
+.sin-datos {
+    font-size: 9pt;
+    color: #777;
+    font-style: italic;
 }
