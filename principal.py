@@ -2,7 +2,7 @@ from datetime import date
 from io import BytesIO
 import os
 from typing import Optional
-
+from mecanicosmodelo import ModeloMecanicosWeb
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -890,6 +890,43 @@ def api_exportar_pdf_hgolo(semana: Optional[str] = None):
         nombre_archivo = f"Horarios golosinas semana {semana}.pdf"
         headers = {"Content-Disposition": f'attachment; filename="{nombre_archivo}"'}
         return StreamingResponse(output, headers=headers, media_type="application/pdf")
+
+    @app.get("/api/mecanicos/datos")
+def api_mecanicos_datos(semana: Optional[str] = ""):
+    modelo = ModeloMecanicosWeb()
+    modelo_base = modeloprincipal()
+    try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+
+        # Mantenemos la purga automática de semanas anteriores
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+
+        mecanicos = modelo.obtener_mecanicos_asignados(semana)
+        return {
+            "semana": semana,
+            "mecanicos": mecanicos
+        }
+    finally:
+        modelo.cerrar_conexion()
+        if hasattr(modelo_base, 'cerrar_conexion'):
+            modelo_base.cerrar_conexion()
+
+
+@app.post("/api/mecanicos/guardar")
+async def api_mecanicos_guardar(request: Request):
+    data = await request.json()
+    semana = data.get("semana")
+    registros = data.get("registros")
+
+    modelo = ModeloMecanicosWeb()
+    try:
+        modelo.guardar_asignaciones_mecanicos(semana, registros)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        modelo.cerrar_conexion()
 
     finally:
         modelo_main.cerrar_conexion()
