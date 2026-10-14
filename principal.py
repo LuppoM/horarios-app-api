@@ -932,4 +932,3 @@ async def api_mecanicos_guardar(request: Request):
         return {"status": "error", "message": str(e)}
     finally:
         modelo.cerrar_conexion()
-        modelo_finde.cerrar_conexion()
