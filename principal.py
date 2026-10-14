@@ -2,7 +2,7 @@ from datetime import date
 from io import BytesIO
 import os
 from typing import Optional
-from mecanicosmodelo import ModeloMecanicosWeb
+
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +21,7 @@ from Hchocomodelo import ModeloHChocoWeb
 from hchocofindemodelo import ModeloHChocoFindeWeb
 from hgolofindemodelo import ModeloHGoloFindeWeb
 from hgolomodelo import ModeloHGoloWeb
+from mecanicosmodelo import ModeloMecanicosWeb
 from modmoimodelo import ModMoiModel
 from principalmodelo import modeloprincipal
 import sectoresmodelo as modelo_sectores
@@ -106,7 +107,8 @@ def vista_hgolo(request: Request):
 @app.get("/hgolofinde", response_class=HTMLResponse)
 def vista_hgolo_finde(request: Request):
     return templates.TemplateResponse(request, "hgolofinde.html", {})
-    
+
+
 @app.get("/mecanicos", response_class=HTMLResponse)
 def vista_mecanicos(request: Request):
     return templates.TemplateResponse(request, "mecanicos.html", {})
@@ -399,14 +401,11 @@ def api_obtener_hchoco(semana: Optional[str] = None):
     modelo = ModeloHChocoWeb()
     modelo_base = modeloprincipal()
     try:
-        # 1. Resolver la semana solicitada o calcular la actual
         if not semana or semana.lower() == "none" or semana.strip() == "":
             semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # 2. Limpieza de semanas anteriores en Supabase (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
-        # 3. Consulta de datos
         sectores = modelo.obtener_sectores_chocolates()
         dotacion_teorica = modelo.obtener_dotacion_teorica(semana)
         datos_guardados = modelo.obtener_datos_semana(semana)
@@ -476,7 +475,6 @@ def api_obtener_hchoco_finde(semana: Optional[str] = None):
         if not semana or semana.lower() == "none" or semana.strip() == "":
             semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # Limpieza previa para garantizar datos libres en fin de semana (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         datos = modelo.obtener_datos_semana_finde(semana)
@@ -643,7 +641,6 @@ def api_exportar_pdf_hchoco(semana: Optional[str] = None):
         nombre_archivo = f"Horarios chocolates semana {semana}.pdf"
         headers = {"Content-Disposition": f'attachment; filename="{nombre_archivo}"'}
         return StreamingResponse(output, headers=headers, media_type="application/pdf")
-
     finally:
         modelo_main.cerrar_conexion()
         modelo_finde.cerrar_conexion()
@@ -658,14 +655,11 @@ def api_obtener_hgolo(semana: Optional[str] = None):
     modelo = ModeloHGoloWeb()
     modelo_base = modeloprincipal()
     try:
-        # 1. Resolver la semana solicitada o calcular la actual
         if not semana or semana.lower() == "none" or semana.strip() == "":
             semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # 2. Limpieza de semanas anteriores en Supabase (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
-        # 3. Consulta de datos
         sectores = modelo.obtener_sectores_golosinas()
         dotacion_teorica = modelo.obtener_dotacion_teorica(semana)
         datos_guardados = modelo.obtener_datos_semana(semana)
@@ -734,7 +728,6 @@ def api_hgolo_finde_datos(semana: Optional[str] = ""):
         if not semana or semana.lower() == "none" or semana.strip() == "":
             semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # Limpieza previa para garantizar datos libres en fin de semana (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         operarios = modelo.obtener_operarios_disponibles(semana)
@@ -894,6 +887,14 @@ def api_exportar_pdf_hgolo(semana: Optional[str] = None):
         nombre_archivo = f"Horarios golosinas semana {semana}.pdf"
         headers = {"Content-Disposition": f'attachment; filename="{nombre_archivo}"'}
         return StreamingResponse(output, headers=headers, media_type="application/pdf")
+    finally:
+        modelo_main.cerrar_conexion()
+        modelo_finde.cerrar_conexion()
+
+
+# ==========================================
+# 8. MÓDULO: MECÁNICOS Y MANTENIMIENTO
+# ==========================================
 
 @app.get("/api/mecanicos/datos")
 def api_mecanicos_datos(semana: Optional[str] = ""):
@@ -903,7 +904,7 @@ def api_mecanicos_datos(semana: Optional[str] = ""):
         if not semana or semana.lower() == "none" or semana.strip() == "":
             semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
-        # Mantenemos la purga automática de semanas anteriores
+        # Purga automática de semanas anteriores (< semana actual)
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
 
         mecanicos = modelo.obtener_mecanicos_asignados(semana)
@@ -931,7 +932,4 @@ async def api_mecanicos_guardar(request: Request):
         return {"status": "error", "message": str(e)}
     finally:
         modelo.cerrar_conexion()
-
-    finally:
-        modelo_main.cerrar_conexion()
         modelo_finde.cerrar_conexion()
