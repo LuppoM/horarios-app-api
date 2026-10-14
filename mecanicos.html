@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Horarios de Mecánicos</title>
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
-    <link rel="stylesheet" href="/archivos/mecanicosvista.css?v=1.0">
+    <link rel="stylesheet" href="/archivos/mecanicosvista.css?v=2">
 </head>
 <body>
 
-    <!-- Barra Superior estilizada exactamente igual a HGolo -->
+    <!-- Top bar identica a HGolo -->
     <div class="top-bar">
         <button class="btn-accion btn-guardar" onclick="guardarMecanicos()">Guardar</button>
         <button class="btn-accion btn-cerrar" onclick="location.href='/'">Cerrar</button>
@@ -18,31 +18,14 @@
         <input type="text" id="inputSemana" class="semana-input" readonly>
     </div>
 
-    <!-- Lista limpia agrupada por planta/sector -->
-    <div class="contenedor-mecanicos">
-
-        <!-- Golosinas -->
-        <div class="grupo-card">
-            <h3 class="grupo-titulo">Golosinas</h3>
-            <div id="listaGolosinas" class="lista-mecanicos"></div>
-        </div>
-
-        <!-- Pasivo Golosinas -->
-        <div class="grupo-card">
-            <h3 class="grupo-titulo">Pasivo Golosinas</h3>
-            <div id="listaPasivo" class="lista-mecanicos"></div>
-        </div>
-
-        <!-- Chocolate -->
-        <div class="grupo-card">
-            <h3 class="grupo-titulo">Chocolate</h3>
-            <div id="listaChocolate" class="lista-mecanicos"></div>
-        </div>
-
+    <!-- Contenedor general de Carga de Datos -->
+    <div class="card-carga">
+        <h3 class="card-titulo">CARGA DATOS</h3>
+        <div id="bloquesHorarios"></div>
     </div>
 
     <script>
-        const TURNOS_MECANICOS = [
+        const HORARIOS_DEFINIDOS = [
             "06:00 a 14:00",
             "07:00 a 15:00",
             "08:30 a 16:30",
@@ -50,101 +33,131 @@
             "22:00 a 06:00"
         ];
 
-        let datosGlobales = {};
+        let mecanicosDisponibles = [];
+        let semanaActualGlobal = "";
 
         async function init() {
             const urlParams = new URLSearchParams(window.location.search);
-            let semanaUrl = urlParams.get('semana') || "";
-
-            const inputSemana = document.getElementById('inputSemana');
-            if (semanaUrl) inputSemana.value = semanaUrl;
+            semanaActualGlobal = urlParams.get('semana') || "";
 
             await cargarDatos();
         }
 
         async function cargarDatos() {
-            const semana = document.getElementById('inputSemana').value || "";
             try {
-                const res = await fetch(`/api/mecanicos/datos?semana=${semana}`);
-                datosGlobales = await res.json();
+                const res = await fetch(`/api/mecanicos/datos?semana=${semanaActualGlobal}`);
+                const data = await res.json();
 
-                if (datosGlobales && datosGlobales.semana) {
-                    document.getElementById('inputSemana').value = datosGlobales.semana;
-                }
-                renderizarMecanicos();
+                semanaActualGlobal = data.semana || semanaActualGlobal;
+                document.getElementById('inputSemana').value = semanaActualGlobal;
+                mecanicosDisponibles = data.disponibles || [];
+
+                renderizarUI(data.asignados || []);
             } catch (error) {
                 console.error("Error al cargar mecánicos:", error);
-                alert("Error al conectar con el servidor.");
+                alert("Error al obtener los datos de mecánicos.");
             }
         }
 
-        function renderizarMecanicos() {
-            const listaGolo = document.getElementById('listaGolosinas');
-            const listaPasivo = document.getElementById('listaPasivo');
-            const listaChoco = document.getElementById('listaChocolate');
+        function renderizarUI(asignados) {
+            const contenedor = document.getElementById('bloquesHorarios');
+            contenedor.innerHTML = "";
 
-            listaGolo.innerHTML = '';
-            listaPasivo.innerHTML = '';
-            listaChoco.innerHTML = '';
+            HORARIOS_DEFINIDOS.forEach(horario => {
+                const blockDiv = document.createElement('div');
+                blockDiv.className = "horario-block";
+                blockDiv.dataset.horario = horario;
 
-            const mecanicos = datosGlobales.mecanicos || [];
-
-            if (mecanicos.length === 0) {
-                listaGolo.innerHTML = '<p class="sin-datos">No hay mecánicos registrados.</p>';
-                return;
-            }
-
-            mecanicos.forEach(mec => {
-                // mec: [id, operario, horario, sector, planta]
-                const [idOp, nombreOp, horVal, secVal, plaVal] = mec;
-
-                const itemDiv = document.createElement('div');
-                itemDiv.className = "mecanico-item";
-
-                let optionsHor = `<option value="">-- Sin asignar --</option>`;
-                TURNOS_MECANICOS.forEach(t => {
-                    optionsHor += `<option value="${t}" ${t === horVal ? 'selected' : ''}>${t} hs</option>`;
-                });
-
-                itemDiv.innerHTML = `
-                    <span class="mecanico-nombre">${nombreOp}</span>
-                    <span class="mecanico-puntos">------------------------------------</span>
-                    <select class="select-horario-simple" data-id="${idOp}" data-sector="${secVal || ''}" data-planta="${plaVal || ''}">
-                        ${optionsHor}
-                    </select>
+                blockDiv.innerHTML = `
+                    <div class="horario-header">
+                        <strong>Horario: ${horario}</strong>
+                        <button class="btn-agregar-op" onclick="agregarFilaOperario('${horario}')">+ Agregar operario</button>
+                    </div>
+                    <div class="rows-container" id="container_${limpiarId(horario)}"></div>
                 `;
 
-                const plantaLower = (plaVal || "").toLowerCase();
-                const sectorLower = (secVal || "").toLowerCase();
+                contenedor.appendChild(blockDiv);
 
-                if (sectorLower.includes("pasivo")) {
-                    listaPasivo.appendChild(itemDiv);
-                } else if (plantaLower.includes("chocolate")) {
-                    listaChoco.appendChild(itemDiv);
-                } else {
-                    listaGolo.appendChild(itemDiv);
+                // Filtrar mecánicos asignados a este horario
+                const asignadosEnHorario = asignados.filter(a => a[2] === horario);
+                if (asignadosEnHorario.length > 0) {
+                    asignadosEnHorario.forEach(a => {
+                        agregarFilaOperario(horario, a[0], a[1]);
+                    });
                 }
             });
         }
 
+        function limpiarId(cadena) {
+            return cadena.replace(/[^a-zA-Z0-9]/g, '_');
+        }
+
+        function agregarFilaOperario(horario, idVal = "", nombreVal = "") {
+            const container = document.getElementById(`container_${limpiarId(horario)}`);
+            if (!container) return;
+
+            const filaDiv = document.createElement('div');
+            filaDiv.className = "fila-operario";
+
+            // Box pequeño para el ID
+            const inputId = document.createElement('input');
+            inputId.type = "text";
+            inputId.className = "input-id-box";
+            inputId.value = idVal;
+            inputId.readOnly = true;
+
+            // Combobox para seleccionar operario
+            const selectOp = document.createElement('select');
+            selectOp.className = "select-operario-mecanico";
+            selectOp.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
+
+            mecanicosDisponibles.forEach(([id, nombre]) => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = nombre;
+                if (parseInt(id) === parseInt(idVal) || nombre === nombreVal) {
+                    opt.selected = true;
+                    inputId.value = id;
+                }
+                selectOp.appendChild(opt);
+            });
+
+            selectOp.onchange = (e) => {
+                inputId.value = e.target.value;
+            };
+
+            // Botón eliminar
+            const btnEliminar = document.createElement('button');
+            btnEliminar.className = "btn-eliminar-op";
+            btnEliminar.textContent = "Eliminar";
+            btnEliminar.onclick = () => filaDiv.remove();
+
+            filaDiv.appendChild(inputId);
+            filaDiv.appendChild(selectOp);
+            filaDiv.appendChild(btnEliminar);
+
+            container.appendChild(filaDiv);
+        }
+
         async function guardarMecanicos() {
-            const semana = document.getElementById('inputSemana').value;
             let registros = [];
 
-            document.querySelectorAll('.select-horario-simple').forEach(sel => {
-                const idOp = parseInt(sel.dataset.id);
-                const horario = sel.value;
-                const sector = sel.dataset.sector || 'Mantenimiento';
-                const planta = sel.dataset.planta || 'General';
+            document.querySelectorAll('.horario-block').forEach(bloque => {
+                const horario = bloque.dataset.horario;
 
-                registros.push([idOp, horario, sector, planta]);
+                bloque.querySelectorAll('.fila-operario').forEach(fila => {
+                    const idOp = fila.querySelector('.input-id-box').value;
+                    if (idOp) {
+                        registros.push([parseInt(idOp), horario, 'Mantenimiento', 'General']);
+                    }
+                });
             });
 
             try {
                 const res = await fetch('/api/mecanicos/guardar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ semana: semana, registros: registros })
+                    body: JSON.stringify({ semana: semanaActualGlobal, registros: registros })
                 });
 
                 const r = await res.json();
@@ -156,7 +169,7 @@
                 }
             } catch (error) {
                 console.error("Error al guardar:", error);
-                alert("Ocurrió un error al guardar los datos.");
+                alert("Ocurrió un error al intentar guardar.");
             }
         }
 
