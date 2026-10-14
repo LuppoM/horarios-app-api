@@ -6,22 +6,19 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f1f5f9;
-    color: #333;
-    padding: 15px;
+    background-color: #ffffff;
+    color: #1a252f;
+    padding: 20px;
 }
 
 /* Barra Superior */
 .top-bar {
-    background-color: #ffffff;
-    padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-    border-radius: 6px;
-    border: 1px solid #e0e0e0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e2e8f0;
 }
 
 .top-bar-left {
@@ -31,27 +28,24 @@ body {
 }
 
 .top-bar h2 {
-    font-size: 11pt;
-    color: #00264d;
-    margin-right: 15px;
+    font-size: 12pt;
+    color: #004080;
     text-transform: uppercase;
 }
 
 .semana-label {
     font-weight: bold;
     color: #004080;
-    font-size: 10pt;
 }
 
 .semana-input {
-    width: 50px;
+    width: 45px;
     font-size: 10pt;
     font-weight: bold;
     text-align: center;
-    border: 1px solid #ccc;
+    border: 1px solid #cbd5e1;
     border-radius: 4px;
-    padding: 4px;
-    background-color: #f9f9f9;
+    padding: 3px;
 }
 
 /* Botones */
@@ -61,18 +55,16 @@ body {
     font-weight: bold;
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 
 .btn-guardar {
-    background-color: #e3f2fd;
-    color: #0d47a1;
-    border: 1px solid #0d47a1;
+    background-color: #004080;
+    color: #ffffff;
+    border: none;
 }
 
 .btn-guardar:hover {
-    background-color: #0d47a1;
-    color: #ffffff;
+    background-color: #00264d;
 }
 
 .btn-cerrar {
@@ -86,63 +78,66 @@ body {
     color: #ffffff;
 }
 
-/* Tabla Estructura */
-.tabla-container {
+/* Contenedor de Listado Simplificado */
+.contenedor-mecanicos {
+    max-width: 650px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.grupo-card {
     background-color: #ffffff;
-    border: 1px solid #d0d7de;
-    border-radius: 6px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-.tabla-mecanicos {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 9pt;
-}
-
-.tabla-mecanicos thead tr {
-    background-color: #004080;
-    color: #ffffff;
-    text-align: left;
-}
-
-.tabla-mecanicos th {
-    padding: 8px 12px;
+.grupo-titulo {
+    font-size: 11pt;
     font-weight: bold;
+    color: #00264d;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 4px;
 }
 
-.tabla-mecanicos td {
-    padding: 6px 12px;
-    border-bottom: 1px solid #e0e0e0;
+.lista-mecanicos {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.tabla-mecanicos tbody tr:nth-child(even) {
+/* Fila de Mecánico limpia */
+.mecanico-item {
+    display: flex;
+    align-items: center;
+    font-size: 10pt;
+}
+
+.mecanico-nombre {
+    font-weight: 600;
+    color: #2c3e50;
+    white-space: nowrap;
+}
+
+.mecanico-puntos {
+    color: #94a3b8;
+    margin: 0 8px;
+    letter-spacing: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.select-horario-simple {
+    font-size: 9.5pt;
+    font-weight: bold;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 3px 6px;
     background-color: #f8fafc;
+    cursor: pointer;
 }
 
-.tabla-mecanicos tbody tr:hover {
-    background-color: #eaf2f8;
-}
-
-/* Columnas */
-.col-id { width: 60px; text-align: center; font-weight: bold; color: #555; }
-.col-op { width: 250px; }
-.col-hor { width: 180px; }
-.col-sec { width: 220px; }
-.col-pla { width: 180px; }
-
-/* Controles de Entrada */
-.tabla-mecanicos select {
-    width: 100%;
-    padding: 4px 6px;
-    font-size: 8.5pt;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    background-color: #ffffff;
-}
-
-.tabla-mecanicos select:focus {
+.select-horario-simple:focus {
     border-color: #004080;
     outline: none;
 }
