@@ -3,41 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horarios Mecánicos</title>
+    <title>Horarios de Mecánicos</title>
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
     <link rel="stylesheet" href="/archivos/mecanicosvista.css">
 </head>
 <body>
 
-    <!-- Barra Superior -->
+    <!-- Barra Superior estilizada exactamente igual a HGolo -->
     <div class="top-bar">
-        <div class="top-bar-left">
-            <h2>HORARIOS DE MECÁNICOS</h2>
-            <label class="semana-label">Semana:</label>
-            <input type="text" id="inputSemana" class="semana-input" readonly>
-            <button class="btn-accion btn-guardar" onclick="guardarMecanicos()">Guardar Cambios</button>
-        </div>
-        <div>
-            <button class="btn-accion btn-cerrar" onclick="location.href='/'">Cerrar</button>
-        </div>
+        <button class="btn-accion btn-guardar" onclick="guardarMecanicos()">Guardar</button>
+        <button class="btn-accion btn-cerrar" onclick="location.href='/'">Cerrar</button>
+        
+        <span class="semana-label">Semana actual:</span>
+        <input type="text" id="inputSemana" class="semana-input" readonly>
     </div>
 
-    <!-- Contenedor Principal en Listado Simplificado -->
+    <!-- Lista limpia agrupada por planta/sector -->
     <div class="contenedor-mecanicos">
 
-        <!-- Grupo Golosinas -->
+        <!-- Golosinas -->
         <div class="grupo-card">
             <h3 class="grupo-titulo">Golosinas</h3>
             <div id="listaGolosinas" class="lista-mecanicos"></div>
         </div>
 
-        <!-- Grupo Pasivo / Guardia -->
-        <div class="grupo-card grupo-pasivo">
+        <!-- Pasivo Golosinas -->
+        <div class="grupo-card">
             <h3 class="grupo-titulo">Pasivo Golosinas</h3>
             <div id="listaPasivo" class="lista-mecanicos"></div>
         </div>
 
-        <!-- Grupo Chocolates -->
+        <!-- Chocolate -->
         <div class="grupo-card">
             <h3 class="grupo-titulo">Chocolate</h3>
             <div id="listaChocolate" class="lista-mecanicos"></div>
@@ -93,6 +89,11 @@
 
             const mecanicos = datosGlobales.mecanicos || [];
 
+            if (mecanicos.length === 0) {
+                listaGolo.innerHTML = '<p class="sin-datos">No hay mecánicos registrados.</p>';
+                return;
+            }
+
             mecanicos.forEach(mec => {
                 // mec: [id, operario, horario, sector, planta]
                 const [idOp, nombreOp, horVal, secVal, plaVal] = mec;
@@ -107,13 +108,12 @@
 
                 itemDiv.innerHTML = `
                     <span class="mecanico-nombre">${nombreOp}</span>
-                    <span class="mecanico-puntos">--------------------------</span>
+                    <span class="mecanico-puntos">------------------------------------</span>
                     <select class="select-horario-simple" data-id="${idOp}" data-sector="${secVal || ''}" data-planta="${plaVal || ''}">
                         ${optionsHor}
                     </select>
                 `;
 
-                // Clasificamos en la pantalla según la planta/sector
                 const plantaLower = (plaVal || "").toLowerCase();
                 const sectorLower = (secVal || "").toLowerCase();
 
@@ -149,14 +149,14 @@
 
                 const r = await res.json();
                 if (r.status === 'ok') {
-                    alert("Horarios guardados correctamente.");
+                    alert("Horarios de mecánicos guardados correctamente.");
                     await cargarDatos();
                 } else {
                     alert("Error al guardar: " + r.message);
                 }
             } catch (error) {
                 console.error("Error al guardar:", error);
-                alert("Ocurrió un error al guardar.");
+                alert("Ocurrió un error al guardar los datos.");
             }
         }
 
