@@ -122,14 +122,14 @@ def vista_mecanicos(request: Request):
 def api_obtener_modmoi(
     vista: str = "Semana", columna: str = None, filtro: str = None
 ):
-    es_finde = vista == "Fin de Semana"
-
-    if es_finde:
+    if vista == "Mecanicos":
+        columnas, datos = modmoi_modelo.obtener_datos_mecanicos(columna, filtro)
+    elif vista == "Fin de Semana":
         columnas, datos = modmoi_modelo.obtener_datos_finde(columna, filtro)
     else:
         columnas, datos = modmoi_modelo.obtener_datos(columna, filtro)
 
-    mod_count, moi_count = modmoi_modelo.contar_mano_de_obra(es_finde=es_finde)
+    mod_count, moi_count = modmoi_modelo.contar_mano_de_obra(vista=vista)
 
     return {
         "columnas": columnas,
@@ -141,16 +141,18 @@ def api_obtener_modmoi(
 
 @app.get("/api/modmoi/exportar-excel")
 def api_exportar_excel(vista: str = "Semana"):
-    es_finde = vista == "Fin de Semana"
-
     semana_actual = modmoi_modelo.obtener_numero_semana_personalizado(date.today())
 
-    if es_finde:
-        columnas, datos = modmoi_modelo.obtener_datos_finde()
+    if vista == "Mecanicos":
+        columnas, datos = modmoi_modelo.obtener_datos_mecanicos(semana_actual=semana_actual)
+        nombre_hoja = "Horarios Mecanicos"
+        nombre_archivo = f"Consolidado Mecanicos semana {semana_actual}.xlsx"
+    elif vista == "Fin de Semana":
+        columnas, datos = modmoi_modelo.obtener_datos_finde(semana_actual=semana_actual)
         nombre_hoja = "Horarios Finde"
         nombre_archivo = f"Consolidado Finde semana {semana_actual}.xlsx"
     else:
-        columnas, datos = modmoi_modelo.obtener_datos()
+        columnas, datos = modmoi_modelo.obtener_datos(semana_actual=semana_actual)
         nombre_hoja = "Horarios Semana"
         nombre_archivo = f"Consolidado Semana {semana_actual}.xlsx"
 
@@ -205,7 +207,6 @@ def api_exportar_excel(vista: str = "Semana"):
         headers=headers,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
 
 @app.get("/api/modmoi/obtener/{id_registro}")
 def api_obtener_registro(id_registro: int):
