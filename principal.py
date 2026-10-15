@@ -52,7 +52,6 @@ def semana_objetivo_por_defecto() -> str:
 # ==========================================
 # 1. VISTAS HTML PRINCIPALES (GENERAL)
 # ==========================================
-
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     # Instanciamos desde el archivo/módulo principalmodelo
