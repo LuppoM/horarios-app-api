@@ -24,11 +24,51 @@ class modeloprincipal:
 
         return fecha_ajustada.isocalendar()[1]
 
+    def obtener_estado_programacion(self, semana: str) -> dict:
+        """
+        Consulta en la base de datos si la semana indicada tiene estado FINALIZADO o PENDIENTE.
+        """
+        cursor = None
+        try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
+            cursor = self.conexion_db.cursor()
+            query = """
+                SELECT semana, estado, modificado_por, fecha_modificacion 
+                FROM estados_programacion 
+                WHERE semana::text = %s;
+            """
+            cursor.execute(query, (str(semana).strip(),))
+            row = cursor.fetchone()
+
+            if row:
+                return {
+                    "semana": str(row[0]),
+                    "estado": row[1],
+                    "modificado_por": row[2],
+                    "fecha_modificacion": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
+                }
+            return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
+
+        except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+            print(f"Error al obtener estado de programación para semana {semana}: {e}")
+            return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
+        finally:
+            if cursor:
+                cursor.close()
+
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
         """Limpieza remota sobre Supabase (PostgreSQL).
         Blanquea asignaciones y limites teoricos de semanas estrictamente ANTERIORES (< semana_actual).
         """
+        cursor = None
         try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor = self.conexion_db.cursor()
 
             if semana_actual is None:
@@ -92,13 +132,12 @@ class modeloprincipal:
             print(f"Limpieza ejecutada exitosamente para semanas anteriores a la semana {semana_num}.")
 
         except Exception as e:
-            if hasattr(self, 'conexion_db') and self.conexion_db:
+            if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error al limpiar semanas anteriores en Supabase: {e}")
-
-    # =========================================================================
-    # MÉTODOS PARA LA TABLA dotacion_teorica_horarios
-    # =========================================================================
+        finally:
+            if cursor:
+                cursor.close()
 
     def obtener_dotacion_teorica(self, semana=None):
         """
@@ -108,7 +147,11 @@ class modeloprincipal:
         if semana is None:
             semana = self.obtener_numero_semana_personalizado()
 
+        cursor = None
         try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor = self.conexion_db.cursor()
             query = """
                 SELECT id, sector, "06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00", semana_inicio, planta
@@ -139,18 +182,26 @@ class modeloprincipal:
             return dotaciones
 
         except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
             print(f"Error al obtener dotación teórica para la semana {semana}: {e}")
             return []
+        finally:
+            if cursor:
+                cursor.close()
 
     def guardar_dotacion_lote(self, lista_dotaciones, semana=None):
         """
         Guarda o actualiza masivamente los registros de dotación programada para una semana.
-        lista_dotaciones: list[dict] -> [{'sector': 'PLANTA DE PASTA', 't06_14': 10, 't14_22': 1, 't22_06': 1, 'planta': 'Chocolates'}, ...]
         """
         if semana is None:
             semana = self.obtener_numero_semana_personalizado()
 
+        cursor = None
         try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor = self.conexion_db.cursor()
             for item in lista_dotaciones:
                 query = """
@@ -176,10 +227,13 @@ class modeloprincipal:
             return True
 
         except Exception as e:
-            if hasattr(self, 'conexion_db') and self.conexion_db:
+            if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error al guardar lote de dotación teórica: {e}")
             return False
+        finally:
+            if cursor:
+                cursor.close()
 
     def cerrar_conexion(self):
         if hasattr(self, 'conexion_db') and self.conexion_db:
