@@ -1,4 +1,8 @@
-/* dtprogramada.css - Estilos para la vista de Dotación Programada */
+/* dtprogramadavista.css - Estilos exactos de la vista original */
+
+* {
+    box-sizing: border-box;
+}
 
 body {
     font-family: Arial, sans-serif;
@@ -7,149 +11,144 @@ body {
     background-color: #f4f6f9;
 }
 
-.header-bar {
-    background-color: #003366;
+.top-bar {
+    background-color: #003865;
     color: white;
-    padding: 12px 20px;
+    padding: 10px 15px;
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    align-items: center;
 }
 
-.header-title {
-    font-size: 18px;
-    font-weight: bold;
+.top-bar-left {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
 }
 
-.semana-input {
-    width: 55px;
-    padding: 4px 8px;
-    font-size: 14px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    text-align: center;
+.top-bar-left h2 {
+    margin: 0;
+    font-size: 16px;
     font-weight: bold;
 }
 
-.badge {
+.btn-accion {
     padding: 6px 14px;
-    border-radius: 12px;
     font-size: 13px;
     font-weight: bold;
-    display: inline-block;
-}
-
-.badge-success {
-    background-color: #28a745;
-    color: white;
-}
-
-.badge-warning {
-    background-color: #ffc107;
-    color: #212529;
-}
-
-.btn-header {
-    background-color: #ffffff;
-    color: #003366;
     border: none;
-    padding: 8px 16px;
-    font-weight: bold;
     border-radius: 4px;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    background-color: #ffffff;
+    color: #003865;
 }
 
-.btn-header:hover {
-    background-color: #e0e0e0;
+.btn-accion:hover {
+    opacity: 0.9;
 }
 
-.btn-cerrar {
-    background-color: #dc3545;
-    color: white;
-    text-decoration: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-weight: bold;
-    transition: background 0.2s;
+.tabs-container {
+    padding: 10px;
 }
 
-.btn-cerrar:hover {
-    background-color: #c82333;
-}
-
-.tab-container {
-    margin: 15px 20px 0 20px;
+.tab-header {
     display: flex;
-    gap: 10px;
+    gap: 5px;
+    margin-bottom: 0;
 }
 
 .tab-btn {
-    padding: 8px 22px;
-    border: 1px solid #003366;
-    background-color: #e9ecef;
-    color: #003366;
+    padding: 6px 18px;
+    font-size: 13px;
     font-weight: bold;
-    border-radius: 4px 4px 0 0;
+    border: 1px solid #ccc;
+    background-color: #e9ecef;
+    color: #333;
     cursor: pointer;
-    transition: all 0.2s;
+    border-radius: 4px 4px 0 0;
 }
 
 .tab-btn.active {
-    background-color: #003366;
+    background-color: #003865;
     color: white;
+    border-color: #003865;
 }
 
-.table-container {
-    margin: 0 20px 20px 20px;
+.tab-content {
+    display: none;
     background: white;
-    border-radius: 0 0 4px 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #ccc;
+    padding: 5px;
     overflow-x: auto;
 }
 
-table {
+.tab-content.active {
+    display: block;
+}
+
+/* Tabla Matriz */
+.tabla-matriz {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 12px;
 }
 
-th, td {
-    border: 1px solid #dee2e6;
-    padding: 8px 12px;
+.tabla-matriz th, .tabla-matriz td {
+    border: 1px solid #c0c0c0;
+    padding: 4px;
     text-align: center;
 }
 
-th {
-    background-color: #003366;
+.th-sector-vacio {
+    background-color: #003865;
     color: white;
+    font-weight: bold;
+    width: 220px;
 }
 
-.th-turnos {
-    background-color: #28a745;
+.th-turno-grupo {
+    background-color: #27ae60;
+    color: white;
+    font-weight: bold;
 }
 
-td.sector-name {
+.th-dias-grupo {
+    background-color: #17a2b8;
+    color: white;
+    font-weight: bold;
+}
+
+.sector-nombre {
     text-align: left;
     font-weight: bold;
-    color: #333;
+    background-color: #f8f9fa;
+    color: #003865;
+    padding-left: 8px;
 }
 
-input.val-input {
-    width: 55px;
+/* Inputs de las celdas */
+.turno-input {
+    width: 60px;
     text-align: center;
-    padding: 4px;
     border: 1px solid #ccc;
     border-radius: 3px;
-    font-size: 13px;
+    padding: 3px;
+    font-weight: bold;
 }
 
-input.val-input:focus {
-    border-color: #003366;
+.turno-input:focus {
+    border-color: #003865;
+    background-color: #e8f4f8;
     outline: none;
-    background-color: #f0f8ff;
+}
+
+.input-total {
+    width: 60px;
+    text-align: center;
+    border: 1px solid #e0e0e0;
+    background-color: #f1f3f5;
+    color: #555;
+    border-radius: 3px;
+    padding: 3px;
+    font-weight: bold;
 }
