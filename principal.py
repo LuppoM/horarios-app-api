@@ -415,69 +415,86 @@ def api_eliminar_tipo_horario(tipo_id: int):
 # 5. MÓDULO: DOTACIÓN PROGRAMADA
 # ==========================================
 
-# ==========================================
-# MÓDULO: DOTACIÓN PROGRAMADA
-# ==========================================
-
-# ==========================================
-# MÓDULO: DOTACIÓN PROGRAMADA
-# ==========================================
-
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
     """
-    Obtiene los datos de la dotación y el estado de la programación.
-    Si no se especifica semana, busca la última semana activa o finalizada en la BD.
+    Obtiene los datos de la dotación y verifica el estado en estados_programacion.
+    Usa una conexión limpia y directa para evitar fallos de cursor viciado.
     """
-    try:
-        # Si no envían semana, intentamos buscar la última registrada en estados_programacion
-        if not semana or semana.lower() == "none" or semana.strip() == "":
-            cursor = modelo_dtprog.conexion_db.cursor()
-            cursor.execute("SELECT semana FROM estados_programacion ORDER BY fecha_modificacion DESC LIMIT 1;")
-            row = cursor.fetchone()
-            if row:
-                semana = str(row[0] if not isinstance(row, dict) else row.get("semana"))
-            else:
-                semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
-            if cursor:
-                cursor.close()
+    # 1. Determinar número de semana
+    if not semana or semana.lower() == "none" or semana.strip() == "":
+        try:
+            semana = str(modelo_dtprog.obtener_numero_semana_personalizado(date.today()))
+        except Exception:
+            semana = "42"
 
+    semana_limpia = str(semana).strip()
+    estado_str = "PENDIENTE"
+    es_finalizado = False
+    modificado_por = ""
+    fecha_modificacion = ""
+
+    # 2. Consultar directamente a la base de datos con conexión propia
+    conn = None
+    cursor = None
+    try:
+        conn = conexion.obtener_conexion()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT estado, modificado_por, fecha_modificacion FROM estados_programacion WHERE TRIM(CAST(semana AS TEXT)) = %s LIMIT 1;", 
+            (semana_limpia,)
+        )
+        row = cursor.fetchone()
+        if row:
+            estado_str = str(row[0]).strip().upper() if row[0] else "PENDIENTE"
+            es_finalizado = (estado_str == "FINALIZADO")
+            modificado_por = str(row[1]) if row[1] else ""
+            fecha_modificacion = str(row[2]) if row[2] else ""
+    except Exception as err:
+        print(f"Error consultando BD directa para semana {semana_limpia}: {err}")
+    finally:
+        if cursor:
+            try: cursor.close()
+            except Exception: pass
+        if conn:
+            try: conn.close()
+            except Exception: pass
+
+    # 3. Cargar datos del modelo de dotación
+    try:
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
-        dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
-
-        info_estado = modelo_dtprog.obtener_estado_programacion(semana)
-        es_finalizado = (info_estado.get("estado") == "FINALIZADO")
-
-        if es_finalizado:
-            mensaje = f"✅ Dotación Semana {semana} FINALIZADA por {info_estado.get('modificado_por')} ({info_estado.get('fecha_modificacion')})"
-        else:
-            mensaje = f"⚠️ Dotación Semana {semana} PENDIENTE de carga"
+        dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana_limpia)
 
         return {
-            "semana": str(semana),
-            "estado": info_estado.get("estado", "PENDIENTE"),
+            "semana": semana_limpia,
+            "estado": estado_str,
             "finalizado": es_finalizado,
-            "modificado_por": info_estado.get("modificado_por", ""),
-            "fecha_modificacion": info_estado.get("fecha_modificacion", ""),
-            "mensaje": mensaje,
+            "modificado_por": modificado_por,
+            "fecha_modificacion": fecha_modificacion,
             "turnos": turnos,
             "sectores_chocolate": sectores_choco,
             "sectores_golosinas": sectores_golo,
             "dotaciones": dotaciones
         }
     except Exception as e:
-        print(f"Error en /api/dtprogramada/datos: {e}")
-        return {"error": str(e)}
+        print(f"Error cargando estructuras de dtprogramada: {e}")
+        return {
+            "semana": semana_limpia,
+            "estado": estado_str,
+            "finalizado": es_finalizado,
+            "modificado_por": modificado_por,
+            "fecha_modificacion": fecha_modificacion,
+            "turnos": [],
+            "sectores_chocolate": [],
+            "sectores_golosinas": [],
+            "dotaciones": {}
+        }
 
 
 @app.post("/api/dtprogramada/guardar")
 def api_guardar_dtprogramada(payload: dict = Body(...)):
-    """
-    Guarda los datos de la dotación (enviados en formato jerárquico por planta) 
-    y actualiza automáticamente el estado en estados_programacion a 'FINALIZADO'.
-    """
     semana = payload.get("semana")
     datos = payload.get("datos", {})
     usuario = payload.get("usuario", "Programacion")
@@ -492,30 +509,42 @@ def api_guardar_dtprogramada(payload: dict = Body(...)):
         exito, mensaje = modelo_dtprog.guardar_dotaciones(semana, datos)
         
         if exito:
-            # Actualizamos el estado en la tabla estados_programacion
-            modelo_dtprog.actualizar_estado_programacion(semana, estado="FINALIZADO", usuario=usuario)
+            # Actualizamos la tabla estados_programacion
+            conn = None
+            cursor = None
+            try:
+                conn = conexion.obtener_conexion()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO estados_programacion (semana, estado, modificado_por, fecha_modificacion)
+                    VALUES (%s, 'FINALIZADO', %s, NOW())
+                    ON CONFLICT (semana) 
+                    DO UPDATE SET estado = 'FINALIZADO', modificado_por = EXCLUDED.modificado_por, fecha_modificacion = NOW();
+                """, (str(semana).strip(), usuario))
+                conn.commit()
+            except Exception as e_st:
+                print(f"Error actualizando estado_programacion: {e_st}")
+            finally:
+                if cursor: cursor.close()
+                if conn: conn.close()
+
             return {"status": "ok", "message": f"Dotación guardada correctamente para la Semana {semana}."}
         else:
             return {"status": "error", "message": mensaje}
     except Exception as e:
-        print(f"Error en /api/dtprogramada/guardar: {e}")
         return {"status": "error", "message": str(e)}
 
 
 @app.get("/api/dtprogramada/exportar-pdf")
 @app.get("/generar_dt_pdf")
 def api_exportar_pdf_dtprogramada(planta: Optional[str] = "ambas", semana: Optional[str] = None):
-    """
-    Genera y descarga el reporte PDF de la Dotación Programada discriminado por planta.
-    """
     if not semana or semana.lower() == "none" or semana.strip() == "":
-        semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
+        semana = str(modelo_dtprog.obtener_numero_semana_personalizado(date.today()))
 
     try:
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO") or ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
-        
         dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
 
         planta_norm = (planta or "ambas").strip().lower()
