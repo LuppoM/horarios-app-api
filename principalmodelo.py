@@ -40,12 +40,23 @@ class modeloprincipal:
             row = cursor.fetchone()
 
             if row:
-                return {
-                    "semana": str(row[0]),
-                    "estado": row[1],
-                    "modificado_por": row[2],
-                    "fecha_modificacion": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
-                }
+                # Si row es una tupla o lista
+                if isinstance(row, (list, tuple)) and len(row) >= 4:
+                    return {
+                        "semana": str(row[0]),
+                        "estado": str(row[1]).strip().upper(),
+                        "modificado_por": str(row[2]) if row[2] else "",
+                        "fecha_modificacion": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
+                    }
+                # Si row es un diccionario
+                elif isinstance(row, dict):
+                    return {
+                        "semana": str(row.get("semana")),
+                        "estado": str(row.get("estado", "PENDIENTE")).strip().upper(),
+                        "modificado_por": str(row.get("modificado_por", "")),
+                        "fecha_modificacion": str(row.get("fecha_modificacion", ""))
+                    }
+
             return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
 
         except Exception as e:
