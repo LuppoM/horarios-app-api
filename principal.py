@@ -14,7 +14,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-
+import conexion
 from abmmodelo import abmmodmoimodelo
 from dtprogramadamodelo import ModeloDTProgramadaWeb
 from Hchocomodelo import ModeloHChocoWeb
