@@ -1,202 +1,155 @@
-/* Estilos inspirados y adaptados de dtprogramadavista.py */
+/* dtprogramada.css - Estilos para la vista de Dotación Programada */
+
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f1f5f9;
+    font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
-    color: #333;
+    background-color: #f4f6f9;
 }
 
-/* Barra superior idéntica a crear_top_bar (#004080) */
-.top-bar {
-    background-color: #004080;
+.header-bar {
+    background-color: #003366;
     color: white;
-    padding: 10px 15px;
+    padding: 12px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 50px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
-.top-bar-left {
+.header-title {
+    font-size: 18px;
+    font-weight: bold;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 15px;
 }
 
-.top-bar h2 {
-    margin: 0;
-    font-size: 13pt;
-    font-weight: bold;
-    color: white;
-}
-
-.top-bar label {
-    font-size: 11pt;
-    font-weight: bold;
-    color: white;
-}
-
-.top-bar input[type="text"] {
-    width: 50px;
-    font-size: 11pt;
-    font-weight: bold;
-    text-align: center;
-    padding: 2px;
+.semana-input {
+    width: 55px;
+    padding: 4px 8px;
+    font-size: 14px;
+    border-radius: 4px;
     border: 1px solid #ccc;
-    border-radius: 3px;
-}
-
-/* Botones de la barra superior */
-.btn-topbar {
-    background-color: #f0f4f8;
-    color: #003366;
-    border: 1px solid #b0c4de;
-    padding: 5px 12px;
-    font-size: 10pt;
+    text-align: center;
     font-weight: bold;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: background-color 0.2s;
 }
 
-.btn-topbar:hover {
-    background-color: #e2e8f0;
+.badge {
+    padding: 6px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.badge-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.btn-header {
+    background-color: #ffffff;
+    color: #003366;
+    border: none;
+    padding: 8px 16px;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.btn-header:hover {
+    background-color: #e0e0e0;
 }
 
 .btn-cerrar {
-    background-color: #ffc7ce;
-    color: #9c0006;
-    border: 1px solid #ffb6c1;
+    background-color: #dc3545;
+    color: white;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background 0.2s;
 }
 
 .btn-cerrar:hover {
-    background-color: #ffb1bc;
+    background-color: #c82333;
 }
 
-/* Contenedor del Notebook y Pestañas */
-.tabs-container {
-    background-color: #ffffff;
-    padding: 10px;
-    margin: 10px;
-    border-radius: 6px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-
-.tab-header {
+.tab-container {
+    margin: 15px 20px 0 20px;
     display: flex;
-    gap: 4px;
-    border-bottom: 2px solid #dde6ed;
-    padding-bottom: 5px;
-    margin-bottom: 10px;
+    gap: 10px;
 }
 
 .tab-btn {
-    padding: 8px 18px;
+    padding: 8px 22px;
+    border: 1px solid #003366;
     background-color: #e9ecef;
-    border: none;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-size: 10pt;
-    font-weight: bold;
     color: #003366;
+    font-weight: bold;
+    border-radius: 4px 4px 0 0;
     cursor: pointer;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
+    transition: all 0.2s;
 }
 
 .tab-btn.active {
-    background-color: #cfe2f3;
-    border: 1px solid #b0c4de;
-    border-bottom: none;
+    background-color: #003366;
+    color: white;
 }
 
-.tab-content {
-    display: none;
-    max-height: 550px;
-    overflow: auto;
+.table-container {
+    margin: 0 20px 20px 20px;
+    background: white;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow-x: auto;
 }
 
-.tab-content.active {
-    display: block;
-}
-
-/* Tablas con las proporciones y colores originales de la vista */
-table.tabla-matriz {
+table {
     width: 100%;
     border-collapse: collapse;
+    font-size: 13px;
+}
+
+th, td {
+    border: 1px solid #dee2e6;
+    padding: 8px 12px;
     text-align: center;
-    font-size: 9pt;
-    background-color: #ffffff;
 }
 
-table.tabla-matriz th, table.tabla-matriz td {
-    border: 1px solid #cbd5e1;
-    padding: 4px 6px;
-}
-
-/* Encabezados de sección y colores específicos */
-.th-sector-vacio {
+th {
     background-color: #003366;
-    width: 260px;
+    color: white;
 }
 
-.th-turno-grupo {
+.th-turnos {
     background-color: #28a745;
-    color: white;
-    font-weight: bold;
-    font-size: 9pt;
 }
 
-.th-dias-grupo {
-    background-color: #17a2b8;
-    color: white;
-    font-weight: bold;
-    font-size: 9pt;
-}
-
-table.tabla-matriz th {
-    font-weight: bold;
-    color: white;
-    padding: 6px;
-}
-
-.bg-azul {
-    background-color: #003366;
-    width: 260px;
-}
-
-.bg-verde {
-    background-color: #28a745;
-    width: 120px;
-}
-
-.bg-celeste {
-    background-color: #17a2b8;
-    width: 90px;
-}
-
-/* Nombres de los sectores a la izquierda (alineados a la izquierda con fondo #f0f4f8) */
-td.sector-nombre {
+td.sector-name {
     text-align: left;
     font-weight: bold;
-    background-color: #f0f4f8;
-    color: #003366;
-    padding-left: 8px;
-    width: 260px;
-}
-
-/* Entradas (Inputs) de turnos y días */
-table.tabla-matriz input[type="text"] {
-    width: 80px;
-    text-align: center;
-    padding: 3px;
-    font-size: 9pt;
-    border: 1px solid #ccc;
-    border-radius: 2px;
-}
-
-table.tabla-matriz input.input-total {
-    background-color: #e9ecef;
-    font-weight: bold;
     color: #333;
+}
+
+input.val-input {
+    width: 55px;
+    text-align: center;
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+input.val-input:focus {
+    border-color: #003366;
+    outline: none;
+    background-color: #f0f8ff;
 }
