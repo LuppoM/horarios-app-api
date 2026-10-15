@@ -142,3 +142,53 @@ class ModeloDTProgramadaWeb:
                 self.conexion_db.close()
             except Exception:
                 pass
+    def obtener_estado_programacion(self, semana: str) -> dict:
+        """
+        Consulta el estado de la programación para una semana en la tabla estados_programacion.
+        """
+        try:
+            cursor = self.conexion_db.cursor()
+            query = """
+                SELECT semana, estado, modificado_por, fecha_modificacion 
+                FROM estados_programacion 
+                WHERE semana = %s;
+            """
+            cursor.execute(query, (str(semana),))
+            row = cursor.fetchone()
+
+            if row:
+                return {
+                    "semana": row[0],
+                    "estado": row[1], # p.ej. 'FINALIZADO' o 'PENDIENTE'
+                    "modificado_por": row[2],
+                    "fecha_modificacion": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
+                }
+            return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
+
+        except Exception as e:
+            print(f"Error al obtener estado de programación para semana {semana}: {e}")
+            return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
+
+    def actualizar_estado_programacion(self, semana: str, estado: str = "FINALIZADO", usuario: str = "Programacion") -> bool:
+        """
+        Registra o actualiza el estado de la programación en estados_programacion (UPSERT).
+        """
+        try:
+            cursor = self.conexion_db.cursor()
+            query = """
+                INSERT INTO estados_programacion (semana, estado, modificado_por, fecha_modificacion)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (semana) 
+                DO UPDATE SET 
+                    estado = EXCLUDED.estado,
+                    modificado_por = EXCLUDED.modificado_por,
+                    fecha_modificacion = NOW();
+            """
+            cursor.execute(query, (str(semana), estado, usuario))
+            self.conexion_db.commit()
+            return True
+        except Exception as e:
+            if hasattr(self, 'conexion_db') and self.conexion_db:
+                self.conexion_db.rollback()
+            print(f"Error al actualizar estado_programacion: {e}")
+            return False
