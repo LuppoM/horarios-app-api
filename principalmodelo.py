@@ -25,9 +25,6 @@ class modeloprincipal:
         return fecha_ajustada.isocalendar()[1]
 
     def obtener_estado_programacion(self, semana: str) -> dict:
-        """
-        Consulta en la base de datos si la semana indicada tiene estado FINALIZADO o PENDIENTE.
-        """
         cursor = None
         try:
             if hasattr(self.conexion_db, 'rollback'):
