@@ -118,39 +118,43 @@ def vista_mecanicos(request: Request):
 
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
-    try:
-        if not semana or semana.lower() == "none" or semana.strip() == "":
-            semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
+    if not semana or semana.lower() == "none" or semana.strip() == "":
+        semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
 
+    # Fuerza una conexión limpia en esta llamada
+    conn = None
+    cursor = None
+    es_finalizado = False
+    modificado_por = ""
+    fecha_modificacion = ""
+    estado_str = "PENDIENTE"
+
+    try:
+        conn = conexion.obtener_conexion()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT estado, modificado_por, fecha_modificacion FROM estados_programacion WHERE semana::text = %s;", 
+            (str(semana).strip(),)
+        )
+        row = cursor.fetchone()
+        if row:
+            estado_str = str(row[0]).strip().upper() if row[0] else "PENDIENTE"
+            es_finalizado = (estado_str == "FINALIZADO")
+            modificado_por = str(row[1]) if row[1] else ""
+            fecha_modificacion = str(row[2]) if row[2] else ""
+    except Exception as err:
+        print(f"Error real leyendo BD: {err}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+    try:
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
         dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
-
-        # CONSULTA DIRECTA A LA TABLA ESTADOS_PROGRAMACION
-        es_finalizado = False
-        modificado_por = ""
-        fecha_modificacion = ""
-        estado_str = "PENDIENTE"
-
-        cursor = None
-        try:
-            cursor = modelo_dtprog.conexion_db.cursor()
-            cursor.execute(
-                "SELECT estado, modificado_por, fecha_modificacion FROM estados_programacion WHERE semana::text = %s LIMIT 1;", 
-                (str(semana).strip(),)
-            )
-            row = cursor.fetchone()
-            if row:
-                estado_str = str(row[0]).strip().upper() if row[0] else "PENDIENTE"
-                es_finalizado = (estado_str == "FINALIZADO")
-                modificado_por = str(row[1]) if row[1] else ""
-                fecha_modificacion = str(row[2]) if row[2] else ""
-        except Exception as err_db:
-            print(f"Error consultando SQL directo: {err_db}")
-        finally:
-            if cursor:
-                cursor.close()
 
         return {
             "semana": str(semana),
@@ -164,7 +168,6 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
             "dotaciones": dotaciones
         }
     except Exception as e:
-        print(f"Error general en /api/dtprogramada/datos: {e}")
         return {"error": str(e)}
 # ==========================================
 # 2. MÓDULO: MANO DE OBRA (MOD/MOI)
