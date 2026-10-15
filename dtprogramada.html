@@ -9,7 +9,7 @@
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
     
     <!-- CSS Específico del Módulo -->
-    <link rel="stylesheet" href="/archivos/dtprogramada.css">
+    <link rel="stylesheet" href="/archivos/dtprogramadavista.css">
 </head>
 <body>
 
@@ -20,7 +20,6 @@
             <span>Semana: 
                 <input type="number" id="inputSemana" class="semana-input" onchange="cargarDatos()">
             </span>
-            <span id="badgeEstado" class="badge badge-warning">Cargando estado...</span>
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
             <button class="btn-header" onclick="guardarCambios()">Guardar Cambios</button>
@@ -73,19 +72,6 @@
                 .then(data => {
                     datosGlobales = data;
                     document.getElementById('inputSemana').value = data.semana;
-
-                    // Actualizar el Badge dinámico según la tabla estados_programacion
-                    const badge = document.getElementById('badgeEstado');
-                    if (data.finalizado) {
-                        badge.className = 'badge badge-success';
-                        badge.innerText = `✅ FINALIZADO (${data.modificado_por || 'Programación'})`;
-                        badge.title = `Última modificación: ${data.fecha_modificacion || 'N/A'}`;
-                    } else {
-                        badge.className = 'badge badge-warning';
-                        badge.innerText = '⚠️ PENDIENTE DE CARGA';
-                        badge.title = 'Esta semana aún no fue marcada como finalizada';
-                    }
-
                     renderizarTabla();
                 })
                 .catch(err => console.error('Error al cargar los datos:', err));
@@ -178,7 +164,7 @@
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'ok') {
-                    alert('Dotación guardada y estado actualizado a FINALIZADO.');
+                    alert('Dotación guardada y confirmada con éxito.');
                     cargarDatos();
                 } else {
                     alert('Error al guardar: ' + (data.message || 'Error desconocido'));
