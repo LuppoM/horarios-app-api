@@ -25,6 +25,9 @@ class modeloprincipal:
         return fecha_ajustada.isocalendar()[1]
 
     def obtener_estado_programacion(self, semana: str) -> dict:
+        """
+        Consulta en la tabla estados_programacion si la semana indicada tiene estado FINALIZADO o PENDIENTE.
+        """
         cursor = None
         try:
             if hasattr(self.conexion_db, 'rollback'):
@@ -33,42 +36,43 @@ class modeloprincipal:
             cursor = self.conexion_db.cursor()
             val_semana = str(semana).strip()
 
-            # Usamos TRIM e ILIKE para evitar fallos por espacios en la BD
+            # Consultamos comparando el texto limpio
             query = """
                 SELECT semana, estado, modificado_por, fecha_modificacion 
                 FROM estados_programacion 
-                WHERE TRIM(CAST(semana AS TEXT)) ILIKE %s
-                LIMIT 1;
+                WHERE TRIM(CAST(semana AS TEXT)) = %s;
             """
             cursor.execute(query, (val_semana,))
             row = cursor.fetchone()
 
             if row:
-                # Manejo seguro si la respuesta es tupla o dict
-                if isinstance(row, (list, tuple)):
-                    semana_db = str(row[0]).strip()
-                    estado_db = str(row[1]).strip().upper() if row[1] else "PENDIENTE"
+                # Si el cursor devuelve tupla/lista
+                if isinstance(row, (list, tuple)) and len(row) >= 2:
+                    st_val = str(row[1]).strip().upper() if row[1] else "PENDIENTE"
                     mod_por = str(row[2]) if len(row) > 2 and row[2] else ""
-                    fecha_mod = row[3].strftime("%Y-%m-%d %H:%M:%S") if len(row) > 3 and row[3] else None
+                    f_mod = row[3].strftime("%Y-%m-%d %H:%M:%S") if len(row) > 3 and row[3] else None
+                    return {
+                        "semana": str(row[0]).strip(),
+                        "estado": st_val,
+                        "modificado_por": mod_por,
+                        "fecha_modificacion": f_mod
+                    }
+                # Si el cursor devuelve diccionario
                 elif isinstance(row, dict):
-                    semana_db = str(row.get("semana", "")).strip()
-                    estado_db = str(row.get("estado", "PENDIENTE")).strip().upper()
-                    mod_por = str(row.get("modificado_por", ""))
-                    fecha_mod = str(row.get("fecha_modificacion", ""))
-
-                return {
-                    "semana": semana_db,
-                    "estado": estado_db,
-                    "modificado_por": mod_por,
-                    "fecha_modificacion": fecha_mod
-                }
+                    st_val = str(row.get("estado", "PENDIENTE")).strip().upper()
+                    return {
+                        "semana": str(row.get("semana", "")).strip(),
+                        "estado": st_val,
+                        "modificado_por": str(row.get("modificado_por", "")),
+                        "fecha_modificacion": str(row.get("fecha_modificacion", ""))
+                    }
 
             return {"semana": val_semana, "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
 
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
-            print(f"Error crítico al obtener estado de programación (semana {semana}): {e}")
+            print(f"Error crítico al consultar estado de programación para semana {semana}: {e}")
             return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
         finally:
             if cursor:
