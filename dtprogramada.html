@@ -120,13 +120,13 @@
             
             let html = `<td class="sector-nombre">${sector}</td>`;
 
-            // Inputs habilitados para Tab (turnos)
+            // Inputs habilitados para Turnos
             turnos.forEach((turno, tIdx) => {
                 const val = (dotacionPlanta[sector] && dotacionPlanta[sector][turno] !== undefined) ? dotacionPlanta[sector][turno] : 0;
                 html += `<td><input type="text" class="turno-input" data-sector="${sector}" data-turno="${turno}" data-fila="${filaIdx}" data-turno-idx="${tIdx}" value="${val}"></td>`;
             });
 
-            // Inputs deshabilitados para Tab (días) -> tabindex="-1" hace que Tab se los saltee
+            // Inputs deshabilitados para Días (Lunes a Viernes) -> tabindex="-1" saltea con Tab
             diasKeys.forEach(dia => {
                 const valDia = (dotacionPlanta[sector] && dotacionPlanta[sector][dia] !== undefined) ? dotacionPlanta[sector][dia] : 0;
                 html += `<td><input type="text" class="input-total dia-input" data-dia="${dia}" value="${valDia}" tabindex="-1" readonly></td>`;
@@ -136,7 +136,6 @@
             tbody.appendChild(tr);
         });
 
-        // Configurar navegación por teclado para los turnos de esta tabla
         configurarNavegacionTablas(tbodyId, turnos.length);
     }
 
@@ -149,7 +148,7 @@
                 const tIdx = parseInt(this.dataset.turnoIdx);
                 const trActual = this.closest('tr');
 
-                // Si se presiona ENTER o si está en el último turno y presiona TAB
+                // ENTER o TAB al final de la fila -> Pasa a la siguiente fila
                 if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey && tIdx === cantTurnos - 1)) {
                     e.preventDefault();
                     const siguienteTr = trActual.nextElementSibling;
@@ -158,7 +157,7 @@
                         if (primerInputSig) primerInputSig.focus();
                     }
                 } 
-                // Si presiona Shift + Tab en el primer turno de la fila, sube a la fila anterior
+                // SHIFT + TAB al inicio de la fila -> Sube a la fila anterior
                 else if (e.key === 'Tab' && e.shiftKey && tIdx === 0) {
                     const anteriorTr = trActual.previousElementSibling;
                     if (anteriorTr) {
@@ -233,6 +232,6 @@
     }
 
     window.onload = init;
-</script>
+    </script>
 </body>
 </html>
