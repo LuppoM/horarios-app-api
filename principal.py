@@ -55,33 +55,29 @@ def semana_objetivo_por_defecto() -> str:
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
+    # Instanciamos desde el archivo/módulo principalmodelo
     modelo_base = modeloprincipal()
-    semana_calculada = None
+    semana_calculada = ""
     try:
-        # Calculamos la semana actual de producción dinámicamente con modeloprincipal
+        # Obtenemos el número de semana actual de producción
         semana_calculada = str(modelo_base.obtener_numero_semana_personalizado())
         
-        # Limpieza global de semanas anteriores en Supabase (< semana actual)
+        # Limpieza de semanas pasadas
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana_calculada)
     except Exception as e:
-        print(f"Error al ejecutar limpieza automática en el Inicio: {e}")
-        if not semana_calculada:
-            # Fallback seguro usando nuevamente modeloprincipal
-            try:
-                semana_calculada = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
-            except Exception:
-                semana_calculada = ""
+        print(f"Error al ejecutar inicio: {e}")
+        try:
+            semana_calculada = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+        except Exception:
+            semana_calculada = ""
     finally:
         if hasattr(modelo_base, 'cerrar_conexion'):
             modelo_base.cerrar_conexion()
 
-    # Le pasamos el número de semana dinámico al template HTML
-    return templates.TemplateResponse(
-        request, 
-        "Principal.html", 
-        {"semana_actual": semana_calculada}
-    )
-
+    # Le enviamos semana_actual a Jinja2 para Principal.html
+    return templates.TemplateResponse(request, "Principal.html", {
+        "semana_actual": semana_calculada
+    })
 
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
