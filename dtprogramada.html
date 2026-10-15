@@ -9,7 +9,7 @@
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
     
     <!-- CSS Específico del Módulo -->
-    <link rel="stylesheet" href="/archivos/dtprogramadavista.css">
+    <link rel="stylesheet" href="/archivos/dtprogramada.css">
 </head>
 <body>
 
@@ -38,11 +38,13 @@
         <table id="tablaDotacion">
             <thead>
                 <tr>
-                    <th rowspan="2">LÍNEA / SECTOR</th>
+                    <th rowspan="2" style="width: 30%;">LÍNEA / SECTOR</th>
                     <th colspan="3" class="th-turnos">DOTACIÓN POR TURNO</th>
                 </tr>
-                <tr id="rowTurnos">
-                    <!-- Generado dinámicamente -->
+                <tr>
+                    <th class="th-turnos">06:00 a 14:00</th>
+                    <th class="th-turnos">14:00 a 22:00</th>
+                    <th class="th-turnos">22:00 a 06:00</th>
                 </tr>
             </thead>
             <tbody id="tbodyDotacion">
@@ -51,7 +53,7 @@
         </table>
     </div>
 
-    <!-- LÓGICA DE INTERACCIÓN Y API -->
+    <!-- LÓGICA JS FUNCIONAL -->
     <script>
         let plantaActual = 'chocolate';
         let datosGlobales = null;
@@ -74,7 +76,7 @@
                     document.getElementById('inputSemana').value = data.semana;
                     renderizarTabla();
                 })
-                .catch(err => console.error('Error al cargar los datos:', err));
+                .catch(err => console.error('Error al cargar datos:', err));
         }
 
         function cambiarPlanta(planta) {
@@ -87,16 +89,12 @@
         function renderizarTabla() {
             if (!datosGlobales) return;
 
-            const turnos = datosGlobales.turnos || ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"];
+            const turnos = ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"];
             const sectores = (plantaActual === 'chocolate') 
                 ? datosGlobales.sectores_chocolate 
                 : datosGlobales.sectores_golosinas;
 
-            // Render Encabezado de Turnos
-            const rowTurnos = document.getElementById('rowTurnos');
-            rowTurnos.innerHTML = turnos.map(t => `<th class="th-turnos">${t}</th>`).join('');
-
-            // Mapa rápido de la dotación existente
+            // Mapeo rápido de dotaciones cargadas
             const mapDot = {};
             (datosGlobales.dotaciones || []).forEach(d => {
                 let sec = d.sector || d[0];
@@ -105,7 +103,6 @@
                 mapDot[`${String(sec).trim().toUpperCase()}_${String(tur).trim()}`] = cant;
             });
 
-            // Render Filas de Sectores
             const tbody = document.getElementById('tbodyDotacion');
             tbody.innerHTML = '';
 
@@ -164,15 +161,15 @@
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'ok') {
-                    alert('Dotación guardada y confirmada con éxito.');
+                    alert('Dotación guardada correctamente.');
                     cargarDatos();
                 } else {
                     alert('Error al guardar: ' + (data.message || 'Error desconocido'));
                 }
             })
             .catch(err => {
-                console.error('Error al guardar los cambios:', err);
-                alert('Ocurrió un error al intentar guardar la información.');
+                console.error('Error al guardar:', err);
+                alert('Ocurrió un error al intentar guardar los cambios.');
             });
         }
     </script>
