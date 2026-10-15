@@ -422,13 +422,39 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
     Usa una conexión limpia y directa para evitar fallos de cursor viciado.
     """
     # 1. Determinar número de semana
-    if not semana or semana.lower() == "none" or semana.strip() == "":
+    semana_limpia = ""
+    if semana and semana.lower() != "none" and str(semana).strip() != "":
+        semana_limpia = str(semana).strip()
+    else:
+        # Si no enviaron semana explícita, buscamos la última registrada en estados_programacion
+        conn_sem = None
+        cursor_sem = None
         try:
-            semana = str(modelo_dtprog.obtener_numero_semana_personalizado(date.today()))
-        except Exception:
-            semana = "42"
+            conn_sem = conexion.obtener_conexion()
+            cursor_sem = conn_sem.cursor()
+            cursor_sem.execute(
+                "SELECT semana FROM estados_programacion WHERE semana IS NOT NULL ORDER BY fecha_modificacion DESC LIMIT 1;"
+            )
+            row_sem = cursor_sem.fetchone()
+            if row_sem and row_sem[0]:
+                semana_limpia = str(row_sem[0]).strip()
+        except Exception as e_sem:
+            print(f"Error buscando última semana registrada: {e_sem}")
+        finally:
+            if cursor_sem:
+                try: cursor_sem.close()
+                except Exception: pass
+            if conn_sem:
+                try: conn_sem.close()
+                except Exception: pass
 
-    semana_limpia = str(semana).strip()
+        # Fallback si no se encontró nada en la BD
+        if not semana_limpia:
+            try:
+                semana_limpia = str(modelo_dtprog.obtener_numero_semana_personalizado(date.today()))
+            except Exception:
+                semana_limpia = "42"
+
     estado_str = "PENDIENTE"
     es_finalizado = False
     modificado_por = ""
@@ -491,7 +517,6 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
             "sectores_golosinas": [],
             "dotaciones": {}
         }
-
 
 @app.post("/api/dtprogramada/guardar")
 def api_guardar_dtprogramada(payload: dict = Body(...)):
