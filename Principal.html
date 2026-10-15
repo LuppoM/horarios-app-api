@@ -23,15 +23,25 @@
                     <a href="/hchoco">Chocolates</a>
                     <a href="/hgolo">Golosinas</a>
                     <a href="/mecanicos">Mecanicos</a>
-
                 </div>
             </div>
 
-            <!-- 2. BOTONES FIJOS -->
+            <!-- 2. BOTÓN FIJO -->
             <a href="/modmoi" class="custom-button">CONSOLIDADO AMBAS PLANTAS</a>
-            <a href="/dtprogramada" class="custom-button">DOTACION PROGRAMADA</a>
 
-            <!-- 3. MENÚ DESPLEGABLE: PARÁMETROS -->
+            <!-- 3. MENÚ DESPLEGABLE: DOTACIÓN PROGRAMADA -->
+            <div class="dropdown">
+                <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuDtProgramada')">DOTACION PROGRAMADA ▼</button>
+                <div id="menuDtProgramada" class="dropdown-menu">
+                    <a href="/dtprogramada">Cargar Dotación Programada</a>
+                    <hr style="margin: 4px 0; border: 0; border-top: 1px solid #ccc;">
+                    <a href="/generar_dt_pdf?planta=chocolates">Generar PDF - Chocolates</a>
+                    <a href="/generar_dt_pdf?planta=golosinas">Generar PDF - Golosinas</a>
+                    <a href="/generar_dt_pdf?planta=ambas">Generar PDF - Ambas Plantas</a>
+                </div>
+            </div>
+
+            <!-- 4. MENÚ DESPLEGABLE: PARÁMETROS -->
             <div class="dropdown">
                 <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuParametros')">PARÁMETROS ▼</button>
                 <div id="menuParametros" class="dropdown-menu">
@@ -40,7 +50,7 @@
                 </div>
             </div>
 
-            <!-- 4. BOTÓN SALIR -->
+            <!-- 5. BOTÓN SALIR -->
             <a href="/" class="custom-button">SALIR</a>
 
         </div>
@@ -48,7 +58,7 @@
 
     <script>
         function toggleDropdown(event, menuId) {
-            event.stopPropagation(); // Pasingked nga saan a mapedpede daytoy a click tapno saan a matukor a dagus
+            event.stopPropagation();
             
             // Ikatlo dagiti dadduma a nakalukat a menu
             document.querySelectorAll('.dropdown-menu').forEach(menu => {
