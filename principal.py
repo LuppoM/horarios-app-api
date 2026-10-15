@@ -371,8 +371,9 @@ def api_eliminar_tipo_horario(tipo_id: int):
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
     """
-    Obtiene los sectores, turnos, dotaciones y el estado de la programación 
-    (PENDIENTE / FINALIZADO) para la semana solicitada.
+    Obtiene los sectores, turnos, dotaciones y el estado de la programación.
+    Si no se recibe semana, calcula la actual del sistema mediante el modelo,
+    la compara contra la base de datos y retorna su estado real.
     """
     if not semana or semana.lower() == "none" or semana.strip() == "":
         semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
@@ -383,7 +384,7 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
         dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
 
-        # Consulta del estado real en la tabla estados_programacion
+        # Consulta en la BD si el número de semana calculado ya fue registrado/finalizado
         info_estado = modelo_dtprog.obtener_estado_programacion(semana)
         es_finalizado = (info_estado.get("estado") == "FINALIZADO")
 
@@ -402,7 +403,7 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
             "turnos": turnos,
             "sectores_chocolate": sectores_choco,
             "sectores_golosinas": sectores_golo,
-            "dotaciones": dotaciones  # Retorna {"Chocolate": {sector: {rango: cant}}, "Golosinas": {...}}
+            "dotaciones": dotaciones
         }
     except Exception as e:
         print(f"Error en /api/dtprogramada/datos: {e}")
