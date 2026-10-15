@@ -364,6 +364,10 @@ def api_eliminar_tipo_horario(tipo_id: int):
 # MÓDULO: DOTACIÓN PROGRAMADA
 # ==========================================
 
+# ==========================================
+# MÓDULO: DOTACIÓN PROGRAMADA
+# ==========================================
+
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
     """
@@ -392,13 +396,13 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
             "semana": str(semana),
             "estado": info_estado.get("estado", "PENDIENTE"),
             "finalizado": es_finalizado,
-            "modificado_por": info_estado.get("modificado_por"),
-            "fecha_modificacion": info_estado.get("fecha_modificacion"),
+            "modificado_por": info_estado.get("modificado_por", ""),
+            "fecha_modificacion": info_estado.get("fecha_modificacion", ""),
             "mensaje": mensaje,
             "turnos": turnos,
             "sectores_chocolate": sectores_choco,
             "sectores_golosinas": sectores_golo,
-            "dotaciones": dotaciones  # Retorna {"Chocolate": {...}, "Golosinas": {...}}
+            "dotaciones": dotaciones  # Retorna {"Chocolate": {sector: {rango: cant}}, "Golosinas": {...}}
         }
     except Exception as e:
         print(f"Error en /api/dtprogramada/datos: {e}")
@@ -418,11 +422,14 @@ def api_guardar_dtprogramada(payload: dict = Body(...)):
     if not semana:
         return {"status": "error", "message": "Semana no especificada"}
 
+    if not datos:
+        return {"status": "error", "message": "No se recibieron datos de dotación para guardar."}
+
     try:
         exito, mensaje = modelo_dtprog.guardar_dotaciones(semana, datos)
         
         if exito:
-            # Marcamos la semana como FINALIZADO en estados_programacion
+            # Actualizamos el estado en la tabla estados_programacion
             modelo_dtprog.actualizar_estado_programacion(semana, estado="FINALIZADO", usuario=usuario)
             return {"status": "ok", "message": f"Dotación guardada correctamente para la Semana {semana}."}
         else:
@@ -446,7 +453,6 @@ def api_exportar_pdf_dtprogramada(planta: Optional[str] = "ambas", semana: Optio
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO") or ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
         
-        # dotaciones retorna {"Chocolate": {sector: {rango: cant}}, "Golosinas": {...}}
         dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
 
         planta_norm = (planta or "ambas").strip().lower()
