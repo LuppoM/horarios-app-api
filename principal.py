@@ -119,8 +119,8 @@ def vista_mecanicos(request: Request):
 @app.get("/api/principal/estado-dotacion")
 def api_estado_dotacion_principal(semana: Optional[str] = None):
     """
-    Endpoint exclusivo para el menú principal (Inicio) que consulta 
-    el estado de la programación usando modeloprincipal.
+    Endpoint exclusivo para Principal.html. 
+    Consulta el estado de la semana actual mediante modeloprincipal.
     """
     modelo_base = modeloprincipal()
     try:
@@ -143,7 +143,6 @@ def api_estado_dotacion_principal(semana: Optional[str] = None):
     finally:
         if hasattr(modelo_base, 'cerrar_conexion'):
             modelo_base.cerrar_conexion()
-
 # ==========================================
 # 2. MÓDULO: MANO DE OBRA (MOD/MOI)
 # ==========================================
