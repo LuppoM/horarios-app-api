@@ -112,7 +112,37 @@ def vista_hgolo_finde(request: Request):
 @app.get("/mecanicos", response_class=HTMLResponse)
 def vista_mecanicos(request: Request):
     return templates.TemplateResponse(request, "mecanicos.html", {})
+# ==========================================
+# 1.1. ESTADO PARA LA VISTA PRINCIPAL (INICIO)
+# ==========================================
 
+@app.get("/api/principal/estado-dotacion")
+def api_estado_dotacion_principal(semana: Optional[str] = None):
+    """
+    Endpoint exclusivo para el menú principal (Inicio) que consulta 
+    el estado de la programación usando modeloprincipal.
+    """
+    modelo_base = modeloprincipal()
+    try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            semana = str(modelo_base.obtener_numero_semana_personalizado())
+
+        info_estado = modelo_base.obtener_estado_programacion(semana)
+        es_finalizado = (info_estado.get("estado") == "FINALIZADO")
+
+        return {
+            "semana": str(semana),
+            "estado": info_estado.get("estado", "PENDIENTE"),
+            "finalizado": es_finalizado,
+            "modificado_por": info_estado.get("modificado_por", ""),
+            "fecha_modificacion": info_estado.get("fecha_modificacion", "")
+        }
+    except Exception as e:
+        print(f"Error en /api/principal/estado-dotacion: {e}")
+        return {"error": str(e)}
+    finally:
+        if hasattr(modelo_base, 'cerrar_conexion'):
+            modelo_base.cerrar_conexion()
 
 # ==========================================
 # 2. MÓDULO: MANO DE OBRA (MOD/MOI)
