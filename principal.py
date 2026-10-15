@@ -371,7 +371,7 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
     (PENDIENTE / FINALIZADO) para la semana solicitada.
     """
     if not semana or semana.lower() == "none" or semana.strip() == "":
-        semana = semana_objetivo_por_defecto()
+        semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
 
     try:
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
@@ -389,7 +389,7 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
             mensaje = f"⚠️ Dotación Semana {semana} PENDIENTE de carga"
 
         return {
-            "semana": semana,
+            "semana": str(semana),
             "estado": info_estado.get("estado", "PENDIENTE"),
             "finalizado": es_finalizado,
             "modificado_por": info_estado.get("modificado_por"),
@@ -398,7 +398,7 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
             "turnos": turnos,
             "sectores_chocolate": sectores_choco,
             "sectores_golosinas": sectores_golo,
-            "dotaciones": dotaciones
+            "dotaciones": dotaciones  # Retorna {"Chocolate": {...}, "Golosinas": {...}}
         }
     except Exception as e:
         print(f"Error en /api/dtprogramada/datos: {e}")
@@ -408,8 +408,8 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
 @app.post("/api/dtprogramada/guardar")
 def api_guardar_dtprogramada(payload: dict = Body(...)):
     """
-    Guarda los datos de la dotación y actualiza automáticamente el estado 
-    en estados_programacion a 'FINALIZADO'.
+    Guarda los datos de la dotación (enviados en formato jerárquico por planta) 
+    y actualiza automáticamente el estado en estados_programacion a 'FINALIZADO'.
     """
     semana = payload.get("semana")
     datos = payload.get("datos", {})
@@ -424,7 +424,7 @@ def api_guardar_dtprogramada(payload: dict = Body(...)):
         if exito:
             # Marcamos la semana como FINALIZADO en estados_programacion
             modelo_dtprog.actualizar_estado_programacion(semana, estado="FINALIZADO", usuario=usuario)
-            return {"status": "ok", "message": "Dotación guardada y estado actualizado a FINALIZADO."}
+            return {"status": "ok", "message": f"Dotación guardada correctamente para la Semana {semana}."}
         else:
             return {"status": "error", "message": mensaje}
     except Exception as e:
@@ -437,40 +437,29 @@ def api_guardar_dtprogramada(payload: dict = Body(...)):
 def api_exportar_pdf_dtprogramada(planta: Optional[str] = "ambas", semana: Optional[str] = None):
     """
     Genera y descarga el reporte PDF de la Dotación Programada discriminado por planta.
-    Parámetros de entrada:
-      - planta: 'chocolates', 'golosinas' o 'ambas'
-      - semana: Número de semana (opcional)
     """
     if not semana or semana.lower() == "none" or semana.strip() == "":
-        semana = semana_objetivo_por_defecto()
+        semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
 
     try:
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO") or ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+        
+        # dotaciones retorna {"Chocolate": {sector: {rango: cant}}, "Golosinas": {...}}
         dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
 
         planta_norm = (planta or "ambas").strip().lower()
         
         if planta_norm in ["chocolates", "choco", "chocolate"]:
-            sectores_filtrados = [("CHOCOLATES", sectores_choco)]
+            sectores_filtrados = [("CHOCOLATES", sectores_choco, "Chocolate")]
             titulo_planta = "PLANTA CHOCOLATES"
         elif planta_norm in ["golosinas", "golo"]:
-            sectores_filtrados = [("GOLOSINAS", sectores_golo)]
+            sectores_filtrados = [("GOLOSINAS", sectores_golo, "Golosinas")]
             titulo_planta = "PLANTA GOLOSINAS"
         else:
-            sectores_filtrados = [("CHOCOLATES", sectores_choco), ("GOLOSINAS", sectores_golo)]
+            sectores_filtrados = [("CHOCOLATES", sectores_choco, "Chocolate"), ("GOLOSINAS", sectores_golo, "Golosinas")]
             titulo_planta = "CONSOLIDADO AMBAS PLANTAS"
-
-        map_dotacion = {}
-        for reg in dotaciones:
-            if isinstance(reg, dict):
-                sec, tur, cant = reg.get("sector"), reg.get("turno"), reg.get("cantidad", 0)
-            elif len(reg) >= 3:
-                sec, tur, cant = reg[0], reg[1], reg[2]
-            else:
-                continue
-            map_dotacion[(str(sec).strip().upper(), str(tur).strip())] = cant
 
         output = BytesIO()
         doc = SimpleDocTemplate(
@@ -498,7 +487,7 @@ def api_exportar_pdf_dtprogramada(planta: Optional[str] = "ambas", semana: Optio
         )
         elements.append(Spacer(1, 14))
 
-        for nombre_bloque, lista_sectores in sectores_filtrados:
+        for nombre_bloque, lista_sectores, clave_planta in sectores_filtrados:
             if not lista_sectores:
                 continue
 
@@ -508,13 +497,15 @@ def api_exportar_pdf_dtprogramada(planta: Optional[str] = "ambas", semana: Optio
             encabezados = ["LÍNEA / SECTOR"] + [str(t) for t in turnos]
             tabla_datos = [encabezados]
 
+            dot_planta = dotaciones.get(clave_planta, {})
+
             for s in lista_sectores:
                 nombre_sec = s.get("nombre_sector") if isinstance(s, dict) else (s[0] if isinstance(s, (list, tuple)) else str(s))
                 nombre_sec_clean = str(nombre_sec).strip()
 
                 fila = [nombre_sec_clean]
                 for t in turnos:
-                    cant = map_dotacion.get((nombre_sec_clean.upper(), str(t).strip()), 0)
+                    cant = dot_planta.get(nombre_sec_clean, {}).get(str(t).strip(), 0)
                     fila.append(str(cant) if cant is not None else "0")
 
                 tabla_datos.append(fila)
