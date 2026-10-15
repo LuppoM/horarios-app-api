@@ -3,192 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DOTACIÓN PROGRAMADA</title>
-    
-    <!-- Ícono -->
+    <title>Dotación Teórica por Horarios</title>
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
-    
-    <!-- CSS Específico del Módulo -->
     <link rel="stylesheet" href="/archivos/dtprogramadavista.css">
 </head>
 <body>
 
-    <!-- BARRA SUPERIOR DE CONTROL -->
-    <div class="header-bar">
-        <div class="header-title">
-            <span>DOTACIÓN TEÓRICA - HORARIOS POR SECTOR</span>
-            <span>Semana: 
-                <input type="number" id="inputSemana" class="semana-input" onchange="cargarDatos()">
-            </span>
-            <span id="badgeEstado" class="badge badge-warning">Cargando estado...</span>
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <h2>DOTACIÓN TEÓRICA - HORARIOS POR SECTOR</h2>
+            <label style="font-weight: bold;">Semana:</label>
+            <input type="text" id="inputSemana" style="width: 50px; text-align: center; font-weight: bold; padding: 4px;" onchange="cargarDatos()">
+            <button class="btn-accion" onclick="guardarDatos()">Guardar Cambios</button>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <button class="btn-header" onclick="guardarCambios()">Guardar Cambios</button>
-            <a href="/" class="btn-cerrar">Cerrar</a>
+        <div>
+            <button class="btn-accion" style="background-color: #ffc7ce; color: #9c0006;" onclick="location.href='/'">Cerrar</button>
         </div>
     </div>
 
-    <!-- PESTAÑAS DE PLANTAS -->
-    <div class="tab-container">
-        <button id="tabChoco" class="tab-btn active" onclick="cambiarPlanta('chocolate')">Chocolates</button>
-        <button id="tabGolo" class="tab-btn" onclick="cambiarPlanta('golosinas')">Golosinas</button>
+    <div class="tabs-container">
+        <div class="tab-header">
+            <button class="tab-btn active" onclick="cambiarTab('choco', event)">Chocolates</button>
+            <button class="tab-btn" onclick="cambiarTab('golo', event)">Golosinas</button>
+        </div>
+
+        <!-- Pestaña Chocolates -->
+        <div id="tabChoco" class="tab-content active">
+            <table class="tabla-matriz" id="tablaChoco">
+                <thead id="headChoco"></thead>
+                <tbody id="bodyChoco"></tbody>
+            </table>
+        </div>
+
+        <!-- Pestaña Golosinas -->
+        <div id="tabGolo" class="tab-content">
+            <table class="tabla-matriz" id="tablaGolo">
+                <thead id="headGolo"></thead>
+                <tbody id="bodyGolo"></tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- CONTENEDOR DE LA TABLA -->
-    <div class="table-container">
-        <table id="tablaDotacion">
-            <thead>
-                <tr>
-                    <th rowspan="2">LÍNEA / SECTOR</th>
-                    <th colspan="3" class="th-turnos">DOTACIÓN POR TURNO</th>
-                </tr>
-                <tr id="rowTurnos">
-                    <!-- Generado dinámicamente -->
-                </tr>
-            </thead>
-            <tbody id="tbodyDotacion">
-                <!-- Generado dinámicamente -->
-            </tbody>
-        </table>
-    </div>
-
-    <!-- LÓGICA DE INTERACCIÓN Y API -->
     <script>
-        let plantaActual = 'chocolate';
-        let datosGlobales = null;
+    let datosGlobales = {};
+    const diasKeys = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
 
-        document.addEventListener('DOMContentLoaded', () => {
-            cargarDatos();
+    async function init() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let semanaUrl = urlParams.get('semana');
+
+        const inputSemana = document.getElementById('inputSemana');
+        if (semanaUrl) {
+            inputSemana.value = semanaUrl;
+        }
+
+        await cargarDatos();
+    }
+
+    async function cargarDatos() {
+        const semana = document.getElementById('inputSemana').value || "";
+        const url = `/api/dtprogramada/datos?semana=${semana}`;
+        
+        try {
+            const res = await fetch(url);
+            datosGlobales = await res.json();
+
+            if (datosGlobales && datosGlobales.semana) {
+                document.getElementById('inputSemana').value = datosGlobales.semana;
+            }
+            renderizarTablas();
+        } catch (error) {
+            console.error("Error al cargar los datos:", error);
+        }
+    }
+
+    function renderizarTablas() {
+        const turnos = datosGlobales.turnos || ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"];
+        const cantTurnos = turnos.length;
+
+        let encabezadoHTML = `
+            <tr>
+                <th rowspan="2" class="th-sector-vacio">LÍNEA / SECTOR</th>
+                <th colspan="${cantTurnos}" class="th-turno-grupo">DOTACIÓN POR TURNO</th>
+                <th colspan="5" class="th-dias-grupo">DOTACIÓN POR DÍAS (LUNES A VIERNES)</th>
+            </tr>
+            <tr>
+                ${turnos.map(t => `<th class="th-turno-grupo">${t}</th>`).join('')}
+                ${diasKeys.map(d => `<th class="th-dias-grupo">${d}</th>`).join('')}
+            </tr>
+        `;
+
+        const headChoco = document.getElementById('headChoco');
+        const headGolo = document.getElementById('headGolo');
+        if (headChoco) headChoco.innerHTML = encabezadoHTML;
+        if (headGolo) headGolo.innerHTML = encabezadoHTML;
+
+        const dotaciones = datosGlobales.dotaciones || {};
+        renderizarCuerpo('bodyChoco', datosGlobales.sectores_chocolate || [], dotaciones.Chocolate || {}, turnos);
+        renderizarCuerpo('bodyGolo', datosGlobales.sectores_golosinas || [], dotaciones.Golosinas || {}, turnos);
+    }
+
+    function renderizarCuerpo(tbodyId, sectores, dotacionPlanta, turnos) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!sectores || sectores.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="${1 + turnos.length + diasKeys.length}" style="text-align: center; padding: 10px; color: #666;">No hay sectores registrados para esta planta.</td>`;
+            tbody.appendChild(tr);
+            return;
+        }
+
+        sectores.forEach((sector, filaIdx) => {
+            const tr = document.createElement('tr');
+            
+            let html = `<td class="sector-nombre">${sector}</td>`;
+
+            // Inputs habilitados para Tab (turnos)
+            turnos.forEach((turno, tIdx) => {
+                const val = (dotacionPlanta[sector] && dotacionPlanta[sector][turno] !== undefined) ? dotacionPlanta[sector][turno] : 0;
+                html += `<td><input type="text" class="turno-input" data-sector="${sector}" data-turno="${turno}" data-fila="${filaIdx}" data-turno-idx="${tIdx}" value="${val}"></td>`;
+            });
+
+            // Inputs deshabilitados para Tab (días) -> tabindex="-1" hace que Tab se los saltee
+            diasKeys.forEach(dia => {
+                const valDia = (dotacionPlanta[sector] && dotacionPlanta[sector][dia] !== undefined) ? dotacionPlanta[sector][dia] : 0;
+                html += `<td><input type="text" class="input-total dia-input" data-dia="${dia}" value="${valDia}" tabindex="-1" readonly></td>`;
+            });
+
+            tr.innerHTML = html;
+            tbody.appendChild(tr);
         });
 
-        function cargarDatos() {
-            const semanaInput = document.getElementById('inputSemana');
-            let url = '/api/dtprogramada/datos';
-            if (semanaInput.value) {
-                url += `?semana=${semanaInput.value}`;
-            }
+        // Configurar navegación por teclado para los turnos de esta tabla
+        configurarNavegacionTablas(tbodyId, turnos.length);
+    }
 
-            fetch(url)
-                .then(res => res.json())
-                .then(data => {
-                    datosGlobales = data;
-                    document.getElementById('inputSemana').value = data.semana;
+    function configurarNavegacionTablas(tbodyId, cantTurnos) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
 
-                    // Actualizar el Badge dinámico según la tabla estados_programacion
-                    const badge = document.getElementById('badgeEstado');
-                    if (data.finalizado) {
-                        badge.className = 'badge badge-success';
-                        badge.innerText = `✅ FINALIZADO (${data.modificado_por || 'Programación'})`;
-                        badge.title = `Última modificación: ${data.fecha_modificacion || 'N/A'}`;
-                    } else {
-                        badge.className = 'badge badge-warning';
-                        badge.innerText = '⚠️ PENDIENTE DE CARGA';
-                        badge.title = 'Esta semana aún no fue marcada como finalizada';
+        tbody.querySelectorAll('.turno-input').forEach(input => {
+            input.addEventListener('keydown', function(e) {
+                const tIdx = parseInt(this.dataset.turnoIdx);
+                const trActual = this.closest('tr');
+
+                // Si se presiona ENTER o si está en el último turno y presiona TAB
+                if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey && tIdx === cantTurnos - 1)) {
+                    e.preventDefault();
+                    const siguienteTr = trActual.nextElementSibling;
+                    if (siguienteTr) {
+                        const primerInputSig = siguienteTr.querySelector('.turno-input[data-turno-idx="0"]');
+                        if (primerInputSig) primerInputSig.focus();
                     }
-
-                    renderizarTabla();
-                })
-                .catch(err => console.error('Error al cargar los datos:', err));
-        }
-
-        function cambiarPlanta(planta) {
-            plantaActual = planta;
-            document.getElementById('tabChoco').classList.toggle('active', planta === 'chocolate');
-            document.getElementById('tabGolo').classList.toggle('active', planta === 'golosinas');
-            renderizarTabla();
-        }
-
-        function renderizarTabla() {
-            if (!datosGlobales) return;
-
-            const turnos = datosGlobales.turnos || ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"];
-            const sectores = (plantaActual === 'chocolate') 
-                ? datosGlobales.sectores_chocolate 
-                : datosGlobales.sectores_golosinas;
-
-            // Render Encabezado de Turnos
-            const rowTurnos = document.getElementById('rowTurnos');
-            rowTurnos.innerHTML = turnos.map(t => `<th class="th-turnos">${t}</th>`).join('');
-
-            // Mapa rápido de la dotación existente
-            const mapDot = {};
-            (datosGlobales.dotaciones || []).forEach(d => {
-                let sec = d.sector || d[0];
-                let tur = d.turno || d[1];
-                let cant = d.cantidad !== undefined ? d.cantidad : d[2];
-                mapDot[`${String(sec).trim().toUpperCase()}_${String(tur).trim()}`] = cant;
-            });
-
-            // Render Filas de Sectores
-            const tbody = document.getElementById('tbodyDotacion');
-            tbody.innerHTML = '';
-
-            sectores.forEach(s => {
-                let nombreSec = typeof s === 'object' ? (s.nombre_sector || s.sector) : s;
-                let nombreClean = String(nombreSec).trim();
-
-                let tr = document.createElement('tr');
-                let html = `<td class="sector-name">${nombreClean}</td>`;
-
-                turnos.forEach(t => {
-                    let key = `${nombreClean.toUpperCase()}_${String(t).trim()}`;
-                    let val = mapDot[key] !== undefined ? mapDot[key] : 0;
-
-                    html += `
-                        <td>
-                            <input type="number" 
-                                   class="val-input" 
-                                   data-sector="${nombreClean}" 
-                                   data-turno="${t}" 
-                                   value="${val}" 
-                                   min="0">
-                        </td>
-                    `;
-                });
-
-                tr.innerHTML = html;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function guardarCambios() {
-            const semana = document.getElementById('inputSemana').value;
-            const inputs = document.querySelectorAll('.val-input');
-            const dotaciones = [];
-
-            inputs.forEach(inp => {
-                dotaciones.push({
-                    sector: inp.dataset.sector,
-                    turno: inp.dataset.turno,
-                    cantidad: parseInt(inp.value) || 0
-                });
-            });
-
-            const payload = {
-                semana: semana,
-                usuario: "Programacion",
-                datos: dotaciones
-            };
-
-            fetch('/api/dtprogramada/guardar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    alert('Dotación guardada y estado actualizado a FINALIZADO.');
-                    cargarDatos();
-                } else {
-                    alert('Error al guardar: ' + (data.message || 'Error desconocido'));
+                } 
+                // Si presiona Shift + Tab en el primer turno de la fila, sube a la fila anterior
+                else if (e.key === 'Tab' && e.shiftKey && tIdx === 0) {
+                    const anteriorTr = trActual.previousElementSibling;
+                    if (anteriorTr) {
+                        e.preventDefault();
+                        const ultimoInputAnt = anteriorTr.querySelector(`.turno-input[data-turno-idx="${cantTurnos - 1}"]`);
+                        if (ultimoInputAnt) ultimoInputAnt.focus();
+                    }
                 }
-            })
-            .catch(err => {
-                console.error('Error al guardar los cambios:', err);
-                alert('Ocurrió un error al intentar guardar la información.');
             });
+        });
+    }
+
+    function cambiarTab(tab, evt) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+        if (tab === 'choco') {
+            document.getElementById('tabChoco').classList.add('active');
+        } else {
+            document.getElementById('tabGolo').classList.add('active');
         }
-    </script>
+        if (evt && evt.currentTarget) {
+            evt.currentTarget.classList.add('active');
+        }
+    }
+
+    async function guardarDatos() {
+        const semana = document.getElementById('inputSemana').value;
+        const estructura = { "Chocolate": {}, "Golosinas": {} };
+
+        // Recopilar Chocolates
+        document.querySelectorAll('#bodyChoco tr').forEach(tr => {
+            const sectorEl = tr.querySelector('.sector-nombre');
+            if (!sectorEl) return;
+            const sector = sectorEl.textContent;
+            estructura.Chocolate[sector] = {};
+            tr.querySelectorAll('.turno-input').forEach(inp => {
+                estructura.Chocolate[sector][inp.dataset.turno] = parseInt(inp.value) || 0;
+            });
+            tr.querySelectorAll('.dia-input').forEach(inp => {
+                estructura.Chocolate[sector][inp.dataset.dia] = parseInt(inp.value) || 0;
+            });
+        });
+
+        // Recopilar Golosinas
+        document.querySelectorAll('#bodyGolo tr').forEach(tr => {
+            const sectorEl = tr.querySelector('.sector-nombre');
+            if (!sectorEl) return;
+            const sector = sectorEl.textContent;
+            estructura.Golosinas[sector] = {};
+            tr.querySelectorAll('.turno-input').forEach(inp => {
+                estructura.Golosinas[sector][inp.dataset.turno] = parseInt(inp.value) || 0;
+            });
+            tr.querySelectorAll('.dia-input').forEach(inp => {
+                estructura.Golosinas[sector][inp.dataset.dia] = parseInt(inp.value) || 0;
+            });
+        });
+
+        const res = await fetch('/api/dtprogramada/guardar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ semana: semana, datos: estructura })
+        });
+
+        const r = await res.json();
+        if (r.status === 'ok') {
+            alert("Dotación teórica guardada correctamente para la Semana " + semana + ".");
+            cargarDatos();
+        } else {
+            alert("Error al guardar: " + r.message);
+        }
+    }
+
+    window.onload = init;
+</script>
 </body>
 </html>
