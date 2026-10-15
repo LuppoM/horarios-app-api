@@ -105,11 +105,16 @@
 
         // Consultar estado de Dotación Programada al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
-            fetch('/api/dtprogramada/datos')
+            // Especificamos la semana activa (puedes cambiarla o dejar "42" para que coincida con tu prueba)
+            const semanaActiva = "42"; 
+
+            fetch(`/api/dtprogramada/datos?semana=${semanaActiva}`)
                 .then(res => res.json())
                 .then(data => {
                     const badge = document.getElementById('badgeEstadoDt');
-                    if (data.finalizado) {
+                    if (!badge) return;
+
+                    if (data.finalizado || data.estado === "FINALIZADO") {
                         badge.className = 'badge-estado badge-ok';
                         badge.innerText = '✅ LISTO';
                         badge.title = `Semana ${data.semana} finalizada por ${data.modificado_por || 'Programación'}`;
@@ -122,7 +127,7 @@
                 .catch(err => {
                     console.error('Error al obtener estado de dotación:', err);
                     const badge = document.getElementById('badgeEstadoDt');
-                    badge.style.display = 'none';
+                    if (badge) badge.style.display = 'none';
                 });
         });
     </script>
