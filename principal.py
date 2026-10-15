@@ -105,8 +105,21 @@ def vista_hchoco(request: Request):
 
 
 @app.get("/dtprogramada", response_class=HTMLResponse)
-def vista_dotacion_programada(request: Request):
-    return templates.TemplateResponse(request, "dtprogramada.html", {})
+def vista_dotacion_programada(request: Request, semana: Optional[str] = None):
+    modelo_base = modeloprincipal()
+    try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            semana = str(modelo_base.obtener_numero_semana_personalizado())
+    except Exception as e:
+        print(f"Error al obtener semana en vista /dtprogramada: {e}")
+        semana = ""
+    finally:
+        if hasattr(modelo_base, 'cerrar_conexion'):
+            modelo_base.cerrar_conexion()
+
+    return templates.TemplateResponse(request, "dtprogramada.html", {
+        "semana_actual": semana
+    })
 
 
 @app.get("/hchocofinde", response_class=HTMLResponse)
