@@ -56,16 +56,31 @@ def semana_objetivo_por_defecto() -> str:
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     modelo_base = modeloprincipal()
+    semana_calculada = None
     try:
+        # Calculamos la semana actual de producción dinámicamente con modeloprincipal
+        semana_calculada = str(modelo_base.obtener_numero_semana_personalizado())
+        
         # Limpieza global de semanas anteriores en Supabase (< semana actual)
-        modelo_base.eliminar_datos_semanas_anteriores()
+        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana_calculada)
     except Exception as e:
-        print(f"Error al ejecutar limpieza automatica en el Inicio: {e}")
+        print(f"Error al ejecutar limpieza automática en el Inicio: {e}")
+        if not semana_calculada:
+            # Fallback seguro usando nuevamente modeloprincipal
+            try:
+                semana_calculada = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+            except Exception:
+                semana_calculada = ""
     finally:
         if hasattr(modelo_base, 'cerrar_conexion'):
             modelo_base.cerrar_conexion()
 
-    return templates.TemplateResponse(request, "Principal.html", {})
+    # Le pasamos el número de semana dinámico al template HTML
+    return templates.TemplateResponse(
+        request, 
+        "Principal.html", 
+        {"semana_actual": semana_calculada}
+    )
 
 
 @app.get("/modmoi", response_class=HTMLResponse)
