@@ -27,7 +27,6 @@ class ModeloDTProgramadaWeb:
     def obtener_sectores_rotativos_por_planta(self, planta):
         cursor = None
         try:
-            # Limpiamos transacciones abortadas previas
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
@@ -62,7 +61,6 @@ class ModeloDTProgramadaWeb:
         horarios_predeterminados = ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
         cursor = None
         try:
-            # Limpiamos transacciones abortadas previas
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
@@ -96,7 +94,6 @@ class ModeloDTProgramadaWeb:
         resultado = {"Chocolate": {}, "Golosinas": {}}
         cursor = None
         try:
-            # Limpiamos transacciones abortadas previas
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
@@ -105,7 +102,7 @@ class ModeloDTProgramadaWeb:
                 SELECT planta, sector, rango_horario, cantidad_operarios 
                 FROM dotacion_teorica_horarios 
                 WHERE semana_inicio::text = %s
-            """, (str(semana),))
+            """, (str(semana).strip(),))
             filas = cursor.fetchall()
 
             for f in filas:
@@ -136,14 +133,14 @@ class ModeloDTProgramadaWeb:
     def guardar_dotaciones(self, semana, datos_completos):
         cursor = None
         try:
-            # 1. Limpieza preventiva de transacciones anteriores
+            # 1. Limpieza de transacciones previas
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
             cursor = self.conexion_db.cursor()
             val_semana = str(semana).strip()
 
-            # 2. Filtrado de duplicados en memoria usando las 4 columnas clave
+            # 2. Desduplicación en memoria de la matriz ingresada
             registros_unicos = {}
 
             for planta, sectores in datos_completos.items():
@@ -153,7 +150,7 @@ class ModeloDTProgramadaWeb:
                     if not isinstance(horarios, dict):
                         continue
                     for rango_horario, cantidad in horarios.items():
-                        # Omitimos acumulados de días (LUNES, MARTES, etc.)
+                        # Excluimos columnas acumulativas de días
                         if str(rango_horario).upper() in ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"]:
                             continue
 
@@ -165,10 +162,10 @@ class ModeloDTProgramadaWeb:
                         clave = (val_semana, planta_clean, sector_clean, rango_clean)
                         registros_unicos[clave] = cant_val
 
-            # 3. Borrado previo de la semana completa (1 sola consulta rápida)
+            # 3. Limpieza de la dotación existente para esa semana en particular
             cursor.execute("DELETE FROM dotacion_teorica_horarios WHERE semana_inicio::text = %s;", (val_semana,))
 
-            # 4. Insert en lote (executemany) -> Guarda todos los registros de un solo viaje a Supabase
+            # 4. Inserción masiva en lote
             query_insert = """
                 INSERT INTO dotacion_teorica_horarios 
                     (semana_inicio, planta, sector, rango_horario, cantidad_operarios)
@@ -180,7 +177,8 @@ class ModeloDTProgramadaWeb:
                 for (semana_k, planta_k, sector_k, rango_k), cant_k in registros_unicos.items()
             ]
 
-            cursor.executemany(query_insert, lista_valores)
+            if lista_valores:
+                cursor.executemany(query_insert, lista_valores)
 
             self.conexion_db.commit()
             return True, "Guardado exitoso"
@@ -194,10 +192,10 @@ class ModeloDTProgramadaWeb:
         finally:
             if cursor:
                 cursor.close()
+
     def obtener_estado_programacion(self, semana: str) -> dict:
         cursor = None
         try:
-            # Limpiamos transacciones abortadas previas
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
@@ -207,7 +205,7 @@ class ModeloDTProgramadaWeb:
                 FROM estados_programacion 
                 WHERE semana::text = %s;
             """
-            cursor.execute(query, (str(semana),))
+            cursor.execute(query, (str(semana).strip(),))
             row = cursor.fetchone()
 
             if row:
@@ -231,7 +229,6 @@ class ModeloDTProgramadaWeb:
     def actualizar_estado_programacion(self, semana: str, estado: str = "FINALIZADO", usuario: str = "Programacion") -> bool:
         cursor = None
         try:
-            # Limpiamos transacciones abortadas previas
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
@@ -246,7 +243,7 @@ class ModeloDTProgramadaWeb:
                     modificado_por = EXCLUDED.modificado_por,
                     fecha_modificacion = NOW();
             """
-            cursor.execute(query, (str(semana), estado, usuario))
+            cursor.execute(query, (str(semana).strip(), estado, usuario))
             self.conexion_db.commit()
             return True
         except Exception as e:
