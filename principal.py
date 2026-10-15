@@ -391,6 +391,140 @@ def api_guardar_dtprogramada(payload: dict = Body(...)):
         return {"status": "ok"}
     else:
         return {"status": "error", "message": mensaje}
+# ==========================================
+# 5.1. EXPORTACIÓN PDF: DOTACIÓN PROGRAMADA
+# ==========================================
+
+@app.get("/api/dtprogramada/exportar-pdf")
+@app.get("/generar_dt_pdf")
+def api_exportar_pdf_dtprogramada(planta: Optional[str] = "ambas", semana: Optional[str] = None):
+    """
+    Genera y descarga un reporte PDF con la Dotación Programada.
+    Parámetros:
+      - planta: 'chocolates', 'golosinas' o 'ambas' (por defecto)
+      - semana: Número de semana (si se omite, calcula la semana activa)
+    """
+    if not semana or semana.lower() == "none" or semana.strip() == "":
+        semana = semana_objetivo_por_defecto()
+
+    try:
+        # 1. Obtener datos desde el modelo de Dotación Programada
+        sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
+        sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
+        turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO") or ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+        dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
+
+        # 2. Filtrar sectores según la planta solicitada
+        planta_norm = (planta or "ambas").strip().lower()
+        
+        if planta_norm in ["chocolates", "choco", "chocolate"]:
+            sectores_filtrados = [("CHOCOLATES", sectores_choco)]
+            titulo_planta = "PLANTA CHOCOLATES"
+        elif planta_norm in ["golosinas", "golo"]:
+            sectores_filtrados = [("GOLOSINAS", sectores_golo)]
+            titulo_planta = "PLANTA GOLOSINAS"
+        else:
+            sectores_filtrados = [("CHOCOLATES", sectores_choco), ("GOLOSINAS", sectores_golo)]
+            titulo_planta = "CONSOLIDADO AMBAS PLANTAS"
+
+        # Map de dotaciones guardadas por (sector, turno)
+        map_dotacion = {}
+        for reg in dotaciones:
+            # Asumiendo estructura de tu modelo o tuplas
+            if isinstance(reg, dict):
+                sec, tur, cant = reg.get("sector"), reg.get("turno"), reg.get("cantidad", 0)
+            elif len(reg) >= 3:
+                sec, tur, cant = reg[0], reg[1], reg[2]
+            else:
+                continue
+            map_dotacion[(str(sec).strip().upper(), str(tur).strip())] = cant
+
+        # 3. Armar documento ReportLab
+        output = BytesIO()
+        doc = SimpleDocTemplate(
+            output,
+            pagesize=A4,
+            rightMargin=30,
+            leftMargin=30,
+            topMargin=30,
+            bottomMargin=30,
+        )
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Encabezado principal
+        elements.append(
+            Paragraph(
+                f"<b>DOTACIÓN PROGRAMADA POR TURNO - SEMANA {semana}</b>",
+                styles["Title"],
+            )
+        )
+        elements.append(
+            Paragraph(
+                f"<font size=11 color='#555555'><b>{titulo_planta}</b></font>",
+                styles["Normal"],
+            )
+        )
+        elements.append(Spacer(1, 14))
+
+        # Construcción de tablas por bloque de planta
+        for nombre_bloque, lista_sectores in sectores_filtrados:
+            if not lista_sectores:
+                continue
+
+            elements.append(Paragraph(f"<b>{nombre_bloque}</b>", styles["Heading2"]))
+            elements.append(Spacer(1, 6))
+
+            # Columnas: LÍNEA / SECTOR + Turnos
+            encabezados = ["LÍNEA / SECTOR"] + [str(t) for t in turnos]
+            tabla_datos = [encabezados]
+
+            for s in lista_sectores:
+                nombre_sec = s.get("nombre_sector") if isinstance(s, dict) else (s[0] if isinstance(s, (list, tuple)) else str(s))
+                nombre_sec_clean = str(nombre_sec).strip()
+
+                fila = [nombre_sec_clean]
+                for t in turnos:
+                    cant = map_dotacion.get((nombre_sec_clean.upper(), str(t).strip()), 0)
+                    fila.append(str(cant) if cant is not None else "0")
+
+                tabla_datos.append(fila)
+
+            # Anchos de columna proporcionales
+            cant_turnos = len(turnos)
+            ancho_sector = 200
+            ancho_turno = (535 - ancho_sector) / cant_turnos if cant_turnos > 0 else 100
+            col_widths = [ancho_sector] + [ancho_turno] * cant_turnos
+
+            tabla_pdf = Table(tabla_datos, colWidths=col_widths)
+            tabla_pdf.setStyle(
+                TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#003366")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 9),
+                    ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                    ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D3D3D3")),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ])
+            )
+
+            elements.append(tabla_pdf)
+            elements.append(Spacer(1, 16))
+
+        doc.build(elements)
+        output.seek(0)
+
+        nombre_archivo = f"Dotacion_Programada_{planta_norm}_semana_{semana}.pdf"
+        headers = {"Content-Disposition": f'inline; filename="{nombre_archivo}"'}
+        return StreamingResponse(output, headers=headers, media_type="application/pdf")
+
+    except Exception as e:
+        print(f"Error al generar PDF de dotación programada: {e}")
+        return {"error": str(e)}
 
 
 # ==========================================
