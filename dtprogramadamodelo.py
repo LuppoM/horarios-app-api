@@ -25,6 +25,7 @@ class ModeloDTProgramadaWeb:
         return fecha_ajustada.isocalendar()[1]
 
     def obtener_sectores_rotativos_por_planta(self, planta):
+        cursor = None
         try:
             cursor = self.conexion_db.cursor()
             cursor.execute("""
@@ -49,9 +50,13 @@ class ModeloDTProgramadaWeb:
                 self.conexion_db.rollback()
             print(f"Error al obtener sectores para {planta}: {e}")
             return []
+        finally:
+            if cursor:
+                cursor.close()
 
     def obtener_turnos_por_tipo(self, tipo="ROTATIVO"):
         horarios_predeterminados = ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+        cursor = None
         try:
             cursor = self.conexion_db.cursor()
             cursor.execute("""
@@ -75,9 +80,13 @@ class ModeloDTProgramadaWeb:
                 self.conexion_db.rollback()
             print(f"Error al obtener turnos: {e}")
             return horarios_predeterminados
+        finally:
+            if cursor:
+                cursor.close()
 
     def obtener_dotaciones_semana(self, semana):
         resultado = {"Chocolate": {}, "Golosinas": {}}
+        cursor = None
         try:
             cursor = self.conexion_db.cursor()
             cursor.execute("""
@@ -89,7 +98,10 @@ class ModeloDTProgramadaWeb:
 
             for f in filas:
                 if isinstance(f, dict):
-                    planta, sector, rango, cantidad = f.get("planta"), f.get("sector"), f.get("rango_horario"), f.get("cantidad_operarios")
+                    planta = f.get("planta")
+                    sector = f.get("sector")
+                    rango = f.get("rango_horario")
+                    cantidad = f.get("cantidad_operarios")
                 else:
                     planta, sector, rango, cantidad = f[0], f[1], f[2], f[3]
 
@@ -105,20 +117,38 @@ class ModeloDTProgramadaWeb:
                 self.conexion_db.rollback()
             print(f"Error al obtener dotaciones semana {semana}: {e}")
             return resultado
+        finally:
+            if cursor:
+                cursor.close()
 
     def guardar_dotaciones(self, semana, datos_completos):
+        cursor = None
         try:
             cursor = self.conexion_db.cursor()
+            
+            # Limpiamos registros previos de la semana para evitar errores de claves
+            cursor.execute("DELETE FROM dotacion_teorica_horarios WHERE semana_inicio::text = %s;", (str(semana),))
+
+            query_insert = """
+                INSERT INTO dotacion_teorica_horarios 
+                    (semana_inicio, planta, sector, rango_horario, cantidad_operarios)
+                VALUES (%s, %s, %s, %s, %s);
+            """
+
             for planta, sectores in datos_completos.items():
                 for sector, horarios in sectores.items():
                     for rango_horario, cantidad in horarios.items():
-                        cursor.execute("""
-                            INSERT INTO dotacion_teorica_horarios 
-                                (semana_inicio, planta, sector, rango_horario, cantidad_operarios)
-                            VALUES (%s, %s, %s, %s, %s)
-                            ON CONFLICT (semana_inicio, planta, sector, rango_horario) 
-                            DO UPDATE SET cantidad_operarios = EXCLUDED.cantidad_operarios
-                        """, (str(semana), planta, sector, rango_horario, cantidad))
+                        # Omitimos días de la semana para guardar solo rangos horarios
+                        if str(rango_horario).upper() in ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"]:
+                            continue
+
+                        cursor.execute(query_insert, (
+                            str(semana), 
+                            str(planta), 
+                            str(sector), 
+                            str(rango_horario), 
+                            int(cantidad or 0)
+                        ))
 
             self.conexion_db.commit()
             return True, "Guardado exitoso"
@@ -127,8 +157,12 @@ class ModeloDTProgramadaWeb:
                 self.conexion_db.rollback()
             print(f"Error al guardar dotaciones: {e}")
             return False, str(e)
+        finally:
+            if cursor:
+                cursor.close()
 
     def obtener_estado_programacion(self, semana: str) -> dict:
+        cursor = None
         try:
             cursor = self.conexion_db.cursor()
             query = """
@@ -149,10 +183,16 @@ class ModeloDTProgramadaWeb:
             return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
 
         except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
             print(f"Error al obtener estado de programación para semana {semana}: {e}")
             return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
+        finally:
+            if cursor:
+                cursor.close()
 
     def actualizar_estado_programacion(self, semana: str, estado: str = "FINALIZADO", usuario: str = "Programacion") -> bool:
+        cursor = None
         try:
             cursor = self.conexion_db.cursor()
             query = """
@@ -172,6 +212,9 @@ class ModeloDTProgramadaWeb:
                 self.conexion_db.rollback()
             print(f"Error al actualizar estado_programacion: {e}")
             return False
+        finally:
+            if cursor:
+                cursor.close()
 
     def cerrar_conexion(self):
         if hasattr(self, 'conexion_db') and self.conexion_db:
