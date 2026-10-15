@@ -27,6 +27,10 @@ class ModeloDTProgramadaWeb:
     def obtener_sectores_rotativos_por_planta(self, planta):
         cursor = None
         try:
+            # Limpiamos transacciones abortadas previas
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor = self.conexion_db.cursor()
             cursor.execute("""
                 SELECT nombre_sector 
@@ -58,6 +62,10 @@ class ModeloDTProgramadaWeb:
         horarios_predeterminados = ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
         cursor = None
         try:
+            # Limpiamos transacciones abortadas previas
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor = self.conexion_db.cursor()
             cursor.execute("""
                 SELECT horarios_definidos 
@@ -88,6 +96,10 @@ class ModeloDTProgramadaWeb:
         resultado = {"Chocolate": {}, "Golosinas": {}}
         cursor = None
         try:
+            # Limpiamos transacciones abortadas previas
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor = self.conexion_db.cursor()
             cursor.execute("""
                 SELECT planta, sector, rango_horario, cantidad_operarios 
@@ -124,11 +136,22 @@ class ModeloDTProgramadaWeb:
     def guardar_dotaciones(self, semana, datos_completos):
         cursor = None
         try:
-            cursor = self.conexion_db.cursor()
-            
-            # Limpiamos registros previos de la semana para evitar errores de claves
-            cursor.execute("DELETE FROM dotacion_teorica_horarios WHERE semana_inicio::text = %s;", (str(semana),))
+            # Limpiamos cualquier error de transacción retenido en la conexión
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
 
+            cursor = self.conexion_db.cursor()
+
+            try:
+                val_semana = int(semana)
+            except (ValueError, TypeError):
+                val_semana = str(semana).strip()
+
+            # 1. Limpiamos los registros anteriores de esta semana
+            query_delete = "DELETE FROM dotacion_teorica_horarios WHERE semana_inicio::text = %s;"
+            cursor.execute(query_delete, (str(val_semana),))
+
+            # 2. Insertamos la nueva matriz completa
             query_insert = """
                 INSERT INTO dotacion_teorica_horarios 
                     (semana_inicio, planta, sector, rango_horario, cantidad_operarios)
@@ -136,27 +159,33 @@ class ModeloDTProgramadaWeb:
             """
 
             for planta, sectores in datos_completos.items():
+                if not isinstance(sectores, dict):
+                    continue
                 for sector, horarios in sectores.items():
+                    if not isinstance(horarios, dict):
+                        continue
                     for rango_horario, cantidad in horarios.items():
-                        # Omitimos días de la semana para guardar solo rangos horarios
+                        # Omitimos guardar las columnas acumuladas de días (LUNES, MARTES, etc.)
                         if str(rango_horario).upper() in ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"]:
                             continue
 
                         cursor.execute(query_insert, (
-                            str(semana), 
-                            str(planta), 
-                            str(sector), 
-                            str(rango_horario), 
+                            str(val_semana), 
+                            str(planta).strip(), 
+                            str(sector).strip(), 
+                            str(rango_horario).strip(), 
                             int(cantidad or 0)
                         ))
 
             self.conexion_db.commit()
             return True, "Guardado exitoso"
+
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
-            print(f"Error al guardar dotaciones: {e}")
+            print(f"Error detallado en guardar_dotaciones: {e}")
             return False, str(e)
+
         finally:
             if cursor:
                 cursor.close()
@@ -164,18 +193,22 @@ class ModeloDTProgramadaWeb:
     def obtener_estado_programacion(self, semana: str) -> dict:
         cursor = None
         try:
+            # Limpiamos transacciones abortadas previas
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor = self.conexion_db.cursor()
             query = """
                 SELECT semana, estado, modificado_por, fecha_modificacion 
                 FROM estados_programacion 
-                WHERE semana = %s;
+                WHERE semana::text = %s;
             """
             cursor.execute(query, (str(semana),))
             row = cursor.fetchone()
 
             if row:
                 return {
-                    "semana": row[0],
+                    "semana": str(row[0]),
                     "estado": row[1],
                     "modificado_por": row[2],
                     "fecha_modificacion": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
@@ -194,7 +227,12 @@ class ModeloDTProgramadaWeb:
     def actualizar_estado_programacion(self, semana: str, estado: str = "FINALIZADO", usuario: str = "Programacion") -> bool:
         cursor = None
         try:
+            # Limpiamos transacciones abortadas previas
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor = self.conexion_db.cursor()
+
             query = """
                 INSERT INTO estados_programacion (semana, estado, modificado_por, fecha_modificacion)
                 VALUES (%s, %s, %s, NOW())
