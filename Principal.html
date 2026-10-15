@@ -105,10 +105,8 @@
 
         // Consultar estado de Dotación Programada al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
-            // Especificamos la semana activa (puedes cambiarla o dejar "42" para que coincida con tu prueba)
-            const semanaActiva = "42"; 
-
-            fetch(`/api/dtprogramada/datos?semana=${semanaActiva}`)
+            // Inaldan nga awan ti parametro tapno kalkulen ti backend ti agdama a semana manipud iti sistema
+            fetch('/api/dtprogramada/datos')
                 .then(res => res.json())
                 .then(data => {
                     const badge = document.getElementById('badgeEstadoDt');
