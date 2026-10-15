@@ -31,38 +31,44 @@ class modeloprincipal:
                 self.conexion_db.rollback()
 
             cursor = self.conexion_db.cursor()
+            val_semana = str(semana).strip()
+
+            # Usamos TRIM e ILIKE para evitar fallos por espacios en la BD
             query = """
                 SELECT semana, estado, modificado_por, fecha_modificacion 
                 FROM estados_programacion 
-                WHERE semana::text = %s;
+                WHERE TRIM(CAST(semana AS TEXT)) ILIKE %s
+                LIMIT 1;
             """
-            cursor.execute(query, (str(semana).strip(),))
+            cursor.execute(query, (val_semana,))
             row = cursor.fetchone()
 
             if row:
-                # Si row es una tupla o lista
-                if isinstance(row, (list, tuple)) and len(row) >= 4:
-                    return {
-                        "semana": str(row[0]),
-                        "estado": str(row[1]).strip().upper(),
-                        "modificado_por": str(row[2]) if row[2] else "",
-                        "fecha_modificacion": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
-                    }
-                # Si row es un diccionario
+                # Manejo seguro si la respuesta es tupla o dict
+                if isinstance(row, (list, tuple)):
+                    semana_db = str(row[0]).strip()
+                    estado_db = str(row[1]).strip().upper() if row[1] else "PENDIENTE"
+                    mod_por = str(row[2]) if len(row) > 2 and row[2] else ""
+                    fecha_mod = row[3].strftime("%Y-%m-%d %H:%M:%S") if len(row) > 3 and row[3] else None
                 elif isinstance(row, dict):
-                    return {
-                        "semana": str(row.get("semana")),
-                        "estado": str(row.get("estado", "PENDIENTE")).strip().upper(),
-                        "modificado_por": str(row.get("modificado_por", "")),
-                        "fecha_modificacion": str(row.get("fecha_modificacion", ""))
-                    }
+                    semana_db = str(row.get("semana", "")).strip()
+                    estado_db = str(row.get("estado", "PENDIENTE")).strip().upper()
+                    mod_por = str(row.get("modificado_por", ""))
+                    fecha_mod = str(row.get("fecha_modificacion", ""))
 
-            return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
+                return {
+                    "semana": semana_db,
+                    "estado": estado_db,
+                    "modificado_por": mod_por,
+                    "fecha_modificacion": fecha_mod
+                }
+
+            return {"semana": val_semana, "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
 
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
-            print(f"Error al obtener estado de programación para semana {semana}: {e}")
+            print(f"Error crítico al obtener estado de programación (semana {semana}): {e}")
             return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
         finally:
             if cursor:
