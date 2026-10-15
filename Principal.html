@@ -51,18 +51,20 @@
             <a href="/modmoi" class="custom-button">CONSOLIDADO AMBAS PLANTAS</a>
 
             <!-- 3. MENÚ DESPLEGABLE: DOTACIÓN PROGRAMADA CON NOTIFICACIÓN DE ESTADO -->
-            <div class="dropdown">
-                <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuDtProgramada')">
-                    DOTACION PROGRAMADA <span id="badgeEstadoDt" class="badge-estado badge-pendiente">...</span> ▼
-                </button>
-                <div id="menuDtProgramada" class="dropdown-menu">
-                    <a href="/dtprogramada">Cargar Dotación Programada</a>
-                    <hr style="margin: 4px 0; border: 0; border-top: 1px solid #ccc;">
-                    <a href="/generar_dt_pdf?planta=chocolates">Generar PDF - Chocolates</a>
-                    <a href="/generar_dt_pdf?planta=golosinas">Generar PDF - Golosinas</a>
-                    <a href="/generar_dt_pdf?planta=ambas">Generar PDF - Ambas Plantas</a>
-                </div>
+            <!-- MENÚ DESPLEGABLE: DOTACIÓN PROGRAMADA -->
+        <div class="dropdown">
+            <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuDtProgramada')">
+                DOTACION PROGRAMADA <span id="badgeEstadoDt" class="badge-estado badge-pendiente">...</span> ▼
+            </button>
+            <div id="menuDtProgramada" class="dropdown-menu">
+                <!-- Pasamos el parámetro ?semana={{ semana_actual }} -->
+                <a href="/dtprogramada?semana={{ semana_actual }}">Cargar Dotación Programada</a>
+                <hr style="margin: 4px 0; border: 0; border-top: 1px solid #ccc;">
+                <a href="/generar_dt_pdf?planta=chocolates&semana={{ semana_actual }}">Generar PDF - Chocolates</a>
+                <a href="/generar_dt_pdf?planta=golosinas&semana={{ semana_actual }}">Generar PDF - Golosinas</a>
+                <a href="/generar_dt_pdf?planta=ambas&semana={{ semana_actual }}">Generar PDF - Ambas Plantas</a>
             </div>
+        </div>
 
             <!-- 4. MENÚ DESPLEGABLE: PARÁMETROS -->
             <div class="dropdown">
