@@ -136,27 +136,15 @@ class ModeloDTProgramadaWeb:
     def guardar_dotaciones(self, semana, datos_completos):
         cursor = None
         try:
-            # Limpiamos cualquier error de transacción retenido en la conexión
+            # 1. Limpieza preventiva de transacciones anteriores
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
             cursor = self.conexion_db.cursor()
+            val_semana = str(semana).strip()
 
-            try:
-                val_semana = int(semana)
-            except (ValueError, TypeError):
-                val_semana = str(semana).strip()
-
-            # 1. Limpiamos los registros anteriores de esta semana
-            query_delete = "DELETE FROM dotacion_teorica_horarios WHERE semana_inicio::text = %s;"
-            cursor.execute(query_delete, (str(val_semana),))
-
-            # 2. Insertamos la nueva matriz completa
-            query_insert = """
-                INSERT INTO dotacion_teorica_horarios 
-                    (semana_inicio, planta, sector, rango_horario, cantidad_operarios)
-                VALUES (%s, %s, %s, %s, %s);
-            """
+            # 2. Filtrado de duplicados en memoria usando las 4 columnas clave
+            registros_unicos = {}
 
             for planta, sectores in datos_completos.items():
                 if not isinstance(sectores, dict):
@@ -165,17 +153,34 @@ class ModeloDTProgramadaWeb:
                     if not isinstance(horarios, dict):
                         continue
                     for rango_horario, cantidad in horarios.items():
-                        # Omitimos guardar las columnas acumuladas de días (LUNES, MARTES, etc.)
+                        # Omitimos acumulados de días (LUNES, MARTES, etc.)
                         if str(rango_horario).upper() in ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"]:
                             continue
 
-                        cursor.execute(query_insert, (
-                            str(val_semana), 
-                            str(planta).strip(), 
-                            str(sector).strip(), 
-                            str(rango_horario).strip(), 
-                            int(cantidad or 0)
-                        ))
+                        planta_clean = str(planta).strip()
+                        sector_clean = str(sector).strip()
+                        rango_clean = str(rango_horario).strip()
+                        cant_val = int(cantidad or 0)
+
+                        clave = (val_semana, planta_clean, sector_clean, rango_clean)
+                        registros_unicos[clave] = cant_val
+
+            # 3. Borrado previo de la semana completa (1 sola consulta rápida)
+            cursor.execute("DELETE FROM dotacion_teorica_horarios WHERE semana_inicio::text = %s;", (val_semana,))
+
+            # 4. Insert en lote (executemany) -> Guarda todos los registros de un solo viaje a Supabase
+            query_insert = """
+                INSERT INTO dotacion_teorica_horarios 
+                    (semana_inicio, planta, sector, rango_horario, cantidad_operarios)
+                VALUES (%s, %s, %s, %s, %s);
+            """
+
+            lista_valores = [
+                (semana_k, planta_k, sector_k, rango_k, cant_k)
+                for (semana_k, planta_k, sector_k, rango_k), cant_k in registros_unicos.items()
+            ]
+
+            cursor.executemany(query_insert, lista_valores)
 
             self.conexion_db.commit()
             return True, "Guardado exitoso"
@@ -189,7 +194,6 @@ class ModeloDTProgramadaWeb:
         finally:
             if cursor:
                 cursor.close()
-
     def obtener_estado_programacion(self, semana: str) -> dict:
         cursor = None
         try:
