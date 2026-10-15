@@ -371,20 +371,27 @@ def api_eliminar_tipo_horario(tipo_id: int):
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
     """
-    Obtiene los sectores, turnos, dotaciones y el estado de la programación.
-    Si no se recibe semana, calcula la actual del sistema mediante el modelo,
-    la compara contra la base de datos y retorna su estado real.
+    Obtiene los datos de la dotación y el estado de la programación.
+    Si no se especifica semana, busca la última semana activa o finalizada en la BD.
     """
-    if not semana or semana.lower() == "none" or semana.strip() == "":
-        semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
-
     try:
+        # Si no envían semana, intentamos buscar la última registrada en estados_programacion
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            cursor = modelo_dtprog.conexion_db.cursor()
+            cursor.execute("SELECT semana FROM estados_programacion ORDER BY fecha_modificacion DESC LIMIT 1;")
+            row = cursor.fetchone()
+            if row:
+                semana = str(row[0] if not isinstance(row, dict) else row.get("semana"))
+            else:
+                semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
+            if cursor:
+                cursor.close()
+
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
         dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
 
-        # Consulta en la BD si el número de semana calculado ya fue registrado/finalizado
         info_estado = modelo_dtprog.obtener_estado_programacion(semana)
         es_finalizado = (info_estado.get("estado") == "FINALIZADO")
 
