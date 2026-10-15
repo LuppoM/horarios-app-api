@@ -105,7 +105,6 @@
 
         // Consultar estado de Dotación Programada al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
-            // Inaldan nga awan ti parametro tapno kalkulen ti backend ti agdama a semana manipud iti sistema
             fetch('/api/dtprogramada/datos')
                 .then(res => res.json())
                 .then(data => {
