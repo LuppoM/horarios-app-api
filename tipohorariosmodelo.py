@@ -34,6 +34,10 @@ def obtener_tipos_horarios():
         print(f"Error al obtener tipos de horarios: {e}")
         return []
     finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
         conn.close()
 
 
@@ -68,6 +72,10 @@ def obtener_tipo_horario_por_id(tipo_id):
         print(f"Error al obtener tipo de horario {tipo_id}: {e}")
         return None
     finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
         conn.close()
 
 
@@ -75,6 +83,14 @@ def insertar_tipo_horario(datos):
     conn = _obtener_conexion()
     cursor = conn.cursor()
     try:
+        # Reajusta la secuencia automática al ID máximo actual para evitar 'duplicate key'
+        cursor.execute("""
+            SELECT setval(
+                pg_get_serial_sequence('tipohorario', 'id'), 
+                COALESCE((SELECT MAX(id) FROM tipohorario), 1)
+            );
+        """)
+
         cursor.execute("""
             INSERT INTO tipohorario (tipo, horarios_definidos)
             VALUES (%s, %s)
@@ -86,6 +102,10 @@ def insertar_tipo_horario(datos):
         print(f"Error al insertar tipo de horario: {e}")
         raise e
     finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
         conn.close()
 
 
@@ -105,6 +125,10 @@ def modificar_tipo_horario(tipo_id, datos):
         print(f"Error al modificar tipo de horario {tipo_id}: {e}")
         raise e
     finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
         conn.close()
 
 
@@ -120,4 +144,8 @@ def eliminar_tipo_horario(tipo_id):
         print(f"Error al eliminar tipo de horario {tipo_id}: {e}")
         raise e
     finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
         conn.close()
