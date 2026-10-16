@@ -93,7 +93,7 @@
 
                 blockDiv.innerHTML = `
                     <div class="horario-header">
-                        <strong>${horario === 'VACACIONES' ? 'Mecánicos Licenciados' : 'Horario: ' + horario}</strong>
+                        <strong>${horario === 'VACACIONES' ? 'Mecánicos' : 'Horario: ' + horario}</strong>
                         <button class="btn-agregar-op" onclick="agregarFilaOperario('${nombrePlanta}', '${horario}')">+ Agregar operario</button>
                     </div>
                     <div class="rows-container" id="container_${limpiarId(nombrePlanta)}_${limpiarId(horario)}"></div>
