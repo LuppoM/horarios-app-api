@@ -18,7 +18,7 @@
         <input type="text" id="inputSemana" class="semana-input" readonly>
     </div>
 
-    <!-- Contenedor General con dos tarjetas de planta -->
+    <!-- Contenedor General con las tarjetas de planta y vacaciones -->
     <div class="plantas-container">
         
         <!-- CARGA DATOS - GOLOSINAS -->
@@ -31,6 +31,12 @@
         <div class="card-carga">
             <h3 class="card-titulo">CHOCOLATES</h3>
             <div id="bloquesChocolates"></div>
+        </div>
+
+        <!-- CARGA DATOS - VACACIONES -->
+        <div class="card-carga">
+            <h3 class="card-titulo">PERSONAL DE VACACIONES</h3>
+            <div id="bloquesVacaciones"></div>
         </div>
 
     </div>
@@ -62,8 +68,12 @@
                 document.getElementById('inputSemana').value = semanaActualGlobal;
                 mecanicosDisponibles = data.disponibles || [];
 
-                renderizarPlanta('Golosinas', 'bloquesGolosinas', data.asignados || []);
-                renderizarPlanta('Chocolates', 'bloquesChocolates', data.asignados || []);
+                // Renderizamos Golosinas y Chocolates con los horarios normales
+                renderizarPlanta('Golosinas', 'bloquesGolosinas', data.asignados || [], HORARIOS_DEFINIDOS);
+                renderizarPlanta('Chocolates', 'bloquesChocolates', data.asignados || [], HORARIOS_DEFINIDOS);
+
+                // Renderizamos Vacaciones con bloque único "VACACIONES"
+                renderizarPlanta('Vacaciones', 'bloquesVacaciones', data.asignados || [], ["VACACIONES"]);
 
             } catch (error) {
                 console.error("Error al cargar mecánicos:", error);
@@ -71,11 +81,11 @@
             }
         }
 
-        function renderizarPlanta(nombrePlanta, idContenedor, asignados) {
+        function renderizarPlanta(nombrePlanta, idContenedor, asignados, listaHorarios) {
             const contenedor = document.getElementById(idContenedor);
             contenedor.innerHTML = "";
 
-            HORARIOS_DEFINIDOS.forEach(horario => {
+            listaHorarios.forEach(horario => {
                 const blockDiv = document.createElement('div');
                 blockDiv.className = "horario-block";
                 blockDiv.dataset.horario = horario;
@@ -83,7 +93,7 @@
 
                 blockDiv.innerHTML = `
                     <div class="horario-header">
-                        <strong>Horario: ${horario}</strong>
+                        <strong>${horario === 'VACACIONES' ? 'Mecánicos Licenciados' : 'Horario: ' + horario}</strong>
                         <button class="btn-agregar-op" onclick="agregarFilaOperario('${nombrePlanta}', '${horario}')">+ Agregar operario</button>
                     </div>
                     <div class="rows-container" id="container_${limpiarId(nombrePlanta)}_${limpiarId(horario)}"></div>
@@ -91,7 +101,7 @@
 
                 contenedor.appendChild(blockDiv);
 
-                // Filtrar mecánicos asignados a esta planta y a este horario
+                // Filtrar mecánicos asignados a esta planta/categoría y horario
                 const asignadosEnBloque = asignados.filter(a => 
                     (a[2] === horario) && (a[3] && a[3].toLowerCase() === nombrePlanta.toLowerCase())
                 );
