@@ -5,6 +5,12 @@ def _obtener_conexion():
     return conexion.obtener_conexion()
 
 
+def _normalizar_requiere_dotacion(valor, defecto=1) -> int:
+    if valor is None:
+        return defecto
+    return 1 if str(valor).strip().lower() in ["1", "true", "si", "on"] else 0
+
+
 def obtener_sectores():
     conn = _obtener_conexion()
     cursor = conn.cursor()
@@ -16,7 +22,6 @@ def obtener_sectores():
         """)
         filas = cursor.fetchall()
         
-        # Convertimos RealDictCursor a lista de tuplas/listas para el frontend
         datos = []
         for f in filas:
             if isinstance(f, dict):
@@ -36,6 +41,8 @@ def obtener_sectores():
         print(f"Error al obtener sectores: {e}")
         return []
     finally:
+        try: cursor.close()
+        except Exception: pass
         conn.close()
 
 
@@ -73,6 +80,8 @@ def obtener_sector_por_id(sector_id):
         print(f"Error al obtener sector {sector_id}: {e}")
         return None
     finally:
+        try: cursor.close()
+        except Exception: pass
         conn.close()
 
 
@@ -96,6 +105,8 @@ def obtener_tipos_horario():
         print(f"Error al obtener tipos de horario: {e}")
         return ["ROTATIVO", "CENTRAL"]
     finally:
+        try: cursor.close()
+        except Exception: pass
         conn.close()
 
 
@@ -103,13 +114,21 @@ def insertar_sector(datos):
     conn = _obtener_conexion()
     cursor = conn.cursor()
     try:
-        req_dot = datos.get("requiere_dotacion", 1)
-        requiere_dotacion = 1 if str(req_dot).lower() in ["1", "true", "si", "on"] else 0
+        requiere_dotacion = _normalizar_requiere_dotacion(datos.get("requiere_dotacion"), defecto=1)
+
+        # Previene 'duplicate key violates unique constraint sectores_pkey'
+        cursor.execute("""
+            SELECT setval(
+                pg_get_serial_sequence('sectores', 'id'), 
+                COALESCE((SELECT MAX(id) FROM sectores), 1)
+            );
+        """)
 
         cursor.execute("""
             INSERT INTO sectores (nombre_sector, planta, tipo_horario, requiere_dotacion)
             VALUES (%s, %s, %s, %s)
         """, (datos.get("nombre_sector"), datos.get("planta"), datos.get("tipo_horario"), requiere_dotacion))
+        
         conn.commit()
     except Exception as e:
         if hasattr(conn, 'rollback'):
@@ -117,6 +136,8 @@ def insertar_sector(datos):
         print(f"Error al insertar sector: {e}")
         raise e
     finally:
+        try: cursor.close()
+        except Exception: pass
         conn.close()
 
 
@@ -127,12 +148,7 @@ def modificar_sector(sector_id, datos):
         nombre_sector = datos.get("nombre_sector") or datos.get("nombre")
         planta = datos.get("planta")
         tipo_horario = datos.get("tipo_horario")
-
-        req_dot = datos.get("requiere_dotacion", 1)
-        if isinstance(req_dot, str):
-            requiere_dotacion = 1 if req_dot.lower() in ["1", "true", "si", "on"] else 0
-        else:
-            requiere_dotacion = int(req_dot)
+        requiere_dotacion = _normalizar_requiere_dotacion(datos.get("requiere_dotacion"), defecto=1)
 
         cursor.execute("""
             UPDATE sectores
@@ -148,6 +164,8 @@ def modificar_sector(sector_id, datos):
         print(f"Error al modificar sector {sector_id}: {e}")
         return False, str(e)
     finally:
+        try: cursor.close()
+        except Exception: pass
         conn.close()
 
 
@@ -163,4 +181,6 @@ def eliminar_sector(sector_id):
         print(f"Error al eliminar sector {sector_id}: {e}")
         raise e
     finally:
+        try: cursor.close()
+        except Exception: pass
         conn.close()
