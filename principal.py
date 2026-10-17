@@ -224,10 +224,16 @@ def api_exportar_excel(vista: str = "Semana"):
 
 @app.get("/api/modmoi/obtener/{id_registro}")
 def api_obtener_registro(id_registro: int):
-    data = abm_modelo.obtener_por_id(id_registro)
-    if not data:
-        return {"error": "Registro no encontrado"}
-    return data
+    # Instanciamos el modelo unificado que se conecta a Supabase
+    modelo = ModMoiModel()
+    try:
+        data = modelo.obtener_por_id(id_registro)
+        if data:
+            return {"status": "ok", "data": data}
+        return {"status": "error", "mensaje": "Registro no encontrado"}
+    except Exception as e:
+        print(f"Error al obtener registro {id_registro}: {e}")
+        return {"status": "error", "mensaje": str(e)}
 
 
 @app.post("/api/modmoi/guardar")
