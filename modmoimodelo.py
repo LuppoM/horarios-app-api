@@ -23,32 +23,54 @@ class ModMoiModel:
             print(f"Error al ejecutar limpieza desde ModMoiModel: {e}")
 
     def obtener_datos(self, columna=None, filtro=None, semana_actual=None):
-        cursor = self.conexion_db.cursor()
-
-        # Traer la lista completa de operarios (MOD / MOI) independientemente de la semana
-        query = """
-            SELECT id, calificacion_mano_obra, operario, "Horario", "Sector", "Planta", semana
-            FROM modymoi
-            WHERE 1=1
-        """
-        params = []
-
-        if columna and filtro:
-            query += f' AND "{columna}" ILIKE %s'
-            params.append(f"%{filtro}%")
-
-        query += ' ORDER BY operario ASC'
-
         try:
-            cursor.execute(query, tuple(params))
+            cursor = self.conexion_db.cursor()
+
+            # nombre que ve el usuario -> columna real (con comillas por las mayúsculas)
+            mapa = {
+                "id": "id",
+                "calificacion_mano_obra": "calificacion_mano_obra",
+                "operario": "operario",
+                "Horario": '"Horario"',
+                "Sector": '"Sector"',
+                "Planta": '"Planta"',
+                "semana": "semana",
+            }
+            columnas = list(mapa.keys())
+
+            query = """
+                SELECT id, calificacion_mano_obra, operario,
+                    "Horario", "Sector", "Planta", semana
+                FROM modymoi
+                WHERE 1=1
+            """
+            params = []
+
+            if columna and filtro:
+                col_real = mapa.get(columna)
+                if col_real:
+                    query += f" AND {col_real}::text ILIKE %s"
+                    params.append(f"%{filtro}%")
+
+            query += " ORDER BY operario ASC"
+            cursor.execute(query, params)
+
             filas = cursor.fetchall()
-            
-            datos = [[r[0], r[1], r[2], r[3], r[4], r[5], r[6]] for r in filas]
-            columnas = ["ID", "Mano Obra", "Operario", "Horario", "Sector", "Planta", "Semana"]
+            datos = []
+            for f in filas:
+                if isinstance(f, dict):
+                    datos.append([f.get("id"), f.get("calificacion_mano_obra"),
+                                f.get("operario"), f.get("Horario"),
+                                f.get("Sector"), f.get("Planta"), f.get("semana")])
+                else:
+                    datos.append(list(f))
+
             return columnas, datos
         except Exception as e:
-            print(f"Error al obtener datos en Supabase: {e}")
-            return [], []
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+            print(f"Error al consultar semana en Supabase: {e}")
+            raise Exception(f"Error al consultar semana: {e}")
 
     def obtener_datos_mecanicos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Consulta la tabla mecanicos usando sus columnas: id, operario, horario, planta, semana."""
