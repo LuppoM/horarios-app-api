@@ -121,35 +121,11 @@ def vista_hgolo_finde(request: Request):
 @app.get("/mecanicos", response_class=HTMLResponse)
 def vista_mecanicos(request: Request):
     return templates.TemplateResponse(request, "mecanicos.html", {})
+@app.get("/dtprogramada", response_class=HTMLResponse)
+def vista_dtprogramada(request: Request):
+    return templates.TemplateResponse(request, "dtprogramada.html", {})
 
-@app.get("/api/dtprogramada/datos")
-def api_obtener_dtprogramada(semana: Optional[str] = None):
-    # Si no envían la semana, retornamos error sin calcular nada en el backend
-    if not semana or semana.lower() == "none" or semana.strip() == "":
-        return {"error": "Debe especificar un número de semana válido"}
 
-    try:
-        # Consulta directamente la semana recibida por parámetro
-        info_estado = modelo_dtprog.obtener_estado_programacion(semana)
-        
-        sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
-        sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
-        turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
-        dotaciones = modelo_dtprog.obtener_dotaciones_semana(semana)
-
-        return {
-            "semana": str(semana),
-            "estado": info_estado.get("estado", "PENDIENTE"),
-            "finalizado": (info_estado.get("estado") == "FINALIZADO"),
-            "modificado_por": info_estado.get("modificado_por", ""),
-            "fecha_modificacion": info_estado.get("fecha_modificacion", ""),
-            "turnos": turnos,
-            "sectores_chocolate": sectores_choco,
-            "sectores_golosinas": sectores_golo,
-            "dotaciones": dotaciones
-        }
-    except Exception as e:
-        return {"error": str(e)}
 
 
 # ==========================================
