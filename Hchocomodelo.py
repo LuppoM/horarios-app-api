@@ -119,25 +119,44 @@ class Modelohchoco(modeloprincipal):
         return asignados
 
     def obtener_operarios_disponibles(self, semana=None):
-        """Ejecuta la limpieza remota de semanas anteriores y devuelve los operarios
-        cuyo Horario, Sector y Planta están libres.
-        """
-        if semana:
-            # Invoca la limpieza heredada de modeloprincipal
-            self.eliminar_datos_semanas_anteriores(semana_actual=semana)
-
-        cursor = self.conexion_db.cursor()
-        cursor.execute(
-            """
-            SELECT id, operario
-            FROM modymoi
-            WHERE ("Sector" IS NULL OR TRIM("Sector") = '')
-              AND ("Horario" IS NULL OR TRIM("Horario") = '')
-              AND operario IS NOT NULL AND TRIM(operario) != ''
-            ORDER BY operario ASC
-            """
-        )
-        return _filas(cursor)
+                """Devuelve todos los operarios que no están asignados ni a un Sector ni a una Planta."""
+                try:
+                    cursor = self.conexion_db.cursor()
+    
+                    # Reseteo preventivo de transacciones
+                    if hasattr(self.conexion_db, 'rollback'):
+                        self.conexion_db.rollback()
+    
+                    if semana:
+                        self.eliminar_datos_semanas_anteriores(semana_actual=semana)
+    
+                    query = """
+                        SELECT id, operario
+                        FROM modymoi
+                        WHERE operario IS NOT NULL 
+                        AND TRIM(operario) != ''
+                        AND ("Sector" IS NULL OR TRIM("Sector") = '' OR LOWER(TRIM("Sector")) = 'null')
+                        AND ("Planta" IS NULL OR TRIM("Planta") = '' OR LOWER(TRIM("Planta")) = 'null')
+                        ORDER BY operario ASC
+                    """
+                    cursor.execute(query)
+    
+                    filas = cursor.fetchall()
+                    
+                    resultado = []
+                    for f in filas:
+                        if isinstance(f, dict):
+                            resultado.append((f.get("id"), f.get("operario")))
+                        else:
+                            resultado.append((f[0], f[1]))
+    
+                    return resultado
+    
+                except Exception as e:
+                    if hasattr(self.conexion_db, 'rollback'):
+                        self.conexion_db.rollback()
+                    print(f"Error al obtener operarios disponibles: {e}")
+                    return []
 
     def obtener_datos_semana(self, semana):
         """Ejecuta la limpieza previa y devuelve los operarios asignados a Chocolates"""
