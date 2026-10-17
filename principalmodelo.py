@@ -36,7 +36,6 @@ class modeloprincipal:
             cursor = self.conexion_db.cursor()
             val_semana = str(semana).strip()
 
-            # Consultamos comparando el texto limpio
             query = """
                 SELECT semana, estado, modificado_por, fecha_modificacion 
                 FROM estados_programacion 
@@ -46,26 +45,25 @@ class modeloprincipal:
             row = cursor.fetchone()
 
             if row:
-                # Si el cursor devuelve tupla/lista
-                if isinstance(row, (list, tuple)) and len(row) >= 2:
-                    st_val = str(row[1]).strip().upper() if row[1] else "PENDIENTE"
-                    mod_por = str(row[2]) if len(row) > 2 and row[2] else ""
-                    f_mod = str(row[3]) if len(row) > 3 and row[3] else None  # <--- Cambiado aquí
-                    return {
-                        "semana": str(row[0]).strip(),
-                        "estado": st_val,
-                        "modificado_por": mod_por,
-                        "fecha_modificacion": f_mod
-                    }
-                # Si el cursor devuelve diccionario
-                elif isinstance(row, dict):
+                # Si el cursor devuelve diccionario/RealDictRow
+                if hasattr(row, 'get') or isinstance(row, dict):
                     st_val = str(row.get("estado", "PENDIENTE")).strip().upper()
-                    return {
-                        "semana": str(row.get("semana", "")).strip(),
-                        "estado": st_val,
-                        "modificado_por": str(row.get("modificado_por", "")),
-                        "fecha_modificacion": str(row.get("fecha_modificacion", ""))
-                    }
+                    mod_por = str(row.get("modificado_por", "")) if row.get("modificado_por") else ""
+                    f_mod = str(row.get("fecha_modificacion")) if row.get("fecha_modificacion") else None
+                    sem_val = str(row.get("semana", val_semana)).strip()
+                # Si el cursor devuelve una tupla/lista
+                else:
+                    st_val = str(row[1]).strip().upper() if len(row) > 1 and row[1] else "PENDIENTE"
+                    mod_por = str(row[2]) if len(row) > 2 and row[2] else ""
+                    f_mod = str(row[3]) if len(row) > 3 and row[3] else None
+                    sem_val = str(row[0]).strip() if len(row) > 0 and row[0] else val_semana
+
+                return {
+                    "semana": sem_val,
+                    "estado": st_val,
+                    "modificado_por": mod_por,
+                    "fecha_modificacion": f_mod
+                }
 
             return {"semana": val_semana, "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
 
