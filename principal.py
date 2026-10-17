@@ -249,10 +249,10 @@ def api_guardar_modmoi(payload: dict = Body(...)):
     if not operario:
         return {"status": "error", "mensaje": "El campo operario es obligatorio"}
 
-    # USAR MODELO DE SUPABASE (NO ABMMODELO/SQLITE)
-    modelo = ModMoiModel()
+    modelo = ModeloModMoiWeb()
     try:
         if modo == "modificar" and id_reg:
+            # Pasa exactamente 4 argumentos: id_registro, calificacion, operario, horario
             exito = modelo.actualizar_registro(id_reg, calificacion, operario, horario)
             if exito:
                 return {"status": "ok"}
