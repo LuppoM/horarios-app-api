@@ -192,40 +192,7 @@ class ModeloDTProgramadaWeb:
         finally:
             if cursor:
                 cursor.close()
-
-    def obtener_estado_programacion(self, semana: str) -> dict:
-        cursor = None
-        try:
-            if hasattr(self.conexion_db, 'rollback'):
-                self.conexion_db.rollback()
-
-            cursor = self.conexion_db.cursor()
-            query = """
-                SELECT semana, estado, modificado_por, fecha_modificacion 
-                FROM estados_programacion 
-                WHERE semana::text = %s;
-            """
-            cursor.execute(query, (str(semana).strip(),))
-            row = cursor.fetchone()
-
-            if row:
-                return {
-                    "semana": str(row[0]),
-                    "estado": row[1],
-                    "modificado_por": row[2],
-                    "fecha_modificacion": row[3].strftime("%Y-%m-%d %H:%M:%S") if row[3] else None
-                }
-            return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
-
-        except Exception as e:
-            if hasattr(self.conexion_db, 'rollback'):
-                self.conexion_db.rollback()
-            print(f"Error al obtener estado de programación para semana {semana}: {e}")
-            return {"semana": str(semana), "estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
-        finally:
-            if cursor:
-                cursor.close()
-
+                
     def actualizar_estado_programacion(self, semana: str, estado: str = "FINALIZADO", usuario: str = "Programacion") -> bool:
         cursor = None
         try:
