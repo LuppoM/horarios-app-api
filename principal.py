@@ -269,26 +269,43 @@ def api_guardar_modmoi(payload: dict = Body(...)):
 
 @app.delete("/api/modmoi/eliminar/{id_registro}")
 def api_eliminar_registro(id_registro: int):
+    modelo = ModMoiModel()
     try:
-        abm_modelo.eliminar(id_registro)
-        return {"status": "ok"}
+        exito = modelo.eliminar_registro(id_registro)
+        if exito:
+            return {"status": "ok"}
+        return {"status": "error", "message": "No se pudo eliminar el registro en Supabase."}
     except Exception as e:
+        print(f"Error en DELETE /api/modmoi/eliminar/{id_registro}: {e}")
         return {"status": "error", "message": str(e)}
-    
+    finally:
+        if hasattr(modelo, "cerrar_conexion"):
+            modelo.cerrar_conexion()
+
+
 @app.post("/api/modmoi/guardar_edicion")
 def api_guardar_edicion(payload: dict = Body(...)):
     id_reg = payload.get("id")
-    operario = payload.get("operario")
-    horario = payload.get("horario")
+    operario = payload.get("operario", "").strip()
+    horario = payload.get("horario", "").strip()
+    calificacion = payload.get("calificacion_mano_obra", "MOD").strip()
 
     if not id_reg or not operario:
         return {"status": "error", "mensaje": "Datos incompletos"}
 
     modelo = ModMoiModel()
-    exito = modelo.actualizar_registro(id_reg, operario, horario)
-    if exito:
-        return {"status": "ok"}
-    return {"status": "error", "mensaje": "No se pudo actualizar el registro en Supabase"}
+    try:
+        # Se pasan exactamente los 4 argumentos: id_registro, calificacion, operario, horario
+        exito = modelo.actualizar_registro(id_reg, calificacion, operario, horario)
+        if exito:
+            return {"status": "ok"}
+        return {"status": "error", "mensaje": "No se pudo actualizar el registro en Supabase"}
+    except Exception as e:
+        print(f"Error en /api/modmoi/guardar_edicion: {e}")
+        return {"status": "error", "mensaje": str(e)}
+    finally:
+        if hasattr(modelo, "cerrar_conexion"):
+            modelo.cerrar_conexion()
 
 
 @app.post("/api/modmoi/limpiar-semanas")
