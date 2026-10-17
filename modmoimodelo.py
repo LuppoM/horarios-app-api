@@ -224,29 +224,50 @@ class ModMoiModel:
             print(f"Error al consultar fin de semana en Supabase: {e}")
             raise Exception(f"Error al consultar fin de semana: {e}")
         
-    def actualizar_registro(self, id_registro, calificacion, operario, horario):
+    def actualizar_registro(self, id_registro, calificacion, operario):
+        """Actualiza calificacion_mano_obra, operario y "Horario" respetando las mayúsculas de PostgreSQL."""
         cursor = self.conexion_db.cursor()
         try:
-            # Si el horario viene vacio o blanco, lo seteamos a NULL en PostgreSQL
-            horario_val = horario.strip() if horario and horario.strip() else None
-
             cursor.execute(
                 """
                 UPDATE modymoi
                 SET calificacion_mano_obra = %s,
                     operario = %s,
-                    "Horario" = %s
                 WHERE id = %s
                 """,
-                (str(calificacion), str(operario), horario_val, int(id_registro))
+                (str(calificacion), str(operario), int(id_registro))
             )
             self.conexion_db.commit()
             return True
         except Exception as e:
+            print(f"Error al actualizar registro en Supabase: {e}")
+            self.conexion_db.rollback()
+            return False
+        
+    def contar_mano_de_obra(self, vista="Semana", semana_actual=None):
+        cursor = self.conexion_db.cursor()
+        try:
+            # Si venía de una transacción fallida previa, reseteamos el estado
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
-            print(f"Error al actualizar registro: {e}")
-            return False
+
+            cursor.execute(
+                """
+                SELECT 
+                    COUNT(CASE WHEN calificacion_mano_obra = 'MOD' THEN 1 END),
+                    COUNT(CASE WHEN calificacion_mano_obra = 'MOI' THEN 1 END)
+                FROM modymoi
+                """
+            )
+            res = cursor.fetchone()
+            if res:
+                return (res[0] or 0, res[1] or 0)
+            return (0, 0)
+        except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+            print(f"Error contando mano de obra en Supabase: {e}")
+            return (0, 0)
         
     def obtener_por_id(self, id_registro):
         """Obtiene un registro específico de modymoi desde Supabase mapeando las columnas exactas."""
