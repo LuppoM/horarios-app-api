@@ -237,26 +237,34 @@ def api_obtener_registro(id_registro: int):
 
 
 @app.post("/api/modmoi/guardar")
-def api_guardar_registro(payload: dict = Body(...)):
+def api_guardar_modmoi(payload: dict = Body(...)):
     modo = payload.get("modo")
-    id_registro = payload.get("id")
+    id_reg = payload.get("id")
     datos = payload.get("datos", {})
 
-    if not datos.get("calificacion_mano_obra"):
-        return {"status": "error", "message": "Seleccione Calificación de Mano de Obra"}
-    if not datos.get("operario"):
-        return {"status": "error", "message": "El nombre de operario es requerido"}
-    if not datos.get("horario"):
-        return {"status": "error", "message": "El horario es requerido"}
+    operario = datos.get("operario", "").strip()
+    horario = datos.get("horario", "").strip()
+    calificacion = datos.get("calificacion_mano_obra", "MOD").strip()
 
+    if not operario:
+        return {"status": "error", "mensaje": "El campo operario es obligatorio"}
+
+    # USAR MODELO DE SUPABASE (NO ABMMODELO/SQLITE)
+    modelo = ModMoiModel()
     try:
-        if modo == "insertar":
-            abm_modelo.insertar(datos)
-        elif modo == "modificar":
-            abm_modelo.modificar(id_registro, datos)
-        return {"status": "ok"}
+        if modo == "modificar" and id_reg:
+            exito = modelo.actualizar_registro(id_reg, calificacion, operario, horario)
+            if exito:
+                return {"status": "ok"}
+            return {"status": "error", "mensaje": "No se pudo actualizar el registro en Supabase."}
+        else:
+            return {"status": "error", "mensaje": "Modo no soportado"}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        print(f"Error en /api/modmoi/guardar: {e}")
+        return {"status": "error", "mensaje": str(e)}
+    finally:
+        if hasattr(modelo, "cerrar_conexion"):
+            modelo.cerrar_conexion()
 
 
 @app.delete("/api/modmoi/eliminar/{id_registro}")
