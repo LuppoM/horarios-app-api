@@ -22,55 +22,74 @@ class ModMoiModel:
         except Exception as e:
             print(f"Error al ejecutar limpieza desde ModMoiModel: {e}")
 
-    def obtener_datos(self, columna=None, filtro=None, semana_actual=None):
+    def obtener_datos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
+        """Consulta la tabla modymoi respetando el orden exacto de columnas de Supabase."""
         try:
             cursor = self.conexion_db.cursor()
 
-            # nombre que ve el usuario -> columna real (con comillas por las mayúsculas)
-            mapa = {
-                "id": "id",
-                "calificacion_mano_obra": "calificacion_mano_obra",
-                "operario": "operario",
-                "Horario": '"Horario"',
-                "Sector": '"Sector"',
-                "Planta": '"Planta"',
-                "semana": "semana",
-            }
-            columnas = list(mapa.keys())
+            if not semana_actual:
+                semana_actual = str(self.obtener_numero_semana_personalizado())
 
-            query = """
-                SELECT id, calificacion_mano_obra, operario,
-                    "Horario", "Sector", "Planta", semana
+            # 1. Definir columnas exactamente como en la BD Supabase
+            columnas = [
+                "id",
+                "calificacion_mano_obra",
+                "operario",
+                "semana",
+                "Horario",
+                "Sector",
+                "Planta"
+            ]
+
+            # 2. SELECT respetando el orden de la BD (semana va 4da, antes de Horario)
+            query_base = """
+                SELECT 
+                    id,
+                    calificacion_mano_obra,
+                    operario,
+                    semana,
+                    COALESCE("Horario"::text, '') AS "Horario",
+                    COALESCE("Sector"::text, '') AS "Sector",
+                    COALESCE("Planta"::text, '') AS "Planta"
                 FROM modymoi
-                WHERE 1=1
+                WHERE (semana::text = %s OR "Horario" IS NOT NULL)
             """
-            params = []
+            params = [str(semana_actual)]
 
-            if columna and filtro:
-                col_real = mapa.get(columna)
-                if col_real:
-                    query += f" AND {col_real}::text ILIKE %s"
-                    params.append(f"%{filtro}%")
+            if filtro_columna and filtro_valor:
+                col_filtro = filtro_columna
+                if col_filtro in ["Horario", "Sector", "Planta"]:
+                    col_filtro = f'"{col_filtro}"'
+                query_base += f" AND {col_filtro}::text ILIKE %s"
+                params.append("%" + str(filtro_valor) + "%")
 
-            query += " ORDER BY operario ASC"
-            cursor.execute(query, params)
+            query_base += " ORDER BY operario ASC"
+            cursor.execute(query_base, params)
 
             filas = cursor.fetchall()
+
             datos = []
             for f in filas:
                 if isinstance(f, dict):
-                    datos.append([f.get("id"), f.get("calificacion_mano_obra"),
-                                f.get("operario"), f.get("Horario"),
-                                f.get("Sector"), f.get("Planta"), f.get("semana")])
+                    datos.append([
+                        f.get("id"),
+                        f.get("calificacion_mano_obra"),
+                        f.get("operario"),
+                        f.get("semana"),
+                        f.get("Horario"),
+                        f.get("Sector"),
+                        f.get("Planta")
+                    ])
                 else:
                     datos.append(list(f))
 
             return columnas, datos
+
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
-            print(f"Error al consultar semana en Supabase: {e}")
-            raise Exception(f"Error al consultar semana: {e}")
+            print(f"Error al consultar modymoi en Supabase: {e}")
+            raise Exception(f"Error al consultar modymoi: {e}")
 
     def obtener_datos_mecanicos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Consulta la tabla mecanicos usando sus columnas: id, operario, horario, planta, semana."""
