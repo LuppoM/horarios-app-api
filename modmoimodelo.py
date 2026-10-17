@@ -225,14 +225,14 @@ class ModMoiModel:
             raise Exception(f"Error al consultar fin de semana: {e}")
         
     def actualizar_registro(self, id_registro, calificacion, operario):
-        """Actualiza calificacion_mano_obra, operario y "Horario" respetando las mayúsculas de PostgreSQL."""
+        """Actualiza únicamente calificacion_mano_obra y operario por ID en Supabase."""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
                 """
                 UPDATE modymoi
                 SET calificacion_mano_obra = %s,
-                    operario = %s,
+                    operario = %s
                 WHERE id = %s
                 """,
                 (str(calificacion), str(operario), int(id_registro))
@@ -241,7 +241,8 @@ class ModMoiModel:
             return True
         except Exception as e:
             print(f"Error al actualizar registro en Supabase: {e}")
-            self.conexion_db.rollback()
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
             return False
         
     def contar_mano_de_obra(self, vista="Semana", semana_actual=None):
