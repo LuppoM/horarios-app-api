@@ -228,25 +228,25 @@ class ModMoiModel:
             print(f"Error al consultar fin de semana en Supabase: {e}")
             raise Exception(f"Error al consultar fin de semana: {e}")
     def actualizar_registro(self, id_registro, calificacion, operario, horario):
-            """Actualiza la mano de obra, el operario y el horario en Supabase."""
-            cursor = self.conexion_db.cursor()
-            try:
-                cursor.execute(
-                    """
-                    UPDATE modymoi
-                    SET calificacion_mano_obra = %s,
-                        operario = %s,
-                        "Horario" = %s
-                    WHERE id = %s
-                    """,
-                    (calificacion, operario, horario, id_registro)
-                )
-                self.conexion_db.commit()
-                return True
-            except Exception as e:
-                print(f"Error al actualizar registro en Supabase: {e}")
-                self.conexion_db.rollback()
-                return False
+        """Actualiza calificacion_mano_obra, operario y "Horario" respetando las mayúsculas de PostgreSQL."""
+        cursor = self.conexion_db.cursor()
+        try:
+            cursor.execute(
+                """
+                UPDATE modymoi
+                SET calificacion_mano_obra = %s,
+                    operario = %s,
+                    "Horario" = %s
+                WHERE id = %s
+                """,
+                (str(calificacion), str(operario), str(horario), int(id_registro))
+            )
+            self.conexion_db.commit()
+            return True
+        except Exception as e:
+            print(f"Error al actualizar registro en Supabase: {e}")
+            self.conexion_db.rollback()
+            return False
         
     def contar_mano_de_obra(self, es_finde=False, semana_actual=None, vista=None):
         try:
@@ -289,25 +289,37 @@ class ModMoiModel:
             print(f"Error al contar mano de obra: {e}")
             return 0, 0
     def obtener_por_id(self, id_registro):
-        """Obtiene un registro específico de modymoi desde Supabase por su ID."""
+        """Obtiene un registro específico de modymoi desde Supabase mapeando las columnas exactas."""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
                 """
-                SELECT id, operario, "Horario", "Sector", "Planta", semana 
+                SELECT id, calificacion_mano_obra, operario, "Horario", "Sector", "Planta", semana 
                 FROM modymoi 
                 WHERE id = %s
                 """,
-                (id_registro,)
+                (int(id_registro),)
             )
             row = cursor.fetchone()
             if not row:
                 return None
-            return tuple(row.values()) if isinstance(row, dict) else tuple(row)
+            
+            # Devuelve un diccionario explícito para que el JS no falle
+            if isinstance(row, dict):
+                return row
+            
+            return {
+                "id": row[0],
+                "calificacion_mano_obra": row[1],
+                "operario": row[2],
+                "horario": row[3],
+                "sector": row[4],
+                "planta": row[5],
+                "semana": row[6]
+            }
         except Exception as e:
             print(f"Error al obtener registro por ID en Supabase: {e}")
             return None
-
     def cerrar_conexion(self):
         if hasattr(self, 'conexion_db') and self.conexion_db:
             try:
