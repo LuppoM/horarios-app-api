@@ -376,77 +376,22 @@ def api_eliminar_tipo_horario(tipo_id: int):
 
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
-    """
-    Obtiene los datos de la dotación y verifica el estado en estados_programacion.
-    Usa una conexión limpia y directa para evitar fallos de cursor viciado.
-    """
-    # 1. Determinar número de semana
-    semana_limpia = ""
-    if semana and semana.lower() != "none" and str(semana).strip() != "":
-        semana_limpia = str(semana).strip()
-    else:
-        # Si no enviaron semana explícita, buscamos la última registrada en estados_programacion
-        conn_sem = None
-        cursor_sem = None
-        try:
-            conn_sem = conexion.obtener_conexion()
-            cursor_sem = conn_sem.cursor()
-            cursor_sem.execute(
-                "SELECT semana FROM estados_programacion WHERE semana IS NOT NULL ORDER BY fecha_modificacion DESC LIMIT 1;"
-            )
-            row_sem = cursor_sem.fetchone()
-            if row_sem and row_sem[0]:
-                semana_limpia = str(row_sem[0]).strip()
-        except Exception as e_sem:
-            print(f"Error buscando última semana registrada: {e_sem}")
-        finally:
-            if cursor_sem:
-                try: cursor_sem.close()
-                except Exception: pass
-            if conn_sem:
-                try: conn_sem.close()
-                except Exception: pass
+    # Validamos que se envíe una semana válida por parámetro
+    if not semana or str(semana).lower() == "none" or not str(semana).strip():
+        return {"error": "Debe especificar un número de semana válido"}
 
-        # Fallback si no se encontró nada en la BD
-        if not semana_limpia:
-            try:
-                semana_limpia = str(modelo_dtprog.obtener_numero_semana_personalizado(date.today()))
-            except Exception:
-                semana_limpia = "42"
+    semana_limpia = str(semana).strip()
 
-    estado_str = "PENDIENTE"
-    es_finalizado = False
-    modificado_por = ""
-    fecha_modificacion = ""
-
-    # 2. Consultar directamente a la base de datos con conexión propia
-    conn = None
-    cursor = None
     try:
-        conn = conexion.obtener_conexion()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT estado, modificado_por, fecha_modificacion FROM estados_programacion WHERE TRIM(CAST(semana AS TEXT)) = %s LIMIT 1;", 
-            (semana_limpia,)
-        )
-        row = cursor.fetchone()
-        if row:
-            estado_str = str(row[0]).strip().upper() if row[0] else "PENDIENTE"
-            es_finalizado = (estado_str == "FINALIZADO")
-            modificado_por = str(row[1]) if row[1] else ""
-            fecha_modificacion = str(row[2]) if row[2] else ""
-    except Exception as err:
-        print(f"Error consultando BD directa para semana {semana_limpia}: {err}")
-    finally:
-        if cursor:
-            try: cursor.close()
-            except Exception: pass
-        if conn:
-            try: conn.close()
-            except Exception: pass
+        # Consultamos el estado mediante el modelo
+        info_estado = modelo_dtprog.obtener_estado_programacion(semana_limpia)
+        
+        estado_str = info_estado.get("estado", "PENDIENTE")
+        es_finalizado = (estado_str == "FINALIZADO")
+        modificado_por = info_estado.get("modificado_por", "")
+        fecha_modificacion = info_estado.get("fecha_modificacion", "")
 
-    # 3. Cargar datos del modelo de dotación
-    try:
+        # Cargar datos de la dotación
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
@@ -467,16 +412,16 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
         print(f"Error cargando estructuras de dtprogramada: {e}")
         return {
             "semana": semana_limpia,
-            "estado": estado_str,
-            "finalizado": es_finalizado,
-            "modificado_por": modificado_por,
-            "fecha_modificacion": fecha_modificacion,
+            "estado": "PENDIENTE",
+            "finalizado": False,
+            "modificado_por": "",
+            "fecha_modificacion": None,
             "turnos": [],
             "sectores_chocolate": [],
             "sectores_golosinas": [],
             "dotaciones": {}
         }
-
+    
 @app.post("/api/dtprogramada/guardar")
 def api_guardar_dtprogramada(payload: dict = Body(...)):
     semana = payload.get("semana")
