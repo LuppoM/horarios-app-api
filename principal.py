@@ -266,6 +266,21 @@ def api_eliminar_registro(id_registro: int):
         return {"status": "ok"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+    
+@app.post("/api/modmoi/guardar_edicion")
+def api_guardar_edicion(payload: dict = Body(...)):
+    id_reg = payload.get("id")
+    operario = payload.get("operario")
+    horario = payload.get("horario")
+
+    if not id_reg or not operario:
+        return {"status": "error", "mensaje": "Datos incompletos"}
+
+    modelo = ModMoiModel()
+    exito = modelo.actualizar_registro(id_reg, operario, horario)
+    if exito:
+        return {"status": "ok"}
+    return {"status": "error", "mensaje": "No se pudo actualizar el registro en Supabase"}
 
 
 @app.post("/api/modmoi/limpiar-semanas")

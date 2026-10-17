@@ -186,84 +186,108 @@
             }
         }
 
-        async function ejecutarAccion() {
-            if (accionPendiente === 'limpiar_tabla') {
-                if (confirm("¿Estás seguro de que deseas blanquear las asignaciones de horarios, sectores y plantas de la semana?")) {
-                    try {
-                        const res = await fetch('/api/modmoi/limpiar-semanas', { method: 'POST' });
-                        const resData = await res.json();
-                        if (resData.status === 'ok') {
-                            alert("Se han blanqueado correctamente los puestos de la tabla.");
-                            cargarDatos();
-                        } else {
-                            alert("Error al limpiar: " + resData.message);
-                        }
-                    } catch (e) {
-                        alert("Error de conexión al intentar limpiar la tabla.");
+            async function ejecutarAccion() {
+        if (accionPendiente === 'limpiar_tabla') {
+            if (confirm("¿Estás seguro de que deseas blanquear las asignaciones de horarios, sectores y plantas de la semana?")) {
+                try {
+                    const res = await fetch('/api/modmoi/limpiar-semanas', { method: 'POST' });
+                    const resData = await res.json();
+                    if (resData.status === 'ok') {
+                        alert("Se han blanqueado correctamente los puestos de la tabla.");
+                        cargarDatos();
+                    } else {
+                        alert("Error al limpiar: " + (resData.message || resData.mensaje));
                     }
+                } catch (e) {
+                    alert("Error de conexión al intentar limpiar la tabla.");
                 }
+            }
 
-            } else if (accionPendiente === 'agregar') {
-                idRegistroActual = null;
-                document.getElementById('abmTitulo').innerText = "Agregar Orden de Trabajo";
-                document.getElementById('abmTipoMo').value = "MOD";
-                document.getElementById('abmOperario').value = "";
-                document.getElementById('abmHorario').value = "06:00 a 14:00";
-                document.getElementById('modalAbm').style.display = 'flex';
+        } else if (accionPendiente === 'agregar') {
+            idRegistroActual = null;
+            document.getElementById('abmTitulo').innerText = "Agregar Orden de Trabajo";
+            document.getElementById('abmTipoMo').value = "MOD";
+            document.getElementById('abmOperario').value = "";
+            document.getElementById('abmHorario').value = "06:00 a 14:00";
+            document.getElementById('modalAbm').style.display = 'flex';
 
-            } else if (accionPendiente === 'modificar') {
-                const fila = datosOriginales[filaSeleccionadaIdx];
-                idRegistroActual = fila[0]; // ID
+        } else if (accionPendiente === 'modificar') {
+            const fila = datosOriginales[filaSeleccionadaIdx];
+            idRegistroActual = fila[0]; // ID del registro en la tabla
 
+            try {
                 const res = await fetch(`/api/modmoi/obtener/${idRegistroActual}`);
-                const data = await res.json();
+                const resData = await res.json();
 
-                if (data.error) {
-                    alert(data.error);
+                // Verificar la envoltura { status: 'ok', data: ... }
+                const reg = resData.data || resData;
+
+                if (resData.status === 'error' || !reg) {
+                    alert(resData.mensaje || resData.error || "No se pudo obtener el registro.");
                     return;
                 }
 
+                // Mapeo seguro si reg viene como Array [id, operario, horario, sector, planta, semana] o como objeto
+                let operarioVal = "";
+                let horarioVal = "06:00 a 14:00";
+                let tipoMoVal = "MOD";
+
+                if (Array.isArray(reg)) {
+                    operarioVal = reg[1] || "";
+                    horarioVal = reg[2] || "06:00 a 14:00";
+                } else if (typeof reg === 'object') {
+                    operarioVal = reg.operario || reg.operario_nombre || "";
+                    horarioVal = reg.Horario || reg.horario || "06:00 a 14:00";
+                    tipoMoVal = reg.calificacion_mano_obra || reg.tipo_mo || "MOD";
+                }
+
                 document.getElementById('abmTitulo').innerText = "Modificar Orden de Trabajo";
-                document.getElementById('abmTipoMo').value = data.calificacion_mano_obra || "MOD";
-                document.getElementById('abmOperario').value = data.operario || "";
-                document.getElementById('abmHorario').value = data.horario || "06:00 a 14:00";
+                document.getElementById('abmTipoMo').value = tipoMoVal;
+                document.getElementById('abmOperario').value = operarioVal;
+                document.getElementById('abmHorario').value = horarioVal;
                 document.getElementById('modalAbm').style.display = 'flex';
 
-            } else if (accionPendiente === 'eliminar') {
-                const fila = datosOriginales[filaSeleccionadaIdx];
-                idRegistroActual = fila[0];
-                if (confirm(`¿Seguro que deseas eliminar el operario con ID ${idRegistroActual}?`)) {
-                    const res = await fetch(`/api/modmoi/eliminar/${idRegistroActual}`, { method: 'DELETE' });
-                    const resData = await res.json();
-                    if (resData.status === 'ok') {
-                        cargarDatos();
-                    } else {
-                        alert("Error al eliminar: " + resData.message);
-                    }
+            } catch (err) {
+                console.error("Error al obtener datos:", err);
+                alert("Error de conexión al obtener los datos del registro.");
+            }
+
+        } else if (accionPendiente === 'eliminar') {
+            const fila = datosOriginales[filaSeleccionadaIdx];
+            idRegistroActual = fila[0];
+            if (confirm(`¿Seguro que deseas eliminar el operario con ID ${idRegistroActual}?`)) {
+                const res = await fetch(`/api/modmoi/eliminar/${idRegistroActual}`, { method: 'DELETE' });
+                const resData = await res.json();
+                if (resData.status === 'ok') {
+                    cargarDatos();
+                } else {
+                    alert("Error al eliminar: " + (resData.message || resData.mensaje));
                 }
             }
         }
+    }
 
-        async function guardarAbm() {
-            const tipoMo = document.getElementById('abmTipoMo').value;
-            const operario = document.getElementById('abmOperario').value.trim();
-            const horario = document.getElementById('abmHorario').value;
+    async function guardarAbm() {
+        const tipoMo = document.getElementById('abmTipoMo').value;
+        const operario = document.getElementById('abmOperario').value.trim();
+        const horario = document.getElementById('abmHorario').value;
 
-            if (!operario) {
-                alert("El campo operario no puede estar vacío.");
-                return;
+        if (!operario) {
+            alert("El campo operario no puede estar vacío.");
+            return;
+        }
+
+        const payload = {
+            modo: idRegistroActual ? "modificar" : "insertar",
+            id: idRegistroActual,
+            datos: {
+                calificacion_mano_obra: tipoMo,
+                operario: operario,
+                horario: horario
             }
+        };
 
-            const payload = {
-                modo: idRegistroActual ? "modificar" : "insertar",
-                id: idRegistroActual,
-                datos: {
-                    calificacion_mano_obra: tipoMo,
-                    operario: operario,
-                    horario: horario
-                }
-            };
-
+        try {
             const res = await fetch('/api/modmoi/guardar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -275,26 +299,13 @@
                 cerrarModalAbm();
                 cargarDatos();
             } else {
-                alert(data.message || "Error al guardar los datos.");
+                alert(data.mensaje || data.message || "Error al guardar los datos.");
             }
+        } catch (error) {
+            console.error("Error al guardar:", error);
+            alert("Ocurrió un error al intentar guardar los datos.");
         }
-
-        function cerrarModalAbm() {
-            document.getElementById('modalAbm').style.display = 'none';
-        }
-
-        function exportarExcel() {
-            const vista = document.getElementById('comboVista').value;
-            const url = `/api/modmoi/exportar-excel?vista=${encodeURIComponent(vista)}`;
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', '');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
+    }
         window.onload = cargarDatos;
     </script>
 </body>

@@ -227,13 +227,30 @@ class ModMoiModel:
                 self.conexion_db.rollback()
             print(f"Error al consultar fin de semana en Supabase: {e}")
             raise Exception(f"Error al consultar fin de semana: {e}")
-
+    def actualizar_registro(self, id_registro, operario, horario):
+            """Actualiza el operario y horario de un registro específico en Supabase."""
+            cursor = self.conexion_db.cursor()
+            try:
+                cursor.execute(
+                    """
+                    UPDATE modymoi
+                    SET operario = %s, "Horario" = %s
+                    WHERE id = %s
+                    """,
+                    (operario, horario, id_registro)
+                )
+                self.conexion_db.commit()
+                return True
+            except Exception as e:
+                print(f"Error al actualizar registro en Supabase: {e}")
+                self.conexion_db.rollback()
+                return False
     def contar_mano_de_obra(self, es_finde=False, semana_actual=None, vista=None):
         try:
             # Si se elige la vista de Mecánicos, retornamos 0, 0
             if vista == "Mecanicos":
                 return 0, 0
-
+    
             cursor = self.conexion_db.cursor()
 
             if es_finde or vista == "Fin de Semana":
