@@ -277,9 +277,12 @@
             return;
         }
 
+        // Convertir explícitamente a entero para Supabase
+        const idParseado = idRegistroActual ? parseInt(idRegistroActual, 10) : null;
+
         const payload = {
-            modo: idRegistroActual ? "modificar" : "insertar",
-            id: idRegistroActual,
+            modo: idParseado ? "modificar" : "insertar",
+            id: idParseado,
             datos: {
                 calificacion_mano_obra: tipoMo,
                 operario: operario,
@@ -295,7 +298,9 @@
             });
 
             const data = await res.json();
-            if (data.status === 'ok') {
+
+            // Evaluar tanto la respuesta HTTP como la clave 'status'
+            if (res.ok && data.status === 'ok') {
                 cerrarModalAbm();
                 cargarDatos();
             } else {
@@ -303,7 +308,7 @@
             }
         } catch (error) {
             console.error("Error al guardar:", error);
-            alert("Ocurrió un error al intentar guardar los datos.");
+            alert("Ocurrió un error al intentar guardar los datos: " + error.message);
         }
     }
         window.onload = cargarDatos;
