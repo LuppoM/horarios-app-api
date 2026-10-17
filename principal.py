@@ -49,6 +49,7 @@ def semana_objetivo_por_defecto() -> str:
     )
 
 
+
 # ==========================================
 # 1. VISTAS HTML PRINCIPALES (GENERAL)
 # ==========================================
@@ -56,21 +57,37 @@ def semana_objetivo_por_defecto() -> str:
 def home(request: Request):
     modelo_base = modeloprincipal()
     semana_calculada = ""
+    info_estado = {"estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
+
     try:
+        # Obtenemos el número de semana actual de producción
         semana_calculada = str(modelo_base.obtener_numero_semana_personalizado())
+        
+        # Limpieza de semanas pasadas
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana_calculada)
+
+        # Consultamos el estado de la semana actual desde modeloprincipal
+        if semana_calculada:
+            info_estado = modelo_base.obtener_estado_programacion(semana_calculada)
+
     except Exception as e:
         print(f"Error al ejecutar inicio: {e}")
         try:
             semana_calculada = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+            if semana_calculada:
+                info_estado = modelo_base.obtener_estado_programacion(semana_calculada)
         except Exception:
             semana_calculada = ""
     finally:
         if hasattr(modelo_base, 'cerrar_conexion'):
             modelo_base.cerrar_conexion()
 
+    # Le enviamos la semana actual y el estado a Jinja2 para Principal.html
     return templates.TemplateResponse(request, "Principal.html", {
-        "semana_actual": semana_calculada
+        "semana_actual": semana_calculada,
+        "estado_programacion": info_estado.get("estado", "PENDIENTE"),
+        "modificado_por": info_estado.get("modificado_por", ""),
+        "fecha_modificacion": info_estado.get("fecha_modificacion", "")
     })
 
 @app.get("/modmoi", response_class=HTMLResponse)
@@ -105,16 +122,14 @@ def vista_hgolo_finde(request: Request):
 def vista_mecanicos(request: Request):
     return templates.TemplateResponse(request, "mecanicos.html", {})
 
-# ==========================================
-# API ENDPOINTS
-# ==========================================
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
+    # Si no envían la semana, retornamos error sin calcular nada en el backend
     if not semana or semana.lower() == "none" or semana.strip() == "":
-        semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
+        return {"error": "Debe especificar un número de semana válido"}
 
     try:
-        # Obtenemos el estado a través del modelo
+        # Consulta directamente la semana recibida por parámetro
         info_estado = modelo_dtprog.obtener_estado_programacion(semana)
         
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
