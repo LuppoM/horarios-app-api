@@ -194,44 +194,63 @@
         }
 
         function actualizarOpcionesSelects() {
-            const seleccionadosEnPantalla = new Set();
-            document.querySelectorAll('.fila-operario select').forEach(sel => {
-                if (sel.value) seleccionadosEnPantalla.add(sel.value);
-            });
+    const seleccionadosEnPantalla = new Set();
 
-            const libres = datosGlobales.operarios_disponibles || [];
+    // 1. Recolectar todos los operarios seleccionados en pantalla (limpiando espacios)
+    document.querySelectorAll('.fila-operario select').forEach(sel => {
+        const val = sel.value ? sel.value.trim() : '';
+        if (val) seleccionadosEnPantalla.add(val);
+    });
 
-            document.querySelectorAll('.fila-operario select').forEach(sel => {
-                const valorActual = sel.value; 
-                sel.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
+    const libres = datosGlobales.operarios_disponibles || [];
 
-                libres.forEach(item => {
-                    const nombre = Array.isArray(item) ? item[1] : item.operario;
+    document.querySelectorAll('.fila-operario select').forEach(sel => {
+        // Obtener el valor actual o el valor por defecto cargado desde el atributo data
+        let valorActual = (sel.value || sel.getAttribute('data-operario-inicial') || '').trim();
 
-                    if (!seleccionadosEnPantalla.has(nombre) || nombre === valorActual) {
-                        const opt = document.createElement('option');
-                        opt.value = nombre;
-                        opt.textContent = nombre;
-                        if (nombre === valorActual) {
-                            opt.selected = true;
-                        }
-                        sel.appendChild(opt);
-                    }
-                });
+        sel.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
 
-                if (valorActual && !Array.from(sel.options).some(o => o.value === valorActual)) {
-                    const opt = document.createElement('option');
-                    opt.value = valorActual;
-                    opt.textContent = valorActual;
+        let encontradoEnDisponibles = false;
+
+        // 2. Poblar con los operarios disponibles
+        libres.forEach(item => {
+            const nombreRaw = Array.isArray(item) ? item[1] : (item.operario || item);
+            const nombre = nombreRaw ? nombreRaw.trim() : '';
+
+            if (!nombre) return;
+
+            // Si no está seleccionado en otra fila o es el operario de esta misma fila
+            if (!seleccionadosEnPantalla.has(nombre) || nombre === valorActual) {
+                const opt = document.createElement('option');
+                opt.value = nombre;
+                opt.textContent = nombre;
+
+                if (nombre === valorActual) {
                     opt.selected = true;
-                    sel.appendChild(opt);
+                    encontradoEnDisponibles = true;
                 }
+                sel.appendChild(opt);
+            }
+        });
 
-                if (valorActual) {
-                    sel.value = valorActual;
-                }
-            });
+        // 3. Si el operario ya estaba asignado en la BD y no vino en la lista de disponibles, agregarlo igual para no perderlo
+        if (valorActual && !encontradoEnDisponibles) {
+            const yaExiste = Array.from(sel.options).some(o => o.value.trim() === valorActual);
+            if (!yaExiste) {
+                const opt = document.createElement('option');
+                opt.value = valorActual;
+                opt.textContent = valorActual;
+                opt.selected = true;
+                sel.appendChild(opt);
+            }
         }
+
+        // 4. Asegurar la selección final
+        if (valorActual) {
+            sel.value = valorActual;
+        }
+    });
+}
 
         function exportarPDF() {
             if (!semanaActualGlobal) {
