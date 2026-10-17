@@ -50,7 +50,7 @@ class modeloprincipal:
                 if isinstance(row, (list, tuple)) and len(row) >= 2:
                     st_val = str(row[1]).strip().upper() if row[1] else "PENDIENTE"
                     mod_por = str(row[2]) if len(row) > 2 and row[2] else ""
-                    f_mod = row[3].strftime("%Y-%m-%d %H:%M:%S") if len(row) > 3 and row[3] else None
+                    f_mod = str(row[3]) if len(row) > 3 and row[3] else None  # <--- Cambiado aquí
                     return {
                         "semana": str(row[0]).strip(),
                         "estado": st_val,
