@@ -205,7 +205,6 @@
             document.getElementById('abmTitulo').innerText = "Agregar Orden de Trabajo";
             document.getElementById('abmTipoMo').value = "MOD";
             document.getElementById('abmOperario').value = "";
-            document.getElementById('abmHorario').value = "06:00 a 14:00";
             document.getElementById('modalAbm').style.display = 'flex';
 
         } else if (accionPendiente === 'modificar') {
@@ -223,23 +222,22 @@
                 }
 
                 let operarioVal = "";
-                let horarioVal = "06:00 a 14:00";
+
                 let tipoMoVal = "MOD";
 
                 if (Array.isArray(reg)) {
                     operarioVal = reg[2] || "";
-                    horarioVal = reg[3] || "06:00 a 14:00";
+
                     tipoMoVal = reg[1] || "MOD";
                 } else if (typeof reg === 'object') {
                     operarioVal = reg.operario || "";
-                    horarioVal = reg.horario || reg.Horario || "06:00 a 14:00";
+       
                     tipoMoVal = reg.calificacion_mano_obra || "MOD";
                 }
 
                 document.getElementById('abmTitulo').innerText = "Modificar Orden de Trabajo";
                 document.getElementById('abmTipoMo').value = tipoMoVal;
                 document.getElementById('abmOperario').value = operarioVal;
-                document.getElementById('abmHorario').value = horarioVal;
                 document.getElementById('modalAbm').style.display = 'flex';
 
             } catch (err) {
@@ -265,7 +263,7 @@
     async function guardarAbm() {
         const tipoMo = document.getElementById('abmTipoMo').value;
         const operario = document.getElementById('abmOperario').value.trim();
-        const horario = document.getElementById('abmHorario').value;
+
 
         if (!operario) {
             alert("El campo operario no puede estar vacío.");
@@ -280,7 +278,7 @@
             datos: {
                 calificacion_mano_obra: tipoMo,
                 operario: operario,
-                horario: horario
+
             }
         };
 
