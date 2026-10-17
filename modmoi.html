@@ -102,91 +102,96 @@
     </div>
 
     <script>
-        let accesoAutorizado = false;
-        let accionPendiente = null;
-        let filaSeleccionadaIdx = null;
-        let datosOriginales = [];
-        let columnasOriginales = [];
-        let idRegistroActual = null;
+    let accesoAutorizado = false;
+    let accionPendiente = null;
+    let filaSeleccionadaIdx = null;
+    let datosOriginales = [];
+    let columnasOriginales = [];
+    let idRegistroActual = null;
 
-        async function cargarDatos() {
-            const vista = document.getElementById('comboVista').value;
-            const comboCol = document.getElementById('comboColumnas');
-            const columna = comboCol.value || '';
-            const filtro = document.getElementById('inputFiltro').value.trim();
+    async function cargarDatos() {
+        const vista = document.getElementById('comboVista').value;
+        const comboCol = document.getElementById('comboColumnas');
+        const columna = comboCol.value || '';
+        const filtro = document.getElementById('inputFiltro').value.trim();
 
-            const url = `/api/modmoi/datos?vista=${encodeURIComponent(vista)}&columna=${encodeURIComponent(columna)}&filtro=${encodeURIComponent(filtro)}`;
+        const url = `/api/modmoi/datos?vista=${encodeURIComponent(vista)}&columna=${encodeURIComponent(columna)}&filtro=${encodeURIComponent(filtro)}`;
 
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
 
-                columnasOriginales = data.columnas || [];
-                datosOriginales = data.datos || [];
+            columnasOriginales = data.columnas || [];
+            datosOriginales = data.datos || [];
 
-                document.getElementById('contadorLabel').innerText = `MOD (Directa): ${data.mod || 0}   |   MOI (Indirecta): ${data.moi || 0}`;
+            document.getElementById('contadorLabel').innerText = `MOD (Directa): ${data.mod || 0}   |   MOI (Indirecta): ${data.moi || 0}`;
 
-                const colSel = comboCol.value;
-                if (comboCol.options.length <= 1) {
-                    comboCol.innerHTML = '<option value="">-- Todas las columnas --</option>';
-                    columnasOriginales.forEach(col => {
-                        const opt = document.createElement('option');
-                        opt.value = col;
-                        opt.innerText = col;
-                        if (col === colSel) opt.selected = true;
-                        comboCol.appendChild(opt);
-                    });
-                }
+            // Reconstruir siempre las columnas según la vista seleccionada
+            const colSel = comboCol.value;
+            comboCol.innerHTML = '<option value="">-- Todas las columnas --</option>';
+            columnasOriginales.forEach(col => {
+                const opt = document.createElement('option');
+                opt.value = col;
+                opt.innerText = col;
+                if (col === colSel) opt.selected = true;
+                comboCol.appendChild(opt);
+            });
 
-                document.getElementById('tablaEncabezados').innerHTML = columnasOriginales.map(c => `<th>${c}</th>`).join('');
+            // Generar Encabezados
+            document.getElementById('tablaEncabezados').innerHTML = columnasOriginales.map(c => `<th>${c}</th>`).join('');
 
-                document.getElementById('tablaCuerpo').innerHTML = datosOriginales.map((fila, idx) => {
-                    return `<tr onclick="seleccionarFila(${idx}, this)">
-                        ${fila.map(val => `<td>${val !== null ? val : ''}</td>`).join('')}
-                    </tr>`;
-                }).join('');
+            // Generar Filas
+            document.getElementById('tablaCuerpo').innerHTML = datosOriginales.map((fila, idx) => {
+                return `<tr onclick="seleccionarFila(${idx}, this)">
+                    ${fila.map(val => `<td>${val !== null ? val : ''}</td>`).join('')}
+                </tr>`;
+            }).join('');
 
-                filaSeleccionadaIdx = null;
+            filaSeleccionadaIdx = null;
 
-            } catch (err) {
-                console.error("Error cargando datos:", err);
-            }
+        } catch (err) {
+            console.error("Error cargando datos:", err);
+        }
+    }
+
+    function seleccionarFila(idx, elem) {
+        document.querySelectorAll('#tablaCuerpo tr').forEach(tr => tr.classList.remove('selected'));
+        elem.classList.add('selected');
+        filaSeleccionadaIdx = idx;
+    }
+
+    function solicitarAccion(accion) {
+        accionPendiente = accion;
+        if (accion !== 'agregar' && accion !== 'limpiar_tabla' && filaSeleccionadaIdx === null) {
+            alert("Por favor selecciona una fila de la tabla.");
+            return;
         }
 
-        function seleccionarFila(idx, elem) {
-            document.querySelectorAll('#tablaCuerpo tr').forEach(tr => tr.classList.remove('selected'));
-            elem.classList.add('selected');
-            filaSeleccionadaIdx = idx;
+        if (accesoAutorizado) {
+            ejecutarAccion();
+        } else {
+            document.getElementById('modalPassword').style.display = 'flex';
+            document.getElementById('inputPassword').value = '';
+            document.getElementById('inputPassword').focus();
         }
+    }
 
-        function solicitarAccion(accion) {
-            accionPendiente = accion;
-            if (accion !== 'agregar' && accion !== 'limpiar_tabla' && filaSeleccionadaIdx === null) {
-                alert("Por favor selecciona una fila de la tabla.");
-                return;
-            }
-
-            if (accesoAutorizado) {
-                ejecutarAccion();
-            } else {
-                document.getElementById('modalPassword').style.display = 'flex';
-                document.getElementById('inputPassword').value = '';
-                document.getElementById('inputPassword').focus();
-            }
+    function verificarPassword() {
+        const pass = document.getElementById('inputPassword').value;
+        if (pass === "Mario456") {
+            accesoAutorizado = true;
+            document.getElementById('modalPassword').style.display = 'none';
+            ejecutarAccion();
+        } else {
+            alert("Contraseña incorrecta");
         }
+    }
 
-        function verificarPassword() {
-            const pass = document.getElementById('inputPassword').value;
-            if (pass === "Mario456") {
-                accesoAutorizado = true;
-                document.getElementById('modalPassword').style.display = 'none';
-                ejecutarAccion();
-            } else {
-                alert("Contraseña incorrecta");
-            }
-        }
+    function cerrarModalAbm() {
+        document.getElementById('modalAbm').style.display = 'none';
+    }
 
-            async function ejecutarAccion() {
+    async function ejecutarAccion() {
         if (accionPendiente === 'limpiar_tabla') {
             if (confirm("¿Estás seguro de que deseas blanquear las asignaciones de horarios, sectores y plantas de la semana?")) {
                 try {
@@ -213,13 +218,11 @@
 
         } else if (accionPendiente === 'modificar') {
             const fila = datosOriginales[filaSeleccionadaIdx];
-            idRegistroActual = fila[0]; // ID del registro en la tabla
+            idRegistroActual = fila[0];
 
             try {
                 const res = await fetch(`/api/modmoi/obtener/${idRegistroActual}`);
                 const resData = await res.json();
-
-                // Verificar la envoltura { status: 'ok', data: ... }
                 const reg = resData.data || resData;
 
                 if (resData.status === 'error' || !reg) {
@@ -227,18 +230,18 @@
                     return;
                 }
 
-                // Mapeo seguro si reg viene como Array [id, operario, horario, sector, planta, semana] o como objeto
                 let operarioVal = "";
                 let horarioVal = "06:00 a 14:00";
                 let tipoMoVal = "MOD";
 
                 if (Array.isArray(reg)) {
-                    operarioVal = reg[1] || "";
-                    horarioVal = reg[2] || "06:00 a 14:00";
+                    operarioVal = reg[2] || "";
+                    horarioVal = reg[3] || "06:00 a 14:00";
+                    tipoMoVal = reg[1] || "MOD";
                 } else if (typeof reg === 'object') {
-                    operarioVal = reg.operario || reg.operario_nombre || "";
-                    horarioVal = reg.Horario || reg.horario || "06:00 a 14:00";
-                    tipoMoVal = reg.calificacion_mano_obra || reg.tipo_mo || "MOD";
+                    operarioVal = reg.operario || "";
+                    horarioVal = reg.horario || reg.Horario || "06:00 a 14:00";
+                    tipoMoVal = reg.calificacion_mano_obra || "MOD";
                 }
 
                 document.getElementById('abmTitulo').innerText = "Modificar Orden de Trabajo";
@@ -268,47 +271,50 @@
     }
 
     async function guardarAbm() {
-    const tipoMo = document.getElementById('abmTipoMo').value;
-    const operario = document.getElementById('abmOperario').value.trim();
-    const horario = document.getElementById('abmHorario').value;
+        const tipoMo = document.getElementById('abmTipoMo').value;
+        const operario = document.getElementById('abmOperario').value.trim();
+        const horario = document.getElementById('abmHorario').value;
 
-    if (!operario) {
-        alert("El campo operario no puede estar vacío.");
-        return;
+        if (!operario) {
+            alert("El campo operario no puede estar vacío.");
+            return;
+        }
+
+        const idParseado = idRegistroActual ? parseInt(idRegistroActual) : null;
+
+        const payload = {
+            modo: idParseado ? "modificar" : "insertar",
+            id: idParseado,
+            datos: {
+                calificacion_mano_obra: tipoMo,
+                operario: operario,
+                horario: horario
+            }
+        };
+
+        try {
+            const res = await fetch('/api/modmoi/guardar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.status === 'ok') {
+                cerrarModalAbm();
+                cargarDatos();
+            } else {
+                alert(data.mensaje || "Error al guardar los datos.");
+            }
+        } catch (error) {
+            console.error("Error al guardar:", error);
+            alert("Ocurrió un error al intentar guardar los datos.");
+        }
     }
 
-    const idParseado = idRegistroActual ? parseInt(idRegistroActual) : null;
-
-    const payload = {
-        modo: idParseado ? "modificar" : "insertar",
-        id: idParseado,
-        datos: {
-            calificacion_mano_obra: tipoMo,
-            operario: operario,
-            horario: horario
-        }
-    };
-
-    try {
-        const res = await fetch('/api/modmoi/guardar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-
-        if (res.ok && data.status === 'ok') {
-            cerrarModalAbm();
-            cargarDatos();
-        } else {
-            alert(data.mensaje || "Error al guardar los datos.");
-        }
-    } catch (error) {
-        console.error("Error al guardar:", error);
-        alert("Ocurrió un error al intentar guardar los datos.");
-    }
-}
-    </script>
+    // Carga inicial al ingresar
+    document.addEventListener('DOMContentLoaded', cargarDatos);
+</script>
 </body>
 </html>

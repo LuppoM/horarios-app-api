@@ -225,9 +225,13 @@ class ModMoiModel:
             self.conexion_db.rollback()
             return False
         
-    def contar_mano_de_obra(self, vista="Semana"):
+    def contar_mano_de_obra(self, vista="Semana", semana_actual=None):
         cursor = self.conexion_db.cursor()
         try:
+            # Si venía de una transacción fallida previa, reseteamos el estado
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
             cursor.execute(
                 """
                 SELECT 
@@ -237,11 +241,15 @@ class ModMoiModel:
                 """
             )
             res = cursor.fetchone()
-            return (res[0] or 0, res[1] or 0) if res else (0, 0)
-        except Exception as e:
-            print(f"Error contando mano de obra: {e}")
+            if res:
+                return (res[0] or 0, res[1] or 0)
             return (0, 0)
-    
+        except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+            print(f"Error contando mano de obra en Supabase: {e}")
+            return (0, 0)
+        
     def obtener_por_id(self, id_registro):
         """Obtiene un registro específico de modymoi desde Supabase mapeando las columnas exactas."""
         cursor = self.conexion_db.cursor()
