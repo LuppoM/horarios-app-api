@@ -54,14 +54,10 @@ def semana_objetivo_por_defecto() -> str:
 # ==========================================
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    # Instanciamos desde el archivo/módulo principalmodelo
     modelo_base = modeloprincipal()
     semana_calculada = ""
     try:
-        # Obtenemos el número de semana actual de producción
         semana_calculada = str(modelo_base.obtener_numero_semana_personalizado())
-        
-        # Limpieza de semanas pasadas
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana_calculada)
     except Exception as e:
         print(f"Error al ejecutar inicio: {e}")
@@ -73,7 +69,6 @@ def home(request: Request):
         if hasattr(modelo_base, 'cerrar_conexion'):
             modelo_base.cerrar_conexion()
 
-    # Le enviamos semana_actual a Jinja2 para Principal.html
     return templates.TemplateResponse(request, "Principal.html", {
         "semana_actual": semana_calculada
     })
@@ -82,98 +77,46 @@ def home(request: Request):
 def vista_modmoi(request: Request):
     return templates.TemplateResponse(request, "modmoi.html", {})
 
-
 @app.get("/sectores", response_class=HTMLResponse)
 def vista_sectores(request: Request):
     return templates.TemplateResponse(request, "sectores.html", {})
 
-
 @app.get("/tipohorarios", response_class=HTMLResponse)
-@app.get("/tiposhorarios", response_class=HTMLResponse)
 def vista_tipos_horario(request: Request):
     return templates.TemplateResponse(request, "tipohorarios.html", {})
-
 
 @app.get("/hchoco", response_class=HTMLResponse)
 def vista_hchoco(request: Request):
     return templates.TemplateResponse(request, "hchoco.html", {})
 
-
-@app.get("/dtprogramada", response_class=HTMLResponse)
-def vista_dotacion_programada(request: Request, semana: Optional[str] = None):
-    modelo_base = modeloprincipal()
-    try:
-        if not semana or semana.lower() == "none" or semana.strip() == "":
-            semana = str(modelo_base.obtener_numero_semana_personalizado())
-    except Exception as e:
-        print(f"Error al obtener semana en vista /dtprogramada: {e}")
-        semana = ""
-    finally:
-        if hasattr(modelo_base, 'cerrar_conexion'):
-            modelo_base.cerrar_conexion()
-
-    return templates.TemplateResponse(request, "dtprogramada.html", {
-        "semana_actual": semana
-    })
-
-
 @app.get("/hchocofinde", response_class=HTMLResponse)
 def vista_hchocofinde(request: Request):
     return templates.TemplateResponse(request, "hchocofinde.html", {})
-
 
 @app.get("/hgolo", response_class=HTMLResponse)
 def vista_hgolo(request: Request):
     return templates.TemplateResponse(request, "hgolo.html", {})
 
-
 @app.get("/hgolofinde", response_class=HTMLResponse)
 def vista_hgolo_finde(request: Request):
     return templates.TemplateResponse(request, "hgolofinde.html", {})
 
-
 @app.get("/mecanicos", response_class=HTMLResponse)
 def vista_mecanicos(request: Request):
     return templates.TemplateResponse(request, "mecanicos.html", {})
-# ==========================================
-# 1.1. ESTADO PARA LA VISTA PRINCIPAL (INICIO)
-# ==========================================
 
+# ==========================================
+# API ENDPOINTS
+# ==========================================
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
     if not semana or semana.lower() == "none" or semana.strip() == "":
         semana = str(modelo_dtprog.obtener_numero_semana_personalizado())
 
-    # Fuerza una conexión limpia en esta llamada
-    conn = None
-    cursor = None
-    es_finalizado = False
-    modificado_por = ""
-    fecha_modificacion = ""
-    estado_str = "PENDIENTE"
-
     try:
-        conn = conexion.obtener_conexion()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT estado, modificado_por, fecha_modificacion FROM estados_programacion WHERE semana::text = %s;", 
-            (str(semana).strip(),)
-        )
-        row = cursor.fetchone()
-        if row:
-            estado_str = str(row[0]).strip().upper() if row[0] else "PENDIENTE"
-            es_finalizado = (estado_str == "FINALIZADO")
-            modificado_por = str(row[1]) if row[1] else ""
-            fecha_modificacion = str(row[2]) if row[2] else ""
-    except Exception as err:
-        print(f"Error real leyendo BD: {err}")
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-    try:
+        # Obtenemos el estado a través del modelo
+        info_estado = modelo_dtprog.obtener_estado_programacion(semana)
+        
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
@@ -181,10 +124,10 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
 
         return {
             "semana": str(semana),
-            "estado": estado_str,
-            "finalizado": es_finalizado,
-            "modificado_por": modificado_por,
-            "fecha_modificacion": fecha_modificacion,
+            "estado": info_estado.get("estado", "PENDIENTE"),
+            "finalizado": (info_estado.get("estado") == "FINALIZADO"),
+            "modificado_por": info_estado.get("modificado_por", ""),
+            "fecha_modificacion": info_estado.get("fecha_modificacion", ""),
             "turnos": turnos,
             "sectores_chocolate": sectores_choco,
             "sectores_golosinas": sectores_golo,
@@ -192,6 +135,8 @@ def api_obtener_dtprogramada(semana: Optional[str] = None):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
 # ==========================================
 # 2. MÓDULO: MANO DE OBRA (MOD/MOI)
 # ==========================================
