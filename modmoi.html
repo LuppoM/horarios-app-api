@@ -268,50 +268,47 @@
     }
 
     async function guardarAbm() {
-        const tipoMo = document.getElementById('abmTipoMo').value;
-        const operario = document.getElementById('abmOperario').value.trim();
-        const horario = document.getElementById('abmHorario').value;
+    const tipoMo = document.getElementById('abmTipoMo').value;
+    const operario = document.getElementById('abmOperario').value.trim();
+    const horario = document.getElementById('abmHorario').value;
 
-        if (!operario) {
-            alert("El campo operario no puede estar vacío.");
-            return;
-        }
-
-        // Convertir explícitamente a entero para Supabase
-        const idParseado = idRegistroActual ? parseInt(idRegistroActual, 10) : null;
-
-        const payload = {
-            modo: idParseado ? "modificar" : "insertar",
-            id: idParseado,
-            datos: {
-                calificacion_mano_obra: tipoMo,
-                operario: operario,
-                horario: horario
-            }
-        };
-
-        try {
-            const res = await fetch('/api/modmoi/guardar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await res.json();
-
-            // Evaluar tanto la respuesta HTTP como la clave 'status'
-            if (res.ok && data.status === 'ok') {
-                cerrarModalAbm();
-                cargarDatos();
-            } else {
-                alert(data.mensaje || data.message || "Error al guardar los datos.");
-            }
-        } catch (error) {
-            console.error("Error al guardar:", error);
-            alert("Ocurrió un error al intentar guardar los datos: " + error.message);
-        }
+    if (!operario) {
+        alert("El campo operario no puede estar vacío.");
+        return;
     }
-        window.onload = cargarDatos;
+
+    const idParseado = idRegistroActual ? parseInt(idRegistroActual) : null;
+
+    const payload = {
+        modo: idParseado ? "modificar" : "insertar",
+        id: idParseado,
+        datos: {
+            calificacion_mano_obra: tipoMo,
+            operario: operario,
+            horario: horario
+        }
+    };
+
+    try {
+        const res = await fetch('/api/modmoi/guardar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.status === 'ok') {
+            cerrarModalAbm();
+            cargarDatos();
+        } else {
+            alert(data.mensaje || "Error al guardar los datos.");
+        }
+    } catch (error) {
+        console.error("Error al guardar:", error);
+        alert("Ocurrió un error al intentar guardar los datos.");
+    }
+}
     </script>
 </body>
 </html>
