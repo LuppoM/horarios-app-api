@@ -376,22 +376,22 @@ def api_eliminar_tipo_horario(tipo_id: int):
 
 @app.get("/api/dtprogramada/datos")
 def api_obtener_dtprogramada(semana: Optional[str] = None):
-    # Validamos que se envíe una semana válida por parámetro
     if not semana or str(semana).lower() == "none" or not str(semana).strip():
         return {"error": "Debe especificar un número de semana válido"}
 
     semana_limpia = str(semana).strip()
 
     try:
-        # Consultamos el estado mediante el modelo
-        info_estado = modelo_dtprog.obtener_estado_programacion(semana_limpia)
+        # Instanciamos modeloprincipal para consultar el estado
+        modelo_base = modeloprincipal()
+        info_estado = modelo_base.obtener_estado_programacion(semana_limpia)
         
         estado_str = info_estado.get("estado", "PENDIENTE")
         es_finalizado = (estado_str == "FINALIZADO")
         modificado_por = info_estado.get("modificado_por", "")
         fecha_modificacion = info_estado.get("fecha_modificacion", "")
 
-        # Cargar datos de la dotación
+        # Cargar estructuras con modelo_dtprog
         sectores_choco = modelo_dtprog.obtener_sectores_rotativos_por_planta("Chocolate")
         sectores_golo = modelo_dtprog.obtener_sectores_rotativos_por_planta("Golosinas")
         turnos = modelo_dtprog.obtener_turnos_por_tipo("ROTATIVO")
