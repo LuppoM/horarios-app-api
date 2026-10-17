@@ -268,6 +268,25 @@ class ModMoiModel:
                 self.conexion_db.rollback()
             print(f"Error al contar mano de obra: {e}")
             return 0, 0
+    def obtener_por_id(self, id_registro):
+        """Obtiene un registro específico de modymoi desde Supabase por su ID."""
+        cursor = self.conexion_db.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT id, operario, "Horario", "Sector", "Planta", semana 
+                FROM modymoi 
+                WHERE id = %s
+                """,
+                (id_registro,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return tuple(row.values()) if isinstance(row, dict) else tuple(row)
+        except Exception as e:
+            print(f"Error al obtener registro por ID en Supabase: {e}")
+            return None
 
     def cerrar_conexion(self):
         if hasattr(self, 'conexion_db') and self.conexion_db:
