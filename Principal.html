@@ -100,6 +100,7 @@
 
         // Cerrar menú al hacer click fuera
         window.addEventListener('click', function() {
+
             document.querySelectorAll('.dropdown-menu').forEach(menu => {
                 menu.classList.remove('show');
             });
@@ -107,7 +108,8 @@
 
         // Consultar estado de Dotación Programada al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
-            fetch('/api/dtprogramada/datos')
+            // Naisukat ti URL tapno maipatulod ti dinamiko a semana {{ semana_actual }}
+            fetch('/api/dtprogramada/datos?semana={{ semana_actual }}')
                 .then(res => res.json())
                 .then(data => {
                     const badge = document.getElementById('badgeEstadoDt');
