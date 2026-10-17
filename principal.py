@@ -249,7 +249,7 @@ def api_guardar_modmoi(payload: dict = Body(...)):
     if not operario:
         return {"status": "error", "mensaje": "El campo operario es obligatorio"}
 
-    modelo = ModeloModMoiWeb()
+    modelo = ModMoiModel()
     try:
         if modo == "modificar" and id_reg:
             # Pasa exactamente 4 argumentos: id_registro, calificacion, operario, horario
