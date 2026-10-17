@@ -243,7 +243,6 @@ def api_guardar_modmoi(payload: dict = Body(...)):
     datos = payload.get("datos", {})
 
     operario = datos.get("operario", "").strip()
-    horario = datos.get("horario", "").strip()
     calificacion = datos.get("calificacion_mano_obra", "MOD").strip()
 
     if not operario:
@@ -252,7 +251,7 @@ def api_guardar_modmoi(payload: dict = Body(...)):
     modelo = ModMoiModel()
     try:
         if modo == "modificar" and id_reg:
-            exito = modelo.actualizar_registro(int(id_reg), calificacion, operario, horario)
+            exito = modelo.actualizar_registro(int(id_reg), calificacion, operario)
             if exito:
                 return {"status": "ok"}
             return {"status": "error", "mensaje": "No se pudo actualizar el registro en Supabase."}
@@ -294,7 +293,7 @@ def api_guardar_edicion(payload: dict = Body(...)):
 
     modelo = ModMoiModel()
     try:
-        # Se pasan exactamente los 4 argumentos: id_registro, calificacion, operario, horario
+        # Se pasan exactamente los 4 argumentos: id_registro, calificacion, operario
         exito = modelo.actualizar_registro(id_reg, calificacion, operario)
         if exito:
             return {"status": "ok"}
