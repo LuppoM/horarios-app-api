@@ -183,6 +183,11 @@
         document.getElementById('modalAbm').style.display = 'none';
     }
 
+    function exportarExcel() {
+        const vista = document.getElementById('comboVista').value;
+        window.location.href = `/api/modmoi/exportar-excel?vista=${encodeURIComponent(vista)}`;
+    }
+
     async function ejecutarAccion() {
         if (accionPendiente === 'limpiar_tabla') {
             if (confirm("¿Estás seguro de que deseas blanquear las asignaciones de horarios, sectores y plantas de la semana?")) {
@@ -222,16 +227,13 @@
                 }
 
                 let operarioVal = "";
-
                 let tipoMoVal = "MOD";
 
                 if (Array.isArray(reg)) {
                     operarioVal = reg[2] || "";
-
                     tipoMoVal = reg[1] || "MOD";
                 } else if (typeof reg === 'object') {
                     operarioVal = reg.operario || "";
-       
                     tipoMoVal = reg.calificacion_mano_obra || "MOD";
                 }
 
@@ -264,7 +266,6 @@
         const tipoMo = document.getElementById('abmTipoMo').value;
         const operario = document.getElementById('abmOperario').value.trim();
 
-
         if (!operario) {
             alert("El campo operario no puede estar vacío.");
             return;
@@ -277,8 +278,7 @@
             id: idParseado,
             datos: {
                 calificacion_mano_obra: tipoMo,
-                operario: operario,
-
+                operario: operario
             }
         };
 
