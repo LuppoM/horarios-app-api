@@ -5,7 +5,7 @@ class ModeloHChocoFindeWeb:
         if conexion_db:
             self.conexion_db = conexion_db
         else:
-            self.conexion_db = conexion.obtener_conexion_supabase()
+            self.conexion_db = conexion.obtener_conexion()
         self.planta = "Chocolates"
 
     def obtener_operarios_disponibles(self, semana):
