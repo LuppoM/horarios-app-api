@@ -6,7 +6,7 @@
     <title>Alistamiento / Fin de semana - Golosinas</title>
     <!-- Mantiene su CSS separado de vista -->
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
-    <link rel="stylesheet" href="/archivos/hgolofinde.css">
+    <link rel="stylesheet" href="/archivos/hgolofindevista.css">
 </head>
 <body>
 
@@ -39,7 +39,13 @@
 
         async function cargarDatos() {
             try {
-                const res = await fetch(`/api/hgolo/finde/datos?semana=${semanaActualGlobal}`);
+                const res = await fetch(`/api/hgolo/finde/datos?semana=${encodeURIComponent(semanaActualGlobal)}`);
+                
+                if (!res.ok) {
+                    console.error("Error en el servidor:", res.status, res.statusText);
+                    return;
+                }
+
                 datosGlobalesFinde = await res.json();
 
                 semanaActualGlobal = datosGlobalesFinde.semana || semanaActualGlobal;
