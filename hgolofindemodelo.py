@@ -5,37 +5,45 @@ class ModeloHGoloFindeWeb:
         if conexion_db:
             self.conexion_db = conexion_db
         else:
-            self.conexion_db = conexion.obtener_conexion_supabase()
+            self.conexion_db = conexion.obtener_conexion()
         self.planta = "Golosinas"
 
-    def obtener_operarios_disponibles(self, semana):
-        """Obtiene los operarios disponibles desde Supabase."""
+    def obtener_operarios_disponibles(self, semana=None):
+        """Devuelve todos los operarios para asignación de fin de semana (INSERT en modymoi_finde)."""
         cursor = self.conexion_db.cursor()
         try:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
-            sem_val = str(semana) if semana else ""
+            planta_filtro = self.planta.lower() if hasattr(self, 'planta') else 'chocolates'
 
-            # Filtra operarios que pertenecen a Golosinas y no están asignados en puesto
+            # Trae a todos los operarios de la tabla principal modymoi
             cursor.execute(
                 """
-                SELECT DISTINCT m.id, m.operario
-                FROM modymoi m
-                WHERE m.semana::text = %s
-                  AND (LOWER(TRIM(m."Planta")) = 'golosinas' OR m."Planta" IS NULL OR TRIM(m."Planta") = '')
-                  AND (m."Sector" IS NULL OR TRIM(m."Sector") = '')
-                ORDER BY m.operario ASC
+                SELECT DISTINCT id, operario
+                FROM modymoi
+                WHERE operario IS NOT NULL 
+                  AND TRIM(operario) != ''
+                  AND (LOWER(TRIM("Planta")) = %s OR "Planta" IS NULL OR TRIM("Planta") = '')
+                ORDER BY operario ASC
                 """,
-                (sem_val,)
+                (planta_filtro,)
             )
             filas = cursor.fetchall()
-            return [(f[0], f[1]) if isinstance(f, (list, tuple)) else (f.get("id"), f.get("operario")) for f in filas]
+
+            resultado = []
+            for f in filas:
+                if isinstance(f, dict):
+                    resultado.append((f.get("id"), f.get("operario")))
+                else:
+                    resultado.append((f[0], f[1]))
+
+            return resultado
 
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
-            print(f"Error al obtener operarios disponibles en Supabase: {e}")
+            print(f"Error al obtener operarios para fin de semana en Supabase: {e}")
             return []
 
     def obtener_sectores(self):
