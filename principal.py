@@ -114,9 +114,12 @@ def vista_hchocofinde(request: Request):
 def vista_hgolo(request: Request):
     return templates.TemplateResponse(request, "hgolo.html", {})
 
-@app.get("/hgolofinde", response_class=HTMLResponse)
-def vista_hgolo_finde(request: Request):
-    return templates.TemplateResponse(request, "hgolofinde.html", {})
+@app.get("/hgolo/finde", response_class=HTMLResponse)
+def vista_hgolo_finde(request: Request, semana: str = None):
+    return templates.TemplateResponse(request, "hgolofinde.html", {
+        "request": request,
+        "semana": semana
+    })
 
 @app.get("/mecanicos", response_class=HTMLResponse)
 def vista_mecanicos(request: Request):
