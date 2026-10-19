@@ -76,7 +76,7 @@ class modeloprincipal:
 
     def eliminar_datos_semanas_anteriores(self, semana_actual=None):
         """Limpieza remota sobre Supabase (PostgreSQL).
-        Blanquea asignaciones y limites teoricos de semanas estrictamente ANTERIORES (< semana_actual).
+        Blanquea asignaciones en modymoi, mecanicos y borra registros de semanas estrictamente ANTERIORES (< semana_actual).
         """
         cursor = None
         try:
@@ -110,7 +110,26 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 2. Eliminar asignaciones registradas del fin de semana para semanas anteriores (<)
+            # 2. Blanquear asignaciones de la tabla mecanicos para semanas anteriores (<)
+            cursor.execute(
+                """
+                UPDATE mecanicos
+                SET horario = '', 
+                    planta = ''
+                WHERE semana IS NOT NULL 
+                  AND TRIM(CAST(semana AS TEXT)) != ''
+                  AND (
+                    CASE 
+                      WHEN TRIM(CAST(semana AS TEXT)) ~ '^[0-9]+$' 
+                      THEN CAST(TRIM(CAST(semana AS TEXT)) AS INTEGER) 
+                      ELSE 0 
+                    END
+                  ) < %s
+                """,
+                (semana_num,),
+            )
+
+            # 3. Eliminar asignaciones registradas del fin de semana para semanas anteriores (<)
             cursor.execute(
                 """
                 DELETE FROM modymoi_finde
@@ -126,7 +145,7 @@ class modeloprincipal:
                 (semana_num,),
             )
 
-            # 3. Eliminar limites de dotacion programada/teorica de semanas anteriores (<)
+            # 4. Eliminar limites de dotacion programada/teorica de semanas anteriores (<)
             cursor.execute(
                 """
                 DELETE FROM dotacion_teorica_horarios
