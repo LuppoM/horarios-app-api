@@ -224,6 +224,28 @@ class ModMoiModel:
             print(f"Error al consultar fin de semana en Supabase: {e}")
             raise Exception(f"Error al consultar fin de semana: {e}")
         
+    def agregar_registro(self, calificacion, operario):
+        """Agrega un nuevo registro insertando únicamente calificacion_mano_obra y operario en Supabase."""
+        cursor = self.conexion_db.cursor()
+        try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
+            cursor.execute(
+                """
+                INSERT INTO modymoi (calificacion_mano_obra, operario)
+                VALUES (%s, %s)
+                """,
+                (str(calificacion), str(operario))
+            )
+            self.conexion_db.commit()
+            return True
+        except Exception as e:
+            print(f"Error al agregar registro en Supabase: {e}")
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+            return False    
+        
     def actualizar_registro(self, id_registro, calificacion, operario):
         """Actualiza únicamente calificacion_mano_obra y operario por ID en Supabase."""
         cursor = self.conexion_db.cursor()
@@ -269,7 +291,29 @@ class ModMoiModel:
                 self.conexion_db.rollback()
             print(f"Error contando mano de obra en Supabase: {e}")
             return (0, 0)
-        
+
+    def eliminar_registro(self, id_registro):
+        """Elimina un registro de modymoi por su ID en Supabase."""
+        cursor = self.conexion_db.cursor()
+        try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
+            cursor.execute(
+                """
+                DELETE FROM modymoi 
+                WHERE id = %s
+                """,
+                (int(id_registro),)
+            )
+            self.conexion_db.commit()
+            return True
+        except Exception as e:
+            print(f"Error al eliminar registro en Supabase: {e}")
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+            return False
+
     def obtener_por_id(self, id_registro):
         """Obtiene un registro específico de modymoi desde Supabase mapeando las columnas exactas."""
         cursor = self.conexion_db.cursor()
