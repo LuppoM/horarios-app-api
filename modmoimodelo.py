@@ -30,7 +30,6 @@ class ModMoiModel:
             if not semana_actual:
                 semana_actual = str(self.obtener_numero_semana_personalizado())
 
-            # 1. Definir columnas exactamente como en la BD Supabase
             columnas = [
                 "id",
                 "calificacion_mano_obra",
@@ -41,7 +40,7 @@ class ModMoiModel:
                 "Planta"
             ]
 
-            # 2. SELECT respetando el orden de la BD (semana va 4da, antes de Horario)
+            # Simplificamos el WHERE para que traiga todo lo de la semana actual sin bloquearse por nulos
             query_base = """
                 SELECT 
                     id,
@@ -52,7 +51,7 @@ class ModMoiModel:
                     COALESCE("Sector"::text, '') AS "Sector",
                     COALESCE("Planta"::text, '') AS "Planta"
                 FROM modymoi
-                WHERE (semana::text = %s OR "Horario" IS NOT NULL)
+                WHERE semana::text = %s
             """
             params = [str(semana_actual)]
 
