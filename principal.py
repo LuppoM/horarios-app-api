@@ -929,7 +929,8 @@ def api_exportar_pdf_hchoco(semana: Optional[str] = None):
             elements.append(Paragraph(f"<b>{sector}</b>", styles["Heading2"]))
             elements.append(Spacer(1, 6))
 
-            columnas = list(turnos.keys())
+            # Ordena os turnos cronologicamente (06:00 -> 14:00 -> 22:00)
+            columnas = sorted(list(turnos.keys()))
             data = [columnas]
             max_filas = max(len(turnos[t]) for t in columnas) if columnas else 0
 
