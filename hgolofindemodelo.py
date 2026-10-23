@@ -15,7 +15,7 @@ class ModeloHGoloFindeWeb:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
-            planta_filtro = self.planta.lower() if hasattr(self, 'planta') else 'chocolates'
+            planta_filtro = self.planta.lower() if hasattr(self, 'planta') else 'Chocolates'
 
             # Trae a todos los operarios de la tabla principal modymoi
             cursor.execute(
