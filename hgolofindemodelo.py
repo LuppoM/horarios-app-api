@@ -15,19 +15,21 @@ class ModeloHGoloFindeWeb:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
-            planta_filtro = self.planta.lower() if hasattr(self, 'planta') else 'Chocolates'
+            # Definimos las plantas que querés incluir (en minúsculas para coincidir con LOWER)
+            plantas_filtro = ('chocolates', 'golosinas')  # Cambia 'golosinas' si en la BD se guarda distinto (ej. 'golosinas oenp')
 
-            # Trae a todos los operarios de la tabla principal modymoi
+            # Usamos IN %s pasándole la tupla de plantas
             cursor.execute(
                 """
                 SELECT DISTINCT id, operario
                 FROM modymoi
                 WHERE operario IS NOT NULL 
                   AND TRIM(operario) != ''
-                  AND (LOWER(TRIM("Planta")) = %s OR "Planta" IS NULL OR TRIM("Planta") = '')
+                  AND (LOWER(TRIM("Planta")) IN %s OR "Planta" IS NULL OR TRIM("Planta") = '')
+                  AND (%s IS NULL OR semana = %s)
                 ORDER BY operario ASC
                 """,
-                (planta_filtro,)
+                (plantas_filtro, semana, semana)
             )
             filas = cursor.fetchall()
 
