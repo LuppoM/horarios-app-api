@@ -258,6 +258,11 @@ def api_guardar_modmoi(payload: dict = Body(...)):
             if exito:
                 return {"status": "ok"}
             return {"status": "error", "mensaje": "No se pudo actualizar el registro en Supabase."}
+        elif modo == "insertar":
+            exito = modelo.agregar_registro(calificacion, operario)
+            if exito:
+                return {"status": "ok"}
+            return {"status": "error", "mensaje": "No se pudo agregar el registro en Supabase."}
         else:
             return {"status": "error", "mensaje": "Modo no soportado"}
     except Exception as e:
