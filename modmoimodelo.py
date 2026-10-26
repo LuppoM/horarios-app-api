@@ -4,12 +4,13 @@ from principalmodelo import modeloprincipal
 
 class ModMoiModel:
 
-    def __init__(self, conexion_db=None):
-        if conexion_db:
-            self.conexion_db = conexion_db
-        else:
-            self.conexion_db = conexion.obtener_conexion()
-        self._modelo_principal = modeloprincipal()
+   def __init__(self, conexion_db=None):
+    if conexion_db:
+        self.conexion_db = conexion_db
+    else:
+        self.conexion_db = conexion.obtener_conexion()
+    
+    self._modelo_principal = modeloprincipal(self.conexion_db)
 
     def obtener_numero_semana_personalizado(self, fecha=None):
         return self._modelo_principal.obtener_numero_semana_personalizado(fecha)
