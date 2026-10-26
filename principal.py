@@ -3,7 +3,7 @@ from io import BytesIO
 import os
 from typing import Optional
 
-from fastapi import Body, FastAPI, Request
+from fastapi import Body, FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -139,21 +139,33 @@ def vista_dtprogramada(request: Request):
 def api_obtener_modmoi(
     vista: str = "Semana", columna: str = None, filtro: str = None
 ):
-    if vista == "Mecanicos":
-        columnas, datos = modmoi_modelo.obtener_datos_mecanicos(columna, filtro)
-    elif vista == "Fin de Semana":
-        columnas, datos = modmoi_modelo.obtener_datos_finde(columna, filtro)
-    else:
-        columnas, datos = modmoi_modelo.obtener_datos(columna, filtro)
+    # Instanciamos la clase del modelo para abrir/gestionar la conexión
+    modelo = ModMoiModel()
+    try:
+        # 1. Traer filas según la vista seleccionada
+        if vista == "Mecanicos":
+            columnas, datos = modelo.obtener_datos_mecanicos(columna, filtro)
+        elif vista == "Fin de Semana":
+            columnas, datos = modelo.obtener_datos_finde(columna, filtro)
+        else:
+            columnas, datos = modelo.obtener_datos(columna, filtro)
 
-    mod_count, moi_count = modmoi_modelo.contar_mano_de_obra(vista=vista)
+        # 2. El mozo pide el conteo al modelo pasando la vista seleccionada
+        mod_count, moi_count = modelo.contar_mano_de_obra(vista=vista)
 
-    return {
-        "columnas": columnas,
-        "datos": datos,
-        "mod": mod_count,
-        "moi": moi_count,
-    }
+        # 3. Retornar en la bandeja (JSON) los datos y los contadores MOD / MOI
+        return {
+            "columnas": columnas,
+            "datos": datos,
+            "mod": mod_count,
+            "moi": moi_count,
+        }
+    except Exception as e:
+        print(f"Error en /api/modmoi/datos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Cerramos la conexión correctamente al terminar de atender la mesa
+        modelo.cerrar_conexion()
 
 
 @app.get("/api/modmoi/exportar-excel")
