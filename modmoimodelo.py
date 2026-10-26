@@ -293,7 +293,7 @@ class ModMoiModel:
                 cursor.close()
 
     def contar_mano_de_obra(self, vista="Semana", semana_actual=None):
-        """Cuenta MOD y MOI dinámicamente según la vista seleccionada (Semana, Mecanicos o Fin de Semana)."""
+        """Cuenta MOD y MOI dinámicamente según la vista seleccionada."""
         cursor = None
         try:
             if hasattr(self.conexion_db, 'rollback'):
@@ -301,36 +301,30 @@ class ModMoiModel:
 
             cursor = self.conexion_db.cursor()
 
-            # 1. Definimos la consulta según la vista activa
             if vista == "Mecanicos":
-                # En mecánicos todos cuentan como MOI (Indirecta)
-                query = """
-                    SELECT 
-                        0 AS mod_count,
-                        COUNT(*) AS moi_count
-                    FROM mecanicos;
-                """
+                cursor.execute("SELECT COUNT(*) FROM mecanicos;")
+                res = cursor.fetchone()
+                total = int(res[0]) if res and res[0] else 0
+                return (0, total)  # Todos los mecánicos son MOI (Indirecta)
+
             elif vista == "Fin de Semana":
-                # Se cruza modymoi_finde con modymoi para obtener la calificación
-                query = """
+                cursor.execute("""
                     SELECT 
                         COUNT(CASE WHEN UPPER(TRIM(COALESCE(m.calificacion_mano_obra::text, ''))) = 'MOD' THEN 1 END),
                         COUNT(CASE WHEN UPPER(TRIM(COALESCE(m.calificacion_mano_obra::text, ''))) = 'MOI' THEN 1 END)
                     FROM modymoi_finde f
                     INNER JOIN modymoi m ON f.id_operario = m.id;
-                """
+                """)
             else:
-                # Vista "Semana" (Tabla general modymoi)
-                query = """
+                # Vista "Semana" por defecto
+                cursor.execute("""
                     SELECT 
                         COUNT(CASE WHEN UPPER(TRIM(COALESCE(calificacion_mano_obra::text, ''))) = 'MOD' THEN 1 END),
                         COUNT(CASE WHEN UPPER(TRIM(COALESCE(calificacion_mano_obra::text, ''))) = 'MOI' THEN 1 END)
                     FROM modymoi;
-                """
+                """)
 
-            cursor.execute(query)
             res = cursor.fetchone()
-
             if res:
                 return (int(res[0] or 0), int(res[1] or 0))
             return (0, 0)
