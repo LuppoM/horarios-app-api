@@ -23,12 +23,13 @@ class ModMoiModel:
             print(f"Error al ejecutar limpieza desde ModMoiModel: {e}")
 
     def obtener_datos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
-        """Consulta la tabla modymoi respetando el orden exacto de columnas de Supabase."""
+        """Consulta la tabla modymoi trayendo todos los operarios registrados."""
+        cursor = None
         try:
-            cursor = self.conexion_db.cursor()
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
 
-            if not semana_actual:
-                semana_actual = str(self.obtener_numero_semana_personalizado())
+            cursor = self.conexion_db.cursor()
 
             columnas = [
                 "id",
@@ -40,20 +41,21 @@ class ModMoiModel:
                 "Planta"
             ]
 
-            # Simplificamos el WHERE para que traiga todo lo de la semana actual sin bloquearse por nulos
+            # Traemos todos los operarios. Si semana::text = %s dejaba la tabla vacía, 
+            # permitimos que traiga aunque semana sea NULL o diferente.
             query_base = """
                 SELECT 
                     id,
-                    calificacion_mano_obra,
+                    COALESCE(calificacion_mano_obra::text, 'MOD') AS calificacion_mano_obra,
                     operario,
-                    semana,
+                    COALESCE(semana::text, '') AS semana,
                     COALESCE("Horario"::text, '') AS "Horario",
                     COALESCE("Sector"::text, '') AS "Sector",
                     COALESCE("Planta"::text, '') AS "Planta"
                 FROM modymoi
-                WHERE semana::text = %s
+                WHERE 1=1
             """
-            params = [str(semana_actual)]
+            params = []
 
             if filtro_columna and filtro_valor:
                 col_filtro = filtro_columna
@@ -88,15 +90,21 @@ class ModMoiModel:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error al consultar modymoi en Supabase: {e}")
-            raise Exception(f"Error al consultar modymoi: {e}")
+            return [
+                "id", "calificacion_mano_obra", "operario", "semana", "Horario", "Sector", "Planta"
+            ], []
+        finally:
+            if cursor:
+                cursor.close()
 
     def obtener_datos_mecanicos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Consulta la tabla mecanicos usando sus columnas: id, operario, horario, planta, semana."""
+        cursor = None
         try:
-            cursor = self.conexion_db.cursor()
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
 
-            if not semana_actual:
-                semana_actual = str(self.obtener_numero_semana_personalizado())
+            cursor = self.conexion_db.cursor()
 
             columnas = [
                 "id",
@@ -112,13 +120,13 @@ class ModMoiModel:
                     id,
                     'MOI' AS calificacion_mano_obra,
                     operario,
-                    semana,
+                    COALESCE(semana::text, '') AS semana,
                     COALESCE(horario::text, '') AS horario_semana,
                     COALESCE(planta::text, '') AS planta_semana
                 FROM mecanicos
-                WHERE (semana::text = %s OR horario IS NOT NULL)
+                WHERE 1=1
             """
-            params = [str(semana_actual)]
+            params = []
 
             if filtro_columna and filtro_valor:
                 col_filtro = filtro_columna
@@ -154,15 +162,19 @@ class ModMoiModel:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error al consultar mecánicos en Supabase: {e}")
-            raise Exception(f"Error al consultar mecánicos: {e}")
+            return ["id", "calificacion_mano_obra", "operario", "semana", "horario_semana", "planta_semana"], []
+        finally:
+            if cursor:
+                cursor.close()
 
     def obtener_datos_finde(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Consulta la tabla modymoi_finde usando sus columnas minúsculas."""
+        cursor = None
         try:
-            cursor = self.conexion_db.cursor()
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
 
-            if not semana_actual:
-                semana_actual = str(self.obtener_numero_semana_personalizado())
+            cursor = self.conexion_db.cursor()
 
             columnas = [
                 "id",
@@ -180,16 +192,16 @@ class ModMoiModel:
                     f.id,
                     f.id_operario,
                     m.operario,
-                    f.semana,
-                    f.dia,
-                    f.horario,
-                    f.sector,
-                    f.planta
+                    COALESCE(f.semana::text, '') AS semana,
+                    COALESCE(f.dia::text, '') AS dia,
+                    COALESCE(f.horario::text, '') AS horario,
+                    COALESCE(f.sector::text, '') AS sector,
+                    COALESCE(f.planta::text, '') AS planta
                 FROM modymoi_finde f
                 INNER JOIN modymoi m ON f.id_operario = m.id
-                WHERE f.semana::text = %s
+                WHERE 1=1
             """
-            params = [str(semana_actual)]
+            params = []
 
             if filtro_columna and filtro_valor:
                 query_base += f" AND f.{filtro_columna}::text ILIKE %s"
@@ -221,15 +233,19 @@ class ModMoiModel:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error al consultar fin de semana en Supabase: {e}")
-            raise Exception(f"Error al consultar fin de semana: {e}")
-        
+            return ["id", "id_operario", "operario", "semana", "dia", "horario", "sector", "planta"], []
+        finally:
+            if cursor:
+                cursor.close()
+
     def agregar_registro(self, calificacion, operario):
         """Agrega un nuevo registro insertando únicamente calificacion_mano_obra y operario en Supabase."""
-        cursor = self.conexion_db.cursor()
+        cursor = None
         try:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
+            cursor = self.conexion_db.cursor()
             cursor.execute(
                 """
                 INSERT INTO modymoi (calificacion_mano_obra, operario)
@@ -243,12 +259,19 @@ class ModMoiModel:
             print(f"Error al agregar registro en Supabase: {e}")
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
-            return False    
-        
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+
     def actualizar_registro(self, id_registro, calificacion, operario):
         """Actualiza únicamente calificacion_mano_obra y operario por ID en Supabase."""
-        cursor = self.conexion_db.cursor()
+        cursor = None
         try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
+            cursor = self.conexion_db.cursor()
             cursor.execute(
                 """
                 UPDATE modymoi
@@ -265,28 +288,30 @@ class ModMoiModel:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             return False
-        
+        finally:
+            if cursor:
+                cursor.close()
+
     def contar_mano_de_obra(self, vista="Semana", semana_actual=None):
+        """Cuenta los registros de MOD y MOI en la tabla modymoi sin fallos de casteo o ceros fijos."""
         cursor = None
         try:
-            # Reseteamos estado si venía de una transacción previa con error
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
             cursor = self.conexion_db.cursor()
-            
-            # Usamos TRIM y UPPER para que ignore espacios extra o diferencias entre mayúsculas/minúsculas
+
             cursor.execute(
                 """
                 SELECT 
-                    COUNT(CASE WHEN UPPER(TRIM(calificacion_mano_obra)) = 'MOD' THEN 1 END),
-                    COUNT(CASE WHEN UPPER(TRIM(calificacion_mano_obra)) = 'MOI' THEN 1 END)
-                FROM modymoi
+                    COUNT(CASE WHEN UPPER(TRIM(COALESCE(calificacion_mano_obra::text, ''))) = 'MOD' THEN 1 END),
+                    COUNT(CASE WHEN UPPER(TRIM(COALESCE(calificacion_mano_obra::text, ''))) = 'MOI' THEN 1 END)
+                FROM modymoi;
                 """
             )
             res = cursor.fetchone()
             if res:
-                return (res[0] or 0, res[1] or 0)
+                return (int(res[0] or 0), int(res[1] or 0))
             return (0, 0)
 
         except Exception as e:
@@ -294,18 +319,18 @@ class ModMoiModel:
                 self.conexion_db.rollback()
             print(f"Error contando mano de obra en Supabase: {e}")
             return (0, 0)
-
         finally:
             if cursor:
                 cursor.close()
 
     def eliminar_registro(self, id_registro):
         """Elimina un registro de modymoi por su ID en Supabase."""
-        cursor = self.conexion_db.cursor()
+        cursor = None
         try:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
+            cursor = self.conexion_db.cursor()
             cursor.execute(
                 """
                 DELETE FROM modymoi 
@@ -320,11 +345,18 @@ class ModMoiModel:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             return False
+        finally:
+            if cursor:
+                cursor.close()
 
     def obtener_por_id(self, id_registro):
         """Obtiene un registro específico de modymoi desde Supabase mapeando las columnas exactas."""
-        cursor = self.conexion_db.cursor()
+        cursor = None
         try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
+            cursor = self.conexion_db.cursor()
             cursor.execute(
                 """
                 SELECT id, calificacion_mano_obra, operario, "Horario", "Sector", "Planta", semana 
@@ -336,11 +368,10 @@ class ModMoiModel:
             row = cursor.fetchone()
             if not row:
                 return None
-            
-            # Devuelve un diccionario explícito para que el JS no falle
+
             if isinstance(row, dict):
                 return row
-            
+
             return {
                 "id": row[0],
                 "calificacion_mano_obra": row[1],
@@ -351,8 +382,14 @@ class ModMoiModel:
                 "semana": row[6]
             }
         except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
             print(f"Error al obtener registro por ID en Supabase: {e}")
             return None
+        finally:
+            if cursor:
+                cursor.close()
+
     def cerrar_conexion(self):
         if hasattr(self, 'conexion_db') and self.conexion_db:
             try:
