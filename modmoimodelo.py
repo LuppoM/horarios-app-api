@@ -293,7 +293,7 @@ class ModMoiModel:
                 cursor.close()
 
     def contar_mano_de_obra(self, vista="Semana", semana_actual=None):
-        """Cuenta los registros de MOD y MOI en la tabla modymoi sin fallos de casteo o ceros fijos."""
+        """Cuenta la totalidad de MOD y MOI registrados en modymoi para ambas plantas."""
         cursor = None
         try:
             if hasattr(self.conexion_db, 'rollback'):
@@ -301,6 +301,7 @@ class ModMoiModel:
 
             cursor = self.conexion_db.cursor()
 
+            # Cuenta directamente sobre la tabla principal 'modymoi' ignorando mayúsculas/minúsculas y espacios
             cursor.execute(
                 """
                 SELECT 
