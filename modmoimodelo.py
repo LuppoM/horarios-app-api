@@ -267,17 +267,20 @@ class ModMoiModel:
             return False
         
     def contar_mano_de_obra(self, vista="Semana", semana_actual=None):
-        cursor = self.conexion_db.cursor()
+        cursor = None
         try:
-            # Si venía de una transacción fallida previa, reseteamos el estado
+            # Reseteamos estado si venía de una transacción previa con error
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
+            cursor = self.conexion_db.cursor()
+            
+            # Usamos TRIM y UPPER para que ignore espacios extra o diferencias entre mayúsculas/minúsculas
             cursor.execute(
                 """
                 SELECT 
-                    COUNT(CASE WHEN calificacion_mano_obra = 'MOD' THEN 1 END),
-                    COUNT(CASE WHEN calificacion_mano_obra = 'MOI' THEN 1 END)
+                    COUNT(CASE WHEN UPPER(TRIM(calificacion_mano_obra)) = 'MOD' THEN 1 END),
+                    COUNT(CASE WHEN UPPER(TRIM(calificacion_mano_obra)) = 'MOI' THEN 1 END)
                 FROM modymoi
                 """
             )
@@ -285,11 +288,16 @@ class ModMoiModel:
             if res:
                 return (res[0] or 0, res[1] or 0)
             return (0, 0)
+
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error contando mano de obra en Supabase: {e}")
             return (0, 0)
+
+    finally:
+        if cursor:
+            cursor.close()
 
     def eliminar_registro(self, id_registro):
         """Elimina un registro de modymoi por su ID en Supabase."""
