@@ -139,10 +139,9 @@ def vista_dtprogramada(request: Request):
 def api_obtener_modmoi(
     vista: str = "Semana", columna: str = None, filtro: str = None
 ):
-    # Instanciamos la clase del modelo para abrir/gestionar la conexión
     modelo = ModMoiModel()
     try:
-        # 1. Traer filas según la vista seleccionada
+        # Traer los datos según la vista
         if vista == "Mecanicos":
             columnas, datos = modelo.obtener_datos_mecanicos(columna, filtro)
         elif vista == "Fin de Semana":
@@ -150,10 +149,9 @@ def api_obtener_modmoi(
         else:
             columnas, datos = modelo.obtener_datos(columna, filtro)
 
-        # 2. El mozo pide el conteo al modelo pasando la vista seleccionada
+        # Contar MOD y MOI especificando la vista seleccionada por el usuario
         mod_count, moi_count = modelo.contar_mano_de_obra(vista=vista)
 
-        # 3. Retornar en la bandeja (JSON) los datos y los contadores MOD / MOI
         return {
             "columnas": columnas,
             "datos": datos,
@@ -164,7 +162,6 @@ def api_obtener_modmoi(
         print(f"Error en /api/modmoi/datos: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # Cerramos la conexión correctamente al terminar de atender la mesa
         modelo.cerrar_conexion()
 
 

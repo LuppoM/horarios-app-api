@@ -293,7 +293,7 @@ class ModMoiModel:
                 cursor.close()
 
     def contar_mano_de_obra(self, vista="Semana", semana_actual=None):
-        """Cuenta la totalidad de MOD y MOI registrados en modymoi para ambas plantas."""
+        """Cuenta MOD y MOI dinámicamente según la vista seleccionada (Semana, Mecanicos o Fin de Semana)."""
         cursor = None
         try:
             if hasattr(self.conexion_db, 'rollback'):
@@ -301,16 +301,36 @@ class ModMoiModel:
 
             cursor = self.conexion_db.cursor()
 
-            # Cuenta directamente sobre la tabla principal 'modymoi' ignorando mayúsculas/minúsculas y espacios
-            cursor.execute(
+            # 1. Definimos la consulta según la vista activa
+            if vista == "Mecanicos":
+                # En mecánicos todos cuentan como MOI (Indirecta)
+                query = """
+                    SELECT 
+                        0 AS mod_count,
+                        COUNT(*) AS moi_count
+                    FROM mecanicos;
                 """
-                SELECT 
-                    COUNT(CASE WHEN UPPER(TRIM(COALESCE(calificacion_mano_obra::text, ''))) = 'MOD' THEN 1 END),
-                    COUNT(CASE WHEN UPPER(TRIM(COALESCE(calificacion_mano_obra::text, ''))) = 'MOI' THEN 1 END)
-                FROM modymoi;
+            elif vista == "Fin de Semana":
+                # Se cruza modymoi_finde con modymoi para obtener la calificación
+                query = """
+                    SELECT 
+                        COUNT(CASE WHEN UPPER(TRIM(COALESCE(m.calificacion_mano_obra::text, ''))) = 'MOD' THEN 1 END),
+                        COUNT(CASE WHEN UPPER(TRIM(COALESCE(m.calificacion_mano_obra::text, ''))) = 'MOI' THEN 1 END)
+                    FROM modymoi_finde f
+                    INNER JOIN modymoi m ON f.id_operario = m.id;
                 """
-            )
+            else:
+                # Vista "Semana" (Tabla general modymoi)
+                query = """
+                    SELECT 
+                        COUNT(CASE WHEN UPPER(TRIM(COALESCE(calificacion_mano_obra::text, ''))) = 'MOD' THEN 1 END),
+                        COUNT(CASE WHEN UPPER(TRIM(COALESCE(calificacion_mano_obra::text, ''))) = 'MOI' THEN 1 END)
+                    FROM modymoi;
+                """
+
+            cursor.execute(query)
             res = cursor.fetchone()
+
             if res:
                 return (int(res[0] or 0), int(res[1] or 0))
             return (0, 0)
@@ -318,7 +338,7 @@ class ModMoiModel:
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
-            print(f"Error contando mano de obra en Supabase: {e}")
+            print(f"Error contando mano de obra en Supabase ({vista}): {e}")
             return (0, 0)
         finally:
             if cursor:
