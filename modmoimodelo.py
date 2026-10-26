@@ -295,9 +295,9 @@ class ModMoiModel:
             print(f"Error contando mano de obra en Supabase: {e}")
             return (0, 0)
 
-    finally:
-        if cursor:
-            cursor.close()
+        finally:
+            if cursor:
+                cursor.close()
 
     def eliminar_registro(self, id_registro):
         """Elimina un registro de modymoi por su ID en Supabase."""
