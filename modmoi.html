@@ -102,50 +102,78 @@
     let idRegistroActual = null;
 
     async function cargarDatos() {
-        const vista = document.getElementById('comboVista').value;
-        const comboCol = document.getElementById('comboColumnas');
-        const columna = comboCol.value || '';
-        const filtro = document.getElementById('inputFiltro').value.trim();
+    const vista = document.getElementById('comboVista').value;
+    const comboCol = document.getElementById('comboColumnas');
+    const columna = comboCol.value || '';
+    const filtro = document.getElementById('inputFiltro').value.trim();
 
-        const url = `/api/modmoi/datos?vista=${encodeURIComponent(vista)}&columna=${encodeURIComponent(columna)}&filtro=${encodeURIComponent(filtro)}`;
+    const url = `/api/modmoi/datos?vista=${encodeURIComponent(vista)}&columna=${encodeURIComponent(columna)}&filtro=${encodeURIComponent(filtro)}`;
 
-        try {
-            const response = await fetch(url);
-            const data = await response.json();
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
 
-            columnasOriginales = data.columnas || [];
-            datosOriginales = data.datos || [];
+        columnasOriginales = data.columnas || [];
+        datosOriginales = data.datos || [];
 
-            document.getElementById('contadorLabel').innerText = `MOD (Directa): ${data.mod || 0}   |   MOI (Indirecta): ${data.moi || 0}`;
+        // --- CONTEO DIRECTO EN EL CLIENTE DESDE LOS DATOS RECIBIDOS ---
+        let cantMod = 0;
+        let cantMoi = 0;
 
-            // Reconstruir siempre las columnas según la vista seleccionada
-            const colSel = comboCol.value;
-            comboCol.innerHTML = '<option value="">-- Todas las columnas --</option>';
-            columnasOriginales.forEach(col => {
-                const opt = document.createElement('option');
-                opt.value = col;
-                opt.innerText = col;
-                if (col === colSel) opt.selected = true;
-                comboCol.appendChild(opt);
+        if (vista === 'Mecanicos') {
+            // En la vista de mecánicos, todos los registros se consideran MOI
+            cantMoi = datosOriginales.length;
+        } else {
+            // Buscamos el índice de la columna calificacion_mano_obra
+            const idxCalificacion = columnasOriginales.indexOf("calificacion_mano_obra");
+
+            datosOriginales.forEach(fila => {
+                let valor = "";
+                if (idxCalificacion !== -1) {
+                    valor = String(fila[idxCalificacion] || "").trim().toUpperCase();
+                } else {
+                    // Si no está la columna por nombre, usamos la segunda posición (índice 1) por defecto
+                    valor = String(fila[1] || "").trim().toUpperCase();
+                }
+
+                if (valor === 'MOD') {
+                    cantMod++;
+                } else if (valor === 'MOI') {
+                    cantMoi++;
+                }
             });
-
-            // Generar Encabezados
-            document.getElementById('tablaEncabezados').innerHTML = columnasOriginales.map(c => `<th>${c}</th>`).join('');
-
-            // Generar Filas
-            document.getElementById('tablaCuerpo').innerHTML = datosOriginales.map((fila, idx) => {
-                return `<tr onclick="seleccionarFila(${idx}, this)">
-                    ${fila.map(val => `<td>${val !== null ? val : ''}</td>`).join('')}
-                </tr>`;
-            }).join('');
-
-            filaSeleccionadaIdx = null;
-
-        } catch (err) {
-            console.error("Error cargando datos:", err);
         }
-    }
 
+        // Actualizamos la etiqueta con el conteo calculado localmente
+        document.getElementById('contadorLabel').innerText = `MOD (Directa): ${cantMod}   |   MOI (Indirecta): ${cantMoi}`;
+
+        // --- RECONSTRUCCIÓN DE COLUMNAS Y TABLA ---
+        const colSel = comboCol.value;
+        comboCol.innerHTML = '<option value="">-- Todas las columnas --</option>';
+        columnasOriginales.forEach(col => {
+            const opt = document.createElement('option');
+            opt.value = col;
+            opt.innerText = col;
+            if (col === colSel) opt.selected = true;
+            comboCol.appendChild(opt);
+        });
+
+        // Generar Encabezados
+        document.getElementById('tablaEncabezados').innerHTML = columnasOriginales.map(c => `<th>${c}</th>`).join('');
+
+        // Generar Filas
+        document.getElementById('tablaCuerpo').innerHTML = datosOriginales.map((fila, idx) => {
+            return `<tr onclick="seleccionarFila(${idx}, this)">
+                ${fila.map(val => `<td>${val !== null ? val : ''}</td>`).join('')}
+            </tr>`;
+        }).join('');
+
+        filaSeleccionadaIdx = null;
+
+    } catch (err) {
+        console.error("Error cargando datos:", err);
+    }
+}
     function seleccionarFila(idx, elem) {
         document.querySelectorAll('#tablaCuerpo tr').forEach(tr => tr.classList.remove('selected'));
         elem.classList.add('selected');
