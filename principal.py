@@ -906,7 +906,7 @@ def api_exportar_pdf_hchoco(semana: Optional[str] = None):
             pagesize=A4,
             rightMargin=30,
             leftMargin=30,
-            topMargin=30,
+            topMargin=0,
             bottomMargin=30,
         )
         elements = []
