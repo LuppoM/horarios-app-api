@@ -102,65 +102,132 @@
     }
 
     function renderizarUI() {
-        const grid = document.getElementById('gridContenedor');
-        grid.innerHTML = "";
+    const grid = document.getElementById('gridContenedor');
+    grid.innerHTML = "";
 
-        if (!datosGlobales.sectores) return;
+    if (!datosGlobales.sectores) return;
 
-        datosGlobales.sectores.forEach(secObj => {
-            const sector = secObj.sector;
-            const tipoHorario = (secObj.tipo_horario || "ROTATIVO").trim().toUpperCase();
-            const esEspecial = (tipoHorario === "CENTRAL");
-            const requiereDotacion = parseInt(secObj.requiere_dotacion) === 1;
-            const esLibre = (requiereDotacion === false || secObj.requiere_dotacion == 0);
+    datosGlobales.sectores.forEach(secObj => {
+        const sector = secObj.sector;
+        const tipoHorario = (secObj.tipo_horario || "ROTATIVO").trim().toUpperCase();
+        const esEspecial = (tipoHorario === "CENTRAL");
+        const requiereDotacion = parseInt(secObj.requiere_dotacion) === 1;
+        const esLibre = (requiereDotacion === false || secObj.requiere_dotacion == 0);
 
-            const card = document.createElement('div');
-            card.className = "sector-card";
-            card.innerHTML = `<h3>${sector}</h3>`;
+        const card = document.createElement('div');
+        card.className = "sector-card";
+        card.innerHTML = `<h3>${sector}</h3>`;
 
-            secObj.turnos.forEach(turno => {
-                const rawCant = (datosGlobales.dotacion_teorica[sector] && datosGlobales.dotacion_teorica[sector][turno]) || 0;
-                const cantTeorica = parseInt(rawCant) || 0;
+        secObj.turnos.forEach(turno => {
+            const rawCant = (datosGlobales.dotacion_teorica[sector] && datosGlobales.dotacion_teorica[sector][turno]) || 0;
+            const cantTeorica = parseInt(rawCant) || 0;
 
-                let limite = (esEspecial || esLibre) ? 999999 : cantTeorica;
-                
-                // OPCIONAL: Si querés que el supervisor PUEDA agregar gente aunque la programación vino en 0, 
-                // podés forzar deshabilitarBoton en false. Si no, lo dejás con tu regla habitual:
-                const deshabilitarBoton = (!esEspecial && !esLibre && cantTeorica <= 0);
+            // Contar cuántos operarios asignados hay guardados actualmente
+            const asignadosEnTurno = (datosGlobales.asignados || []).filter(
+                ([id, op, t, s]) => s === sector && t === turno
+            ).length;
 
-                const turnoBox = document.createElement('div');
-                turnoBox.className = "turno-box";
-                turnoBox.id = `box_${sector}_${turno}`;
-                
-                let etiquetaTexto = esEspecial ? `Horario: ${turno}` : (esLibre ? `Turno: ${turno}` : `Turno: ${turno} | Dotación programada: ${cantTeorica}`);
+            // Tomar el máximo entre la programación y los cargados reales
+            const cantTeoricaEfectiva = Math.max(cantTeorica, asignadosEnTurno);
 
-                turnoBox.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h4>${etiquetaTexto}</h4>
-                        <button class="btn-accion" id="btn_${sector}_${turno}" style="font-size: 8pt; padding: 2px 6px; ${deshabilitarBoton ? 'background-color: #e0e0e0; color: #888; cursor: not-allowed;' : ''}" 
-                            onclick="intentarAgregarFila('${sector}', '${turno}', ${limite}, ${deshabilitarBoton})">
+            let limite = (esEspecial || esLibre) ? 999999 : (cantTeoricaEfectiva > 0 ? cantTeoricaEfectiva : 999999);
+            
+            // Permitir siempre interacción sin bloquear el botón por programación en 0
+            const deshabilitarBoton = false;
+
+            const turnoBox = document.createElement('div');
+            turnoBox.className = "turno-box";
+            turnoBox.id = `box_${sector}_${turno}`;
+            
+            let etiquetaTexto = esEspecial ? `Horario: ${turno}` : (esLibre ? `Turno: ${turno}` : `Turno: ${turno} | Dotación programada: ${cantTeoricaEfectiva}`);
+
+            turnoBox.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4>${etiquetaTexto}</h4>
+                    <div>
+                        <button class="btn-accion" style="font-size: 8pt; padding: 2px 6px; margin-right: 4px; background-color: #f0ad4e; color: white; border: none; border-radius: 3px; cursor: pointer;" 
+                            onclick="moverOperariosDeTurno('${sector}', '${turno}')">
+                            ⇄ Mover grupo
+                        </button>
+                        <button class="btn-accion" id="btn_${sector}_${turno}" style="font-size: 8pt; padding: 2px 6px;" 
+                            onclick="intentarAgregarFila('${sector}', '${turno}', ${limite}, false)">
                             + Agregar operario
                         </button>
                     </div>
-                    <div class="filas-container" id="filas_${sector}_${turno}"></div>
-                `;
-                card.appendChild(turnoBox);
-            });
-
-            grid.appendChild(card);
+                </div>
+                <div class="filas-container" id="filas_${sector}_${turno}"></div>
+            `;
+            card.appendChild(turnoBox);
         });
 
-        // Re-inyectar las filas de operarios preservadas
-        if (datosGlobales.asignados) {
-            datosGlobales.asignados.forEach(([id_val, operario, horario, sector]) => {
-                if (sector && horario) {
-                    agregarFila(sector, horario, id_val, operario);
+        grid.appendChild(card);
+    });
+
+    // Re-inyectar las filas de operarios preservadas
+    if (datosGlobales.asignados) {
+        datosGlobales.asignados.forEach(([id_val, operario, horario, sector]) => {
+            if (sector && horario) {
+                agregarFila(sector, horario, id_val, operario);
+            }
+        });
+    }
+
+    actualizarOpcionesSelects();
+}
+    function moverOperariosDeTurno(sector, turnoOrigen) {
+            const containerOrigen = document.getElementById(`filas_${sector}_${turnoOrigen}`);
+            if (!containerOrigen) return;
+
+            const filasOrigen = containerOrigen.querySelectorAll('.fila-operario');
+            if (filasOrigen.length === 0) {
+                alert("No hay operarios en este turno para mover.");
+                return;
+            }
+
+            const turnosPosibles = [];
+            document.querySelectorAll('#gridContenedor .sector-card').forEach(card => {
+                if (card.querySelector('h3').textContent.trim() === sector) {
+                    card.querySelectorAll('.turno-box').forEach(box => {
+                        const idBox = box.id;
+                        const turnoNombre = idBox.replace(`box_${sector}_`, '');
+                        if (turnoNombre !== turnoOrigen) {
+                            turnosPosibles.push(turnoNombre);
+                        }
+                    });
                 }
             });
-        }
 
-        actualizarOpcionesSelects();
-    }
+            if (turnosPosibles.length === 0) return;
+
+            let mensaje = `Seleccione el turno destino para mover los ${filasOrigen.length} operarios:\n\n`;
+            turnosPosibles.forEach((t, index) => {
+                mensaje += `${index + 1}. ${t}\n`;
+            });
+
+            const opcion = prompt(mensaje, "1");
+            if (!opcion) return;
+
+            const idxSeleccionado = parseInt(opcion) - 1;
+            if (isNaN(idxSeleccionado) || idxSeleccionado < 0 || idxSeleccionado >= turnosPosibles.length) {
+                alert("Opción no válida.");
+                return;
+            }
+
+            const turnoDestino = turnosPosibles[idxSeleccionado];
+
+            filasOrigen.forEach(fila => {
+                const inputId = fila.querySelector('input')?.value || "";
+                const select = fila.querySelector('select');
+                const nombreOp = select ? (select.value || select.getAttribute('data-operario-inicial') || "") : "";
+
+                if (nombreOp) {
+                    agregarFila(sector, turnoDestino, inputId, nombreOp);
+                }
+            });
+
+            containerOrigen.innerHTML = "";
+            actualizarOpcionesSelects();
+        }
 
     function intentarAgregarFila(sector, turno, limite, deshabilitarBoton) {
         if (deshabilitarBoton) {
