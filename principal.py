@@ -775,12 +775,14 @@ def api_exportar_pdf_dtprogramada(planta: Optional[str] = "ambas", semana: Optio
 @app.get("/api/hchoco/datos")
 def api_obtener_hchoco(semana: Optional[str] = None):
     modelo = ModeloHChocoWeb()
-    modelo_base = modeloprincipal()
     try:
         if not semana or semana.lower() == "none" or semana.strip() == "":
-            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
-
-        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+            modelo_base = modeloprincipal()
+            try:
+                semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+            finally:
+                if hasattr(modelo_base, "cerrar_conexion"):
+                    modelo_base.cerrar_conexion()
 
         sectores = modelo.obtener_sectores_chocolates()
         dotacion_teorica = modelo.obtener_dotacion_teorica(semana)
@@ -788,7 +790,9 @@ def api_obtener_hchoco(semana: Optional[str] = None):
         operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
         todos_operarios = modelo.obtener_operarios()
 
+        cache_turnos = {}
         sectores_info = []
+
         for row in sectores:
             if isinstance(row, dict):
                 sec = row.get("nombre_sector") or row.get("sector")
@@ -798,15 +802,22 @@ def api_obtener_hchoco(semana: Optional[str] = None):
                 sec, tipo, req = row[0], row[1], row[2]
 
             t_horario = str(tipo).strip().upper() if tipo else "ROTATIVO"
-            turnos = modelo.obtener_turnos_por_tipo(t_horario)
-            if not turnos:
-                turnos = ["08:00 a 16:00"] if t_horario == "CENTRAL" else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+
+            if t_horario not in cache_turnos:
+                turnos = modelo.obtener_turnos_por_tipo(t_horario)
+                if not turnos:
+                    turnos = (
+                        ["08:00 a 16:00"]
+                        if t_horario == "CENTRAL"
+                        else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+                    )
+                cache_turnos[t_horario] = turnos
 
             sectores_info.append({
                 "sector": sec,
                 "tipo_horario": t_horario,
                 "requiere_dotacion": req,
-                "turnos": turnos
+                "turnos": cache_turnos[t_horario],
             })
 
         return {
@@ -815,15 +826,13 @@ def api_obtener_hchoco(semana: Optional[str] = None):
             "dotacion_teorica": dotacion_teorica,
             "asignados": datos_guardados,
             "operarios": todos_operarios,
-            "operarios_disponibles": operarios_disponibles
+            "operarios_disponibles": operarios_disponibles,
         }
     except Exception as e:
         print(f"Error en endpoint /api/hchoco/datos: {e}")
         return {"error": str(e)}
     finally:
         modelo.cerrar_conexion()
-        if hasattr(modelo_base, 'cerrar_conexion'):
-            modelo_base.cerrar_conexion()
 
 
 @app.post("/api/hchoco/guardar")
@@ -840,7 +849,6 @@ def api_guardar_hchoco(payload: dict = Body(...)):
         return {"status": "error", "mensaje": str(e)}
     finally:
         modelo.cerrar_conexion()
-
 
 @app.get("/api/hchoco/finde/datos")
 def api_obtener_hchoco_finde(semana: Optional[str] = None):
@@ -1030,12 +1038,14 @@ def api_exportar_pdf_hchoco(semana: Optional[str] = None):
 @app.get("/api/hgolo/datos")
 def api_obtener_hgolo(semana: Optional[str] = None):
     modelo = ModeloHGoloWeb()
-    modelo_base = modeloprincipal()
     try:
         if not semana or semana.lower() == "none" or semana.strip() == "":
-            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
-
-        modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana)
+            modelo_base = modeloprincipal()
+            try:
+                semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+            finally:
+                if hasattr(modelo_base, "cerrar_conexion"):
+                    modelo_base.cerrar_conexion()
 
         sectores = modelo.obtener_sectores_golosinas()
         dotacion_teorica = modelo.obtener_dotacion_teorica(semana)
@@ -1043,7 +1053,9 @@ def api_obtener_hgolo(semana: Optional[str] = None):
         operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
         todos_operarios = modelo.obtener_operarios()
 
+        cache_turnos = {}
         sectores_info = []
+
         for row in sectores:
             if isinstance(row, dict):
                 sec = row.get("nombre_sector") or row.get("sector")
@@ -1053,15 +1065,22 @@ def api_obtener_hgolo(semana: Optional[str] = None):
                 sec, tipo, req = row[0], row[1], row[2]
 
             t_horario = str(tipo).strip().upper() if tipo else "ROTATIVO"
-            turnos = modelo.obtener_turnos_por_tipo(t_horario)
-            if not turnos:
-                turnos = ["08:00 a 16:00"] if t_horario == "CENTRAL" else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+
+            if t_horario not in cache_turnos:
+                turnos = modelo.obtener_turnos_por_tipo(t_horario)
+                if not turnos:
+                    turnos = (
+                        ["08:00 a 16:00"]
+                        if t_horario == "CENTRAL"
+                        else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+                    )
+                cache_turnos[t_horario] = turnos
 
             sectores_info.append({
                 "sector": sec,
                 "tipo_horario": t_horario,
                 "requiere_dotacion": req,
-                "turnos": turnos
+                "turnos": cache_turnos[t_horario],
             })
 
         return {
@@ -1070,15 +1089,13 @@ def api_obtener_hgolo(semana: Optional[str] = None):
             "dotacion_teorica": dotacion_teorica,
             "asignados": datos_guardados,
             "operarios": todos_operarios,
-            "operarios_disponibles": operarios_disponibles
+            "operarios_disponibles": operarios_disponibles,
         }
     except Exception as e:
         print(f"Error en endpoint /api/hgolo/datos: {e}")
         return {"error": str(e)}
     finally:
         modelo.cerrar_conexion()
-        if hasattr(modelo_base, 'cerrar_conexion'):
-            modelo_base.cerrar_conexion()
 
 
 @app.post("/api/hgolo/guardar")

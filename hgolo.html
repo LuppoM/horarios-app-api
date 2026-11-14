@@ -119,27 +119,20 @@
         card.innerHTML = `<h3>${sector}</h3>`;
 
         secObj.turnos.forEach(turno => {
+            // Se mantiene EXACTAMENTE la dotación teórica original de la base de datos sin alterar
             const rawCant = (datosGlobales.dotacion_teorica[sector] && datosGlobales.dotacion_teorica[sector][turno]) || 0;
             const cantTeorica = parseInt(rawCant) || 0;
 
-            // Contar cuántos operarios asignados hay guardados actualmente
-            const asignadosEnTurno = (datosGlobales.asignados || []).filter(
-                ([id, op, t, s]) => s === sector && t === turno
-            ).length;
-
-            // Tomar el máximo entre la programación y los cargados reales
-            const cantTeoricaEfectiva = Math.max(cantTeorica, asignadosEnTurno);
-
-            let limite = (esEspecial || esLibre) ? 999999 : (cantTeoricaEfectiva > 0 ? cantTeoricaEfectiva : 999999);
-            
-            // Permitir siempre interacción sin bloquear el botón por programación en 0
+            // Se libera el límite visual para no restringir la carga al supervisor
+            let limite = (esEspecial || esLibre) ? 999999 : 999999;
             const deshabilitarBoton = false;
 
             const turnoBox = document.createElement('div');
             turnoBox.className = "turno-box";
             turnoBox.id = `box_${sector}_${turno}`;
             
-            let etiquetaTexto = esEspecial ? `Horario: ${turno}` : (esLibre ? `Turno: ${turno}` : `Turno: ${turno} | Dotación programada: ${cantTeoricaEfectiva}`);
+            // Muestra siempre la cantTeorica real de la programación (ej: 0)
+            let etiquetaTexto = esEspecial ? `Horario: ${turno}` : (esLibre ? `Turno: ${turno}` : `Turno: ${turno} | Dotación programada: ${cantTeorica}`);
 
             turnoBox.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -174,6 +167,7 @@
 
     actualizarOpcionesSelects();
 }
+
     function moverOperariosDeTurno(sector, turnoOrigen) {
             const containerOrigen = document.getElementById(`filas_${sector}_${turnoOrigen}`);
             if (!containerOrigen) return;
