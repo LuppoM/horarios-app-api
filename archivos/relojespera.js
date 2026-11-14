@@ -41,6 +41,19 @@
     let overlay = null;
     let peticionesActivas = 0;
     let esDescargaArchivo = false;
+    let timerSeguridadUnload = null;
+
+    const PALABRAS_DESCARGA = [
+        "pdf",
+        "exportar",
+        "consolidado",
+        "descargar",
+        "download",
+        "excel",
+        "csv",
+        "reporte",
+        "imprimir"
+    ];
 
     function asegurarOverlay() {
         if (overlay) return overlay;
@@ -63,27 +76,31 @@
     };
 
     window.ocultarRelojito = function () {
+        if (timerSeguridadUnload) {
+            clearTimeout(timerSeguridadUnload);
+            timerSeguridadUnload = null;
+        }
         if (!overlay) return;
         overlay.classList.remove("activo");
         document.body.style.cursor = "default";
     };
 
-    // 2. Detectar clics en botones/enlaces de exportación para no dejar el cartel trabado
+    // 2. Detectar clics en cualquier botón/enlace de descarga (PDF, Consolidado, etc.)
     document.addEventListener("click", function (e) {
-        const target = e.target.closest("button, a");
+        const target = e.target.closest("button, a, input[type='button'], input[type='submit']");
         if (!target) return;
-        const texto = (target.textContent || "").toLowerCase();
-        const onclickAttr = (target.getAttribute("onclick") || "").toLowerCase();
-        const hrefAttr = (target.getAttribute("href") || "").toLowerCase();
 
-        if (
-            texto.includes("pdf") ||
-            texto.includes("exportar") ||
-            onclickAttr.includes("pdf") ||
-            hrefAttr.includes("pdf")
-        ) {
+        const firma = [
+            target.textContent || "",
+            target.value || "",
+            target.id || "",
+            target.getAttribute("onclick") || "",
+            target.getAttribute("href") || ""
+        ].join(" ").toLowerCase();
+
+        if (PALABRAS_DESCARGA.some(palabra => firma.includes(palabra))) {
             esDescargaArchivo = true;
-            setTimeout(() => { esDescargaArchivo = false; }, 3000);
+            setTimeout(() => { esDescargaArchivo = false; }, 4000);
         }
     }, true);
 
@@ -92,10 +109,13 @@
     window.fetch = async function (...args) {
         peticionesActivas++;
         if (peticionesActivas === 1) {
-            const url = typeof args[0] === "string" ? args[0] : "";
-            const msg = url.includes("guardar")
-                ? "Guardando cambios..."
-                : "Cargando datos...";
+            const url = typeof args[0] === "string" ? args[0].toLowerCase() : "";
+            let msg = "Cargando datos...";
+            if (url.includes("guardar")) {
+                msg = "Guardando cambios...";
+            } else if (PALABRAS_DESCARGA.some(p => url.includes(p))) {
+                msg = "Generando archivo...";
+            }
             window.mostrarRelojito(msg);
         }
 
@@ -109,10 +129,17 @@
         }
     };
 
-    // 4. Mostrar relojito al navegar, excepto si es descarga de PDF
+    // 4. Mostrar relojito al navegar, con corte automático si la página no cambia (descarga directa)
     window.addEventListener("beforeunload", function () {
         if (esDescargaArchivo) return;
         window.mostrarRelojito("Abriendo pantalla...");
+
+        if (timerSeguridadUnload) clearTimeout(timerSeguridadUnload);
+        timerSeguridadUnload = setTimeout(() => {
+            if (peticionesActivas === 0) {
+                window.ocultarRelojito();
+            }
+        }, 2500);
     });
 
     // 5. Limpiar el overlay si el usuario vuelve atrás en el navegador (bfcache)
