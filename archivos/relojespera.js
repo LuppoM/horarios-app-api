@@ -38,9 +38,9 @@
     `;
     document.head.appendChild(style);
 
-    // 2. Crear el contenedor HTML en el body cuando esté listo
     let overlay = null;
     let peticionesActivas = 0;
+    let esDescargaArchivo = false;
 
     function asegurarOverlay() {
         if (overlay) return overlay;
@@ -68,6 +68,25 @@
         document.body.style.cursor = "default";
     };
 
+    // 2. Detectar clics en botones/enlaces de exportación para no dejar el cartel trabado
+    document.addEventListener("click", function (e) {
+        const target = e.target.closest("button, a");
+        if (!target) return;
+        const texto = (target.textContent || "").toLowerCase();
+        const onclickAttr = (target.getAttribute("onclick") || "").toLowerCase();
+        const hrefAttr = (target.getAttribute("href") || "").toLowerCase();
+
+        if (
+            texto.includes("pdf") ||
+            texto.includes("exportar") ||
+            onclickAttr.includes("pdf") ||
+            hrefAttr.includes("pdf")
+        ) {
+            esDescargaArchivo = true;
+            setTimeout(() => { esDescargaArchivo = false; }, 3000);
+        }
+    }, true);
+
     // 3. Interceptar TODOS los fetch() de la aplicación automáticamente
     const fetchOriginal = window.fetch;
     window.fetch = async function (...args) {
@@ -90,8 +109,16 @@
         }
     };
 
-    // 4. Mostrar relojito también al cambiar de página (Cerrar / Alistamiento / Menú)
+    // 4. Mostrar relojito al navegar, excepto si es descarga de PDF
     window.addEventListener("beforeunload", function () {
+        if (esDescargaArchivo) return;
         window.mostrarRelojito("Abriendo pantalla...");
+    });
+
+    // 5. Limpiar el overlay si el usuario vuelve atrás en el navegador (bfcache)
+    window.addEventListener("pageshow", function () {
+        if (peticionesActivas === 0) {
+            window.ocultarRelojito();
+        }
     });
 })();
