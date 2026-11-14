@@ -24,20 +24,37 @@ class ModeloHGolo(modeloprincipal):
         if conexion:
             self.conexion_db = conexion
         self.conexion = self.conexion_db
+
         self.operarios_dict = {}  # {id: nombre}
         self.operarios_asignados = {}  # {semana: set(IDs operarios)}
+        self._cache_modymoi = None
+        self._cache_turnos = None
 
-        self.cargar_operarios()
+    def _leer_modymoi_completo(self):
+        """Lee la tabla modymoi UNA sola vez por instancia para alimentar todos los métodos."""
+        if self._cache_modymoi is not None:
+            return self._cache_modymoi
+
+        cursor = self.conexion_db.cursor()
+        cursor.execute(
+            """
+            SELECT id, operario, "Horario", "Sector", "Planta", semana
+            FROM modymoi
+            ORDER BY operario ASC
+            """
+        )
+        filas = _filas(cursor)
+        self._cache_modymoi = filas
+        self.operarios_dict = {r[0]: r[1] for r in filas if r[1]}
+        return filas
 
     def cargar_operarios(self):
         """Carga todos los operarios desde la base de datos"""
-        cursor = self.conexion_db.cursor()
-        cursor.execute("SELECT id, operario FROM modymoi ORDER BY operario ASC")
-        rows = _filas(cursor)
-        self.operarios_dict = {row[0]: row[1] for row in rows if row[1]}
+        self._leer_modymoi_completo()
 
     def obtener_operarios(self):
         """Devuelve todos los operarios cargados"""
+        self._leer_modymoi_completo()
         return self.operarios_dict
 
     def obtener_sectores_golosinas(self):
@@ -58,19 +75,20 @@ class ModeloHGolo(modeloprincipal):
             return []
 
     def obtener_turnos_por_tipo(self, tipo_horario):
-        """Busca en la base de datos los turnos asociados al tipo de horario usando la tabla tipohorario"""
-        cursor = self.conexion_db.cursor()
-        try:
-            cursor.execute(
-                "SELECT horarios_definidos FROM tipohorario WHERE UPPER(TRIM(tipo)) = %s",
-                (str(tipo_horario).upper().strip(),),
-            )
-            row = _a_tupla(cursor.fetchone())
-            if row and row[0]:
-                return [t.strip() for t in row[0].split(",")]
-        except Exception as e:
-            print(f"Error al obtener turnos por tipo: {e}")
-        return []
+        """Busca en la base de datos los turnos asociados al tipo de horario (con caché en memoria)"""
+        if self._cache_turnos is None:
+            self._cache_turnos = {}
+            cursor = self.conexion_db.cursor()
+            try:
+                cursor.execute("SELECT tipo, horarios_definidos FROM tipohorario")
+                for row in _filas(cursor):
+                    if row[0] and row[1]:
+                        clave = str(row[0]).upper().strip()
+                        self._cache_turnos[clave] = [t.strip() for t in row[1].split(",")]
+            except Exception as e:
+                print(f"Error al obtener turnos por tipo: {e}")
+
+        return self._cache_turnos.get(str(tipo_horario).upper().strip(), [])
 
     def obtener_dotacion_teorica(self, semana):
         """Obtiene la dotación teórica por sector y horario para Golosinas"""
@@ -101,81 +119,55 @@ class ModeloHGolo(modeloprincipal):
 
     def obtener_operarios_asignados_en_otro_sector(self, semana):
         """Devuelve IDs de operarios que ya tienen sector asignado en una semana"""
-        if semana in self.operarios_asignados:
-            return self.operarios_asignados[semana]
+        sem_str = str(semana).strip()
+        if sem_str in self.operarios_asignados:
+            return self.operarios_asignados[sem_str]
 
-        cursor = self.conexion_db.cursor()
-        cursor.execute(
-            """
-            SELECT id
-            FROM modymoi
-            WHERE semana = %s AND operario != '' AND "Sector" != ''
-            """,
-            (str(semana),),
+        filas = self._leer_modymoi_completo()
+        asignados = set(
+            r[0]
+            for r in filas
+            if str(r[5] or "").strip() == sem_str
+            and (r[1] or "").strip() != ""
+            and (r[3] or "").strip() != ""
         )
-        asignados = set(row[0] for row in _filas(cursor))
-        self.operarios_asignados[semana] = asignados
+        self.operarios_asignados[sem_str] = asignados
         return asignados
 
     def obtener_operarios_disponibles(self, semana=None):
-            """Devuelve todos los operarios que no están asignados ni a un Sector ni a una Planta."""
-            try:
-                cursor = self.conexion_db.cursor()
-
-                # Reseteo preventivo de transacciones
-                if hasattr(self.conexion_db, 'rollback'):
-                    self.conexion_db.rollback()
-
-                if semana:
-                    self.eliminar_datos_semanas_anteriores(semana_actual=semana)
-
-                query = """
-                    SELECT id, operario
-                    FROM modymoi
-                    WHERE operario IS NOT NULL 
-                    AND TRIM(operario) != ''
-                    AND ("Sector" IS NULL OR TRIM("Sector") = '' OR LOWER(TRIM("Sector")) = 'null')
-                    AND ("Planta" IS NULL OR TRIM("Planta") = '' OR LOWER(TRIM("Planta")) = 'null')
-                    ORDER BY operario ASC
-                """
-                cursor.execute(query)
-
-                filas = cursor.fetchall()
-                
-                resultado = []
-                for f in filas:
-                    if isinstance(f, dict):
-                        resultado.append((f.get("id"), f.get("operario")))
-                    else:
-                        resultado.append((f[0], f[1]))
-
-                return resultado
-
-            except Exception as e:
-                if hasattr(self.conexion_db, 'rollback'):
-                    self.conexion_db.rollback()
-                print(f"Error al obtener operarios disponibles: {e}")
-                return []
+        """Devuelve todos los operarios que no están asignados ni a un Sector ni a una Planta (sin re-consultar BD)."""
+        try:
+            filas = self._leer_modymoi_completo()
+            resultado = []
+            for id_op, operario, _, sector, planta, _ in filas:
+                op_str = (operario or "").strip()
+                if not op_str:
+                    continue
+                sec_str = (sector or "").strip().lower()
+                pla_str = (planta or "").strip().lower()
+                if sec_str in ("", "null") and pla_str in ("", "null"):
+                    resultado.append((id_op, operario))
+            return resultado
+        except Exception as e:
+            print(f"Error al obtener operarios disponibles: {e}")
+            return []
 
     def obtener_datos_semana(self, semana):
-        """Ejecuta la limpieza previa y devuelve los operarios asignados a Golosinas"""
-        if semana:
-            self.eliminar_datos_semanas_anteriores(semana_actual=semana)
+        """Devuelve los operarios asignados a Golosinas para la semana dada (sin re-consultar BD)."""
+        sem_str = str(semana).strip()
+        filas = self._leer_modymoi_completo()
+        resultado = []
+        for id_op, operario, horario, sector, planta, sem_row in filas:
+            if (
+                str(sem_row or "").strip() == sem_str
+                and (planta or "").strip().lower() in ("golosinas", "golosina")
+                and (sector or "").strip() != ""
+            ):
+                resultado.append((id_op, operario, horario, sector))
+        return resultado
 
-        cursor = self.conexion_db.cursor()
-        cursor.execute(
-            """
-            SELECT id, operario, "Horario", "Sector"
-            FROM modymoi
-            WHERE semana = %s AND LOWER(TRIM("Planta")) IN ('golosinas', 'golosina')
-              AND "Sector" IS NOT NULL AND TRIM("Sector") != ''
-            """,
-            (str(semana),),
-        )
-        return _filas(cursor)
-
-    def guardar_operario(self, id_val, operario, horario, sector, semana):
-        """Realiza el UPDATE directo a las columnas "Horario", "Sector", "Planta" y semana"""
+    def guardar_operario(self, id_val, operario, horario, sector, semana, hacer_commit=True):
+        """Realiza el UPDATE directo a las columnas Horario, Sector, Planta y semana"""
         cursor = self.conexion_db.cursor()
         cursor.execute(
             """
@@ -185,13 +177,15 @@ class ModeloHGolo(modeloprincipal):
             """,
             (operario, horario, sector, str(semana), id_val),
         )
-        self.conexion_db.commit()
+        if hacer_commit:
+            self.conexion_db.commit()
 
         self.operarios_dict[id_val] = operario
+        self._cache_modymoi = None
         if semana in self.operarios_asignados:
             self.operarios_asignados[semana].add(id_val)
 
-    def limpiar_operario(self, id_val):
+    def limpiar_operario(self, id_val, hacer_commit=True):
         """Elimina la asignación de un operario blanqueando Horario, Sector y Planta"""
         cursor = self.conexion_db.cursor()
         cursor.execute(
@@ -202,17 +196,21 @@ class ModeloHGolo(modeloprincipal):
             """,
             (id_val,),
         )
-        self.conexion_db.commit()
+        if hacer_commit:
+            self.conexion_db.commit()
 
+        self._cache_modymoi = None
         for semana, asignados in self.operarios_asignados.items():
             asignados.discard(id_val)
 
     def guardar_datos_semana(self, semana, registros_pantalla):
-        """Guarda la grilla semanal reutilizando limpiar_operario y guardar_operario."""
+        """Guarda toda la grilla semanal en una única transacción (1 solo commit)."""
         cursor = self.conexion_db.cursor()
         sem_val = str(semana).strip()
 
-        # 1. Obtenemos los IDs de los operarios que estaban en Golosinas para esta semana en la BD
+        # Limpieza de semanas anteriores solo al guardar
+        self.eliminar_datos_semanas_anteriores(semana_actual=sem_val)
+
         cursor.execute(
             """
             SELECT id 
@@ -222,20 +220,16 @@ class ModeloHGolo(modeloprincipal):
             (sem_val,),
         )
         ids_previos_en_bd = set(row[0] for row in _filas(cursor))
-
-        # 2. Obtenemos los IDs presentes actualmente en la pantalla
         ids_actuales_en_pantalla = set(r[0] for r in registros_pantalla)
-
-        # 3. Calculamos quiénes fueron reemplazados o quitados
         ids_a_limpiar = ids_previos_en_bd - ids_actuales_en_pantalla
 
-        # 4. Reutilizamos limpiar_operario para los que ya no están
         for id_old in ids_a_limpiar:
-            self.limpiar_operario(id_old)
+            self.limpiar_operario(id_old, hacer_commit=False)
 
-        # 5. Reutilizamos guardar_operario para asignar los seleccionados
         for id_op, operario_nombre, turno, sector in registros_pantalla:
-            self.guardar_operario(id_op, operario_nombre, turno, sector, sem_val)
+            self.guardar_operario(id_op, operario_nombre, turno, sector, sem_val, hacer_commit=False)
+
+        self.conexion_db.commit()
 
 
 # Alias por retrocompatibilidad con importaciones previas en la API
