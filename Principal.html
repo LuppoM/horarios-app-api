@@ -44,27 +44,28 @@
                     <a href="/hchoco">Chocolates</a>
                     <a href="/hgolo">Golosinas</a>
                     <a href="/mecanicos">Mecanicos</a>
+                    <a href="/analistascalidad">Calidad</a>
+                    <a href="/depositomp">Depósito Materia Prima</a>
+                    <a href="/depositopt">Depósito Producto Terminado</a>
                 </div>
             </div>
 
             <!-- 2. BOTÓN FIJO -->
-            <a href="/modmoi" class="custom-button">CONSOLIDADO AMBAS PLANTAS</a>
+            <a href="/modmoi" class="custom-button">CONSOLIDADO</a>
 
-            <!-- 3. MENÚ DESPLEGABLE: DOTACIÓN PROGRAMADA CON NOTIFICACIÓN DE ESTADO -->
-            <!-- MENÚ DESPLEGABLE: DOTACIÓN PROGRAMADA -->
-        <div class="dropdown">
-            <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuDtProgramada')">
-                DOTACION PROGRAMADA <span id="badgeEstadoDt" class="badge-estado badge-pendiente">...</span> ▼
-            </button>
-            <div id="menuDtProgramada" class="dropdown-menu">
-                <!-- Pasamos el parámetro ?semana={{ semana_actual }} -->
-                <a href="/dtprogramada?semana={{ semana_actual }}">Cargar Dotación Programada</a>
-                <hr style="margin: 4px 0; border: 0; border-top: 1px solid #ccc;">
-                <a href="/generar_dt_pdf?planta=chocolates&semana={{ semana_actual }}">Generar PDF - Chocolates</a>
-                <a href="/generar_dt_pdf?planta=golosinas&semana={{ semana_actual }}">Generar PDF - Golosinas</a>
-                <a href="/generar_dt_pdf?planta=ambas&semana={{ semana_actual }}">Generar PDF - Ambas Plantas</a>
+            <!-- 3. MENÚ DESPLEGABLE: DOTACIÓN PROGRAMADA -->
+            <div class="dropdown">
+                <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuDtProgramada')">
+                    DOTACION PROGRAMADA <span id="badgeEstadoDt" class="badge-estado badge-pendiente">...</span> ▼
+                </button>
+                <div id="menuDtProgramada" class="dropdown-menu">
+                    <a href="/dtprogramada?semana={{ semana_actual }}">Cargar Dotación Programada</a>
+                    <hr style="margin: 4px 0; border: 0; border-top: 1px solid #ccc;">
+                    <a href="/generar_dt_pdf?planta=chocolates&semana={{ semana_actual }}">Generar PDF - Chocolates</a>
+                    <a href="/generar_dt_pdf?planta=golosinas&semana={{ semana_actual }}">Generar PDF - Golosinas</a>
+                    <a href="/generar_dt_pdf?planta=ambas&semana={{ semana_actual }}">Generar PDF - Ambas Plantas</a>
+                </div>
             </div>
-        </div>
 
             <!-- 4. MENÚ DESPLEGABLE: PARÁMETROS -->
             <div class="dropdown">
@@ -73,7 +74,6 @@
                     <a href="/sectores">Sectores</a>
                     <a href="/tipohorarios">Tipos de horario</a>
                     <a href="/abmusuarios">Usuarios y permisos</a>
-                    
                 </div>
             </div>
 
@@ -83,7 +83,11 @@
     </div>
 
     <script>
-        // Función para abrir / cerrar desplegables
+        const sesionRaw = sessionStorage.getItem('usuario_sesion');
+        if (!sesionRaw) {
+            window.location.replace('/login');
+        }
+
         function toggleDropdown(event, menuId) {
             event.stopPropagation();
             
@@ -98,21 +102,14 @@
                 menu.classList.toggle('show');
             }
         }
-            const sesionRaw = sessionStorage.getItem('usuario_sesion');
-            if (!sesionRaw) {
-                window.location.replace('/login');
-            }
-        // Cerrar menú al hacer click fuera
-        window.addEventListener('click', function() {
 
+        window.addEventListener('click', function() {
             document.querySelectorAll('.dropdown-menu').forEach(menu => {
                 menu.classList.remove('show');
             });
         });
 
-        // Consultar estado de Dotación Programada al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
-            // Naisukat ti URL tapno maipatulod ti dinamiko a semana {{ semana_actual }}
             fetch('/api/dtprogramada/datos?semana={{ semana_actual }}')
                 .then(res => res.json())
                 .then(data => {
@@ -135,11 +132,12 @@
                     if (badge) badge.style.display = 'none';
                 });
         });
+
         function cerrarSesion(e) {
-    if (e) e.preventDefault();
-    sessionStorage.removeItem('usuario_sesion');
-    window.location.replace('/login');
-}
+            if (e) e.preventDefault();
+            sessionStorage.removeItem('usuario_sesion');
+            window.location.replace('/login');
+        }
     </script>
 </body>
 </html>

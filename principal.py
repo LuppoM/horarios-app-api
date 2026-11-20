@@ -29,6 +29,9 @@ import tipohorariosmodelo as modelo_tipohorarios
 from pydantic import BaseModel
 from usuariosmodelo import verificar_requiere_clave, validar_usuario
 import abmusuariosmodelo
+from modelocalidad import ModeloAnalistasCalidadWeb
+from modelodepositomp import ModeloDepositoMPWeb
+from modelodepositopt import ModeloDepositoPTWeb
 
 
 modelo_dtprog = ModeloDTProgramadaWeb()
@@ -61,7 +64,24 @@ class UsuarioABMRequest(BaseModel):
     area: str
     requiere_contrasena: bool = False
     contrasena: Optional[str] = None
-
+def _armar_sectores_info_area(modelo, sectores_raw):
+    cache_turnos = {}
+    sectores_info = []
+    for row in sectores_raw:
+        sec, tipo, req = row[0], row[1], row[2]
+        t_horario = str(tipo).strip().upper() if tipo else "ROTATIVO"
+        if t_horario not in cache_turnos:
+            turnos = modelo.obtener_turnos_por_tipo(t_horario)
+            if not turnos:
+                turnos = ["08:00 a 16:00"] if t_horario == "CENTRAL" else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+            cache_turnos[t_horario] = turnos
+        sectores_info.append({
+            "sector": sec,
+            "tipo_horario": t_horario,
+            "requiere_dotacion": req,
+            "turnos": cache_turnos[t_horario],
+        })
+    return sectores_info
 # ==========================================
 # 1. VISTAS HTML PRINCIPALES (GENERAL)
 # ==========================================
@@ -150,6 +170,17 @@ def vista_login(request: Request):
 @app.get("/abmusuarios", response_class=HTMLResponse)
 def vista_abm_usuarios(request: Request):
     return templates.TemplateResponse("abmusuarios.html", {"request": request})
+@app.get("/analistascalidad", response_class=HTMLResponse)
+def vista_analistascalidad(request: Request):
+    return templates.TemplateResponse("calidad.html", {"request": request})
+
+@app.get("/depositomp", response_class=HTMLResponse)
+def vista_depositomp(request: Request):
+    return templates.TemplateResponse("depositomp.html", {"request": request})
+
+@app.get("/depositopt", response_class=HTMLResponse)
+def vista_depositopt(request: Request):
+    return templates.TemplateResponse("depositopt.html", {"request": request})
 
 
 # ==========================================
@@ -1405,3 +1436,110 @@ def api_eliminar_usuario(user_id: int):
         return {"ok": True, "message": "Usuario eliminado correctamente."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+# --- ANALISTAS DE CALIDAD ---
+@app.get("/api/analistascalidad/datos")
+def api_analistascalidad_datos(semana: Optional[str] = None):
+    modelo = ModeloAnalistasCalidadWeb()
+    modelo_base = modeloprincipal()
+    try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+
+        sectores = modelo.obtener_sectores_area()
+        return {
+            "semana": semana,
+            "sectores": _armar_sectores_info_area(modelo, sectores),
+            "asignados": modelo.obtener_asignaciones_semana(semana),
+            "operarios_disponibles": modelo.obtener_analistas_disponibles(),
+        }
+    finally:
+        modelo.cerrar_conexion()
+        if hasattr(modelo_base, "cerrar_conexion"):
+            modelo_base.cerrar_conexion()
+
+
+@app.post("/api/analistascalidad/guardar")
+def api_analistascalidad_guardar(payload: dict = Body(...)):
+    semana = payload.get("semana")
+    registros = payload.get("registros", [])
+    modelo = ModeloAnalistasCalidadWeb()
+    try:
+        modelo.guardar_asignaciones_analistas(semana, registros)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "mensaje": str(e)}
+    finally:
+        modelo.cerrar_conexion()
+
+
+# --- DEPÓSITO MP ---
+@app.get("/api/depositomp/datos")
+def api_depositomp_datos(semana: Optional[str] = None):
+    modelo = ModeloDepositoMPWeb()
+    modelo_base = modeloprincipal()
+    try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+
+        sectores = modelo.obtener_sectores_area()
+        return {
+            "semana": semana,
+            "sectores": _armar_sectores_info_area(modelo, sectores),
+            "asignados": modelo.obtener_asignaciones_semana(semana),
+            "operarios_disponibles": modelo.obtener_operarios_disponibles(),
+        }
+    finally:
+        modelo.cerrar_conexion()
+        if hasattr(modelo_base, "cerrar_conexion"):
+            modelo_base.cerrar_conexion()
+
+
+@app.post("/api/depositomp/guardar")
+def api_depositomp_guardar(payload: dict = Body(...)):
+    semana = payload.get("semana")
+    registros = payload.get("registros", [])
+    modelo = ModeloDepositoMPWeb()
+    try:
+        modelo.guardar_asignaciones_depositomp(semana, registros)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "mensaje": str(e)}
+    finally:
+        modelo.cerrar_conexion()
+
+
+# --- DEPÓSITO PT ---
+@app.get("/api/depositopt/datos")
+def api_depositopt_datos(semana: Optional[str] = None):
+    modelo = ModeloDepositoPTWeb()
+    modelo_base = modeloprincipal()
+    try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+
+        sectores = modelo.obtener_sectores_area()
+        return {
+            "semana": semana,
+            "sectores": _armar_sectores_info_area(modelo, sectores),
+            "asignados": modelo.obtener_asignaciones_semana(semana),
+            "operarios_disponibles": modelo.obtener_operarios_disponibles(),
+        }
+    finally:
+        modelo.cerrar_conexion()
+        if hasattr(modelo_base, "cerrar_conexion"):
+            modelo_base.cerrar_conexion()
+
+
+@app.post("/api/depositopt/guardar")
+def api_depositopt_guardar(payload: dict = Body(...)):
+    semana = payload.get("semana")
+    registros = payload.get("registros", [])
+    modelo = ModeloDepositoPTWeb()
+    try:
+        modelo.guardar_asignaciones_depositopt(semana, registros)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "mensaje": str(e)}
+    finally:
+        modelo.cerrar_conexion()

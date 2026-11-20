@@ -62,7 +62,12 @@
         let columnasOriginales = [];
         let idRegistroActual = null;
         
-        const horasDisponibles = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0') + ":00");
+        const horasDisponibles = Array.from({length: 48}, (_, i) => {
+            const h = String(Math.floor(i / 2)).padStart(2, '0');
+            const m = i % 2 === 0 ? '00' : '30';
+            return `${h}:${m}`;
+        });
+        
 
         async function cargarDatos() {
             try {

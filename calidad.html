@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horarios Analistas de Calidad</title>
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+    <link rel="stylesheet" href="/archivos/hchocovista.css">
+    <script src="/archivos/seguridad.js"></script>
+    <script src="/archivos/relojespera.js" defer></script>
+</head>
+<body>
+
+    <div class="top-bar">
+        <button class="btn-accion" onclick="guardarDatos()">Guardar</button>
+        <button class="btn-accion" style="background-color: #ffc7ce; color: #9c0006;" onclick="location.href='/'">Cerrar</button>
+        <span style="font-weight: bold; color: #004080; margin-left: 20px;">Semana actual:</span>
+        <span id="labelSemana" style="font-weight: bold; color: #333; font-size: 11pt; margin-left: 5px;">-</span>
+    </div>
+
+    <div id="gridContenedor" class="grid-sectores"></div>
+
+    <script>
+        let datosGlobales = {};
+        let semanaActualGlobal = "";
+
+        async function init() {
+            await cargarDatos();
+        }
+
+        async function cargarDatos() {
+            try {
+                const res = await fetch(`/api/analistascalidad/datos`);
+                datosGlobales = await res.json();
+
+                semanaActualGlobal = datosGlobales.semana;
+                const labelSemana = document.getElementById('labelSemana');
+                if (labelSemana) labelSemana.textContent = semanaActualGlobal;
+
+                renderizarUI();
+            } catch (error) {
+                console.error("Error al cargar los datos:", error);
+                alert("Error al conectar con el servidor para cargar los datos.");
+            }
+        }
+
+        function renderizarUI() {
+            const grid = document.getElementById('gridContenedor');
+            grid.innerHTML = "";
+
+            if (!datosGlobales.sectores || datosGlobales.sectores.length === 0) {
+                grid.innerHTML = `<p style="padding:20px; color:#555;">No hay sectores configurados para el área <strong>CALIDAD</strong>. Agregalos desde Parámetros → Sectores.</p>`;
+                return;
+            }
+
+            datosGlobales.sectores.forEach(secObj => {
+                const sector = secObj.sector;
+                const card = document.createElement('div');
+                card.className = "sector-card";
+                card.innerHTML = `<h3>${sector}</h3>`;
+
+                secObj.turnos.forEach(turno => {
+                    const turnoBox = document.createElement('div');
+                    turnoBox.className = "turno-box";
+
+                    turnoBox.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4>Horario: ${turno}</h4>
+                            <button class="btn-accion" style="font-size: 8pt; padding: 2px 6px;" 
+                                onclick="agregarFila('${sector.replace(/'/g, "\\'")}', '${turno.replace(/'/g, "\\'")}', '', '')">
+                                + Agregar analista
+                            </button>
+                        </div>
+                        <div class="filas-container" id="filas_${sector}_${turno}"></div>
+                    `;
+                    card.appendChild(turnoBox);
+                });
+
+                grid.appendChild(card);
+            });
+
+            if (datosGlobales.asignados) {
+                datosGlobales.asignados.forEach(([id_val, operario, horario, sector]) => {
+                    if (sector && horario) {
+                        agregarFila(sector, horario, id_val, operario);
+                    }
+                });
+            }
+
+            actualizarOpcionesSelects();
+        }
+
+        function agregarFila(sector, turno, idVal = "", operarioVal = "") {
+            const container = document.getElementById(`filas_${sector}_${turno}`);
+            if (!container) return;
+
+            const filaDiv = document.createElement('div');
+            filaDiv.className = "fila-operario";
+
+            const inputId = document.createElement('input');
+            inputId.type = "text";
+            inputId.value = idVal;
+            inputId.readOnly = true;
+
+            const selectOp = document.createElement('select');
+            if (operarioVal) {
+                selectOp.setAttribute('data-operario-inicial', operarioVal.trim());
+            }
+
+            selectOp.onchange = (e) => {
+                const nombreSel = e.target.value.trim();
+                selectOp.setAttribute('data-operario-inicial', nombreSel);
+
+                const disponibles = datosGlobales.operarios_disponibles || [];
+                const encontrada = disponibles.find(item => (item[1] || "").trim() === nombreSel);
+                inputId.value = encontrada ? encontrada[0] : "";
+
+                actualizarOpcionesSelects();
+            };
+
+            const btnDel = document.createElement('button');
+            btnDel.className = "btn-eliminar";
+            btnDel.textContent = "Eliminar";
+            btnDel.onclick = () => {
+                filaDiv.remove();
+                actualizarOpcionesSelects();
+            };
+
+            filaDiv.appendChild(inputId);
+            filaDiv.appendChild(selectOp);
+            filaDiv.appendChild(btnDel);
+
+            container.appendChild(filaDiv);
+            actualizarOpcionesSelects();
+
+            if (operarioVal) {
+                selectOp.value = operarioVal.trim();
+            }
+        }
+
+        function actualizarOpcionesSelects() {
+            const seleccionados = new Set();
+            document.querySelectorAll('.fila-operario select').forEach(sel => {
+                const val = (sel.value || sel.getAttribute('data-operario-inicial') || '').trim();
+                if (val) seleccionados.add(val);
+            });
+
+            const libres = datosGlobales.operarios_disponibles || [];
+
+            document.querySelectorAll('.fila-operario select').forEach(sel => {
+                const valorActual = (sel.value || sel.getAttribute('data-operario-inicial') || '').trim();
+                sel.innerHTML = `<option value="">-- Seleccione Analista --</option>`;
+                let encontrado = false;
+
+                libres.forEach(item => {
+                    const nombre = (item[1] || "").trim();
+                    if (!nombre) return;
+                    if (!seleccionados.has(nombre) || nombre === valorActual) {
+                        const opt = document.createElement('option');
+                        opt.value = nombre;
+                        opt.textContent = nombre;
+                        if (nombre === valorActual) {
+                            opt.selected = true;
+                            encontrado = true;
+                        }
+                        sel.appendChild(opt);
+                    }
+                });
+
+                if (valorActual && !encontrado) {
+                    const opt = document.createElement('option');
+                    opt.value = valorActual;
+                    opt.textContent = valorActual;
+                    opt.selected = true;
+                    sel.appendChild(opt);
+                }
+
+                if (valorActual) sel.value = valorActual;
+            });
+        }
+
+        async function guardarDatos() {
+            let registros = [];
+
+            document.querySelectorAll('.sector-card').forEach(card => {
+                const sector = card.querySelector('h3').textContent.trim();
+                card.querySelectorAll('.turno-box').forEach(box => {
+                    const turno = box.querySelector('h4').textContent.replace('Horario:', '').trim();
+                    box.querySelectorAll('.fila-operario').forEach(fila => {
+                        const idVal = fila.querySelector('input').value;
+                        const opNombre = fila.querySelector('select').value;
+                        if (idVal && opNombre) {
+                            registros.push([parseInt(idVal), opNombre, turno, sector]);
+                        }
+                    });
+                });
+            });
+
+            try {
+                const res = await fetch('/api/analistascalidad/guardar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ semana: semanaActualGlobal, registros: registros })
+                });
+
+                const r = await res.json();
+                if (r.status === 'ok') {
+                    alert("Datos guardados correctamente.");
+                    cargarDatos();
+                } else {
+                    alert("Error al guardar: " + (r.mensaje || ""));
+                }
+            } catch (error) {
+                console.error("Error al guardar:", error);
+                alert("Ocurrió un error al intentar guardar los datos.");
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
