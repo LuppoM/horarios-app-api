@@ -26,6 +26,10 @@ from modmoimodelo import ModMoiModel
 from principalmodelo import modeloprincipal
 import sectoresmodelo as modelo_sectores
 import tipohorariosmodelo as modelo_tipohorarios
+from pydantic import BaseModel
+from usuariosmodelo import verificar_requiere_clave, validar_usuario
+import abmusuariosmodelo
+
 
 modelo_dtprog = ModeloDTProgramadaWeb()
 app = FastAPI(title="ARMADO DE HORARIOS")
@@ -48,7 +52,15 @@ def semana_objetivo_por_defecto() -> str:
         modelo_dtprog.obtener_numero_semana_personalizado(date.today())
     )
 
+class LoginRequest(BaseModel):
+    usuario: str
+    clave: str = ""
 
+class UsuarioABMRequest(BaseModel):
+    usuario: str
+    area: str
+    requiere_contrasena: bool = False
+    contrasena: Optional[str] = None
 
 # ==========================================
 # 1. VISTAS HTML PRINCIPALES (GENERAL)
@@ -83,7 +95,9 @@ def home(request: Request):
             modelo_base.cerrar_conexion()
 
     # Le enviamos la semana actual y el estado a Jinja2 para Principal.html
-    return templates.TemplateResponse(request, "Principal.html", {
+   # Le enviamos la semana actual y el estado a Jinja2 para Principal.html
+    return templates.TemplateResponse("Principal.html", {
+        "request": request,
         "semana_actual": semana_calculada,
         "estado_programacion": info_estado.get("estado", "PENDIENTE"),
         "modificado_por": info_estado.get("modificado_por", ""),
@@ -92,43 +106,50 @@ def home(request: Request):
 
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
-    return templates.TemplateResponse(request, "modmoi.html", {})
+    return templates.TemplateResponse("modmoi.html", {"request": request})
 
 @app.get("/sectores", response_class=HTMLResponse)
 def vista_sectores(request: Request):
-    return templates.TemplateResponse(request, "sectores.html", {})
+    return templates.TemplateResponse("sectores.html", {"request": request})
 
 @app.get("/tipohorarios", response_class=HTMLResponse)
 def vista_tipos_horario(request: Request):
-    return templates.TemplateResponse(request, "tipohorarios.html", {})
+    return templates.TemplateResponse("tipohorarios.html", {"request": request})
 
 @app.get("/hchoco", response_class=HTMLResponse)
 def vista_hchoco(request: Request):
-    return templates.TemplateResponse(request, "hchoco.html", {})
+    return templates.TemplateResponse("hchoco.html", {"request": request})
 
 @app.get("/hchocofinde", response_class=HTMLResponse)
 def vista_hchocofinde(request: Request):
-    return templates.TemplateResponse(request, "hchocofinde.html", {})
+    return templates.TemplateResponse("hchocofinde.html", {"request": request})
 
 @app.get("/hgolo", response_class=HTMLResponse)
 def vista_hgolo(request: Request):
-    return templates.TemplateResponse(request, "hgolo.html", {})
+    return templates.TemplateResponse("hgolo.html", {"request": request})
 
 @app.get("/hgolo/finde", response_class=HTMLResponse)
 def vista_hgolo_finde(request: Request, semana: str = None):
-    return templates.TemplateResponse(request, "hgolofinde.html", {
+    return templates.TemplateResponse("hgolofinde.html", {
         "request": request,
         "semana": semana
     })
 
 @app.get("/mecanicos", response_class=HTMLResponse)
 def vista_mecanicos(request: Request):
-    return templates.TemplateResponse(request, "mecanicos.html", {})
+    return templates.TemplateResponse("mecanicos.html", {"request": request})
+
 @app.get("/dtprogramada", response_class=HTMLResponse)
 def vista_dtprogramada(request: Request):
-    return templates.TemplateResponse(request, "dtprogramada.html", {})
+    return templates.TemplateResponse("dtprogramada.html", {"request": request})
 
+@app.get("/login", response_class=HTMLResponse)
+def vista_login(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
+@app.get("/abmusuarios", response_class=HTMLResponse)
+def vista_abm_usuarios(request: Request):
+    return templates.TemplateResponse("abmusuarios.html", {"request": request})
 
 
 # ==========================================
@@ -340,7 +361,7 @@ def api_limpiar_semanas_manual():
 def api_obtener_sectores():
     filas = modelo_sectores.obtener_sectores()
     tipos_horario = modelo_sectores.obtener_tipos_horario()
-    columnas = ["ID", "Sector", "Planta", "Tipo de Horario", "Requiere Dotación"]
+    columnas = ["ID", "Sector", "Planta", "Tipo de Horario", "Requiere Dotación", "Área"]
     return {
         "columnas": columnas,
         "datos": filas,
@@ -1327,3 +1348,60 @@ async def api_mecanicos_guardar(request: Request):
         return {"status": "error", "message": str(e)}
     finally:
         modelo.cerrar_conexion()
+
+
+
+# ==========================================
+# 9. MÓDULO: Usuarios y login
+# ==========================================
+
+@app.get("/api/usuario-config/{usuario}")
+def api_usuario_config(usuario: str):
+    config = verificar_requiere_clave(usuario)
+    if not config:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return {"ok": True, **config}
+
+@app.post("/api/login")
+def api_login(datos: LoginRequest):
+    user = validar_usuario(datos.usuario, datos.clave)
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    return {"ok": True, **user}
+
+# --- ENDPOINTS CRUD PARA GESTIÓN DE USUARIOS ---
+
+@app.get("/api/usuarios")
+def api_listar_usuarios():
+    try:
+        return abmusuariosmodelo.listar_usuarios()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/usuarios")
+def api_crear_usuario(datos: UsuarioABMRequest):
+    try:
+        nuevo_id = abmusuariosmodelo.crear_usuario(
+            datos.usuario, datos.area, datos.requiere_contrasena, datos.contrasena
+        )
+        return {"ok": True, "id": nuevo_id, "message": "Usuario creado correctamente."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/usuarios/{user_id}")
+def api_editar_usuario(user_id: int, datos: UsuarioABMRequest):
+    try:
+        abmusuariosmodelo.editar_usuario(
+            user_id, datos.usuario, datos.area, datos.requiere_contrasena, datos.contrasena
+        )
+        return {"ok": True, "message": "Usuario actualizado correctamente."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/usuarios/{user_id}")
+def api_eliminar_usuario(user_id: int):
+    try:
+        abmusuariosmodelo.eliminar_usuario(user_id)
+        return {"ok": True, "message": "Usuario eliminado correctamente."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

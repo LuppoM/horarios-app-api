@@ -1,0 +1,90 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #212529;
+}
+
+.login-contenedor {
+    width: 100%;
+    max-width: 360px;
+    margin: 16px;
+    padding: 32px 28px;
+    background: #ffffff;
+    border: 1px solid #e3e6ea;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.login-titulo {
+    margin: 0 0 4px;
+    font-size: 22px;
+}
+
+.login-subtitulo {
+    margin: 0 0 24px;
+    font-size: 14px;
+    color: #6c757d;
+}
+
+.login-form label {
+    display: block;
+    margin: 14px 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.login-form input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: #ffffff;
+}
+
+.login-form input:focus {
+    outline: none;
+    border-color: #0b57b8;
+    box-shadow: 0 0 0 3px rgba(11, 87, 184, 0.15);
+}
+
+.mensaje-error {
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #842029;
+    background: #f8d7da;
+    border: 1px solid #f5c2c7;
+    border-radius: 4px;
+}
+
+.btn-ingresar {
+    width: 100%;
+    margin-top: 20px;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    background: #0b57b8;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-ingresar:hover:not(:disabled) {
+    background: #094a9c;
+}
+
+.btn-ingresar:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}

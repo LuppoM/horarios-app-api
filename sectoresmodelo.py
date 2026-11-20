@@ -8,7 +8,7 @@ def _obtener_conexion():
 def _normalizar_requiere_dotacion(valor, defecto=1) -> int:
     if valor is None:
         return defecto
-    return 1 if str(valor).strip().lower() in ["1", "true", "si", "on"] else 0
+    return 1 if str(valor).strip().lower() in ["1", "true", "si", "sí", "on"] else 0
 
 
 def obtener_sectores():
@@ -16,7 +16,7 @@ def obtener_sectores():
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT id, nombre_sector, planta, tipo_horario, requiere_dotacion
+            SELECT id, nombre_sector, planta, tipo_horario, requiere_dotacion, COALESCE(area, 'PRODUCCION') AS area
             FROM sectores
             ORDER BY id ASC
         """)
@@ -30,10 +30,14 @@ def obtener_sectores():
                     f.get("nombre_sector"),
                     f.get("planta"),
                     f.get("tipo_horario"),
-                    f.get("requiere_dotacion")
+                    f.get("requiere_dotacion"),
+                    f.get("area") or "PRODUCCION"
                 ])
             else:
-                datos.append(list(f))
+                lista = list(f)
+                if len(lista) > 5 and not lista[5]:
+                    lista[5] = "PRODUCCION"
+                datos.append(lista)
         return datos
     except Exception as e:
         if hasattr(conn, 'rollback'):
@@ -51,7 +55,7 @@ def obtener_sector_por_id(sector_id):
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT id, nombre_sector, planta, tipo_horario, requiere_dotacion
+            SELECT id, nombre_sector, planta, tipo_horario, requiere_dotacion, COALESCE(area, 'PRODUCCION') AS area
             FROM sectores
             WHERE id = %s
         """, (sector_id,))
@@ -65,14 +69,16 @@ def obtener_sector_por_id(sector_id):
                 "nombre_sector": fila.get("nombre_sector"),
                 "planta": fila.get("planta"),
                 "tipo_horario": fila.get("tipo_horario"),
-                "requiere_dotacion": fila.get("requiere_dotacion")
+                "requiere_dotacion": fila.get("requiere_dotacion"),
+                "area": fila.get("area") or "PRODUCCION"
             }
         return {
             "id": fila[0],
             "nombre_sector": fila[1],
             "planta": fila[2],
             "tipo_horario": fila[3],
-            "requiere_dotacion": fila[4]
+            "requiere_dotacion": fila[4],
+            "area": fila[5] or "PRODUCCION"
         }
     except Exception as e:
         if hasattr(conn, 'rollback'):
@@ -115,6 +121,7 @@ def insertar_sector(datos):
     cursor = conn.cursor()
     try:
         requiere_dotacion = _normalizar_requiere_dotacion(datos.get("requiere_dotacion"), defecto=1)
+        area = (datos.get("area") or "PRODUCCION").strip().upper()
 
         # Previene 'duplicate key violates unique constraint sectores_pkey'
         cursor.execute("""
@@ -125,9 +132,9 @@ def insertar_sector(datos):
         """)
 
         cursor.execute("""
-            INSERT INTO sectores (nombre_sector, planta, tipo_horario, requiere_dotacion)
-            VALUES (%s, %s, %s, %s)
-        """, (datos.get("nombre_sector"), datos.get("planta"), datos.get("tipo_horario"), requiere_dotacion))
+            INSERT INTO sectores (nombre_sector, planta, tipo_horario, requiere_dotacion, area)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (datos.get("nombre_sector"), datos.get("planta"), datos.get("tipo_horario"), requiere_dotacion, area))
         
         conn.commit()
     except Exception as e:
@@ -149,12 +156,13 @@ def modificar_sector(sector_id, datos):
         planta = datos.get("planta")
         tipo_horario = datos.get("tipo_horario")
         requiere_dotacion = _normalizar_requiere_dotacion(datos.get("requiere_dotacion"), defecto=1)
+        area = (datos.get("area") or "PRODUCCION").strip().upper()
 
         cursor.execute("""
             UPDATE sectores
-            SET nombre_sector = %s, planta = %s, tipo_horario = %s, requiere_dotacion = %s
+            SET nombre_sector = %s, planta = %s, tipo_horario = %s, requiere_dotacion = %s, area = %s
             WHERE id = %s
-        """, (nombre_sector, planta, tipo_horario, requiere_dotacion, sector_id))
+        """, (nombre_sector, planta, tipo_horario, requiere_dotacion, area, sector_id))
 
         conn.commit()
         return True, "Modificación exitosa"

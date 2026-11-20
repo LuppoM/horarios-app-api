@@ -71,12 +71,13 @@
                 <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuParametros')">PARÁMETROS ▼</button>
                 <div id="menuParametros" class="dropdown-menu">
                     <a href="/sectores">Sectores</a>
-                    <a href="/tipohorarios">Tipos de Horario</a>
+                    <a href="/tipohorarios">Tipos de horario</a>
+                    <a href="/abmusuarios">Usuarios y permisos</a>
+                    
                 </div>
             </div>
 
-            <!-- 5. BOTÓN SALIR -->
-            <a href="/" class="custom-button">SALIR</a>
+            <button type="button" class="custom-button" onclick="cerrarSesion()">SALIR</button>
 
         </div>
     </div>
@@ -97,7 +98,10 @@
                 menu.classList.toggle('show');
             }
         }
-
+            const sesionRaw = sessionStorage.getItem('usuario_sesion');
+            if (!sesionRaw) {
+                window.location.replace('/login');
+            }
         // Cerrar menú al hacer click fuera
         window.addEventListener('click', function() {
 
@@ -131,6 +135,11 @@
                     if (badge) badge.style.display = 'none';
                 });
         });
+        function cerrarSesion(e) {
+    if (e) e.preventDefault();
+    sessionStorage.removeItem('usuario_sesion');
+    window.location.replace('/login');
+}
     </script>
 </body>
 </html>

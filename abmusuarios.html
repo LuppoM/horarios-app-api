@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Usuarios - Armado de Horarios</title>
+
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+    <link rel="stylesheet" href="/archivos/abmusuariosvista.css">
+
+    <script src="/archivos/seguridad.js"></script>
+
+    <script>
+        // Bloquea acceso si no hay sesión activa
+        const sesionRaw = sessionStorage.getItem('usuario_sesion');
+        if (!sesionRaw) {
+            window.location.replace('/login');
+        }
+        const usuarioActual = sesionRaw ? JSON.parse(sesionRaw) : null;
+    </script>
+</head>
+<body>
+
+    <main class="abm-container">
+        <div class="abm-card">
+            <div class="abm-header">
+                <div>
+                    <a href="/" class="btn-volver">← Volver al Menú Principal</a>
+                    <h1>Gestión de Usuarios</h1>
+                    <p class="abm-subtitulo">Administración de usuarios, áreas y acceso con contraseña</p>
+                </div>
+                <div class="header-acciones">
+                    <span id="info-usuario" class="usuario-pill"></span>
+                    <button type="button" id="btn-nuevo-usuario" class="btn-primario">
+                        + Nuevo Usuario
+                    </button>
+                </div>
+            </div>
+
+            <div class="abm-toolbar">
+                <input type="text" id="input-buscar" class="input-buscar" placeholder="Buscar por usuario o área...">
+                <span id="contador-registros" class="contador-registros">0 usuarios</span>
+            </div>
+
+            <div id="alerta-global" class="alerta" hidden></div>
+
+            <div class="tabla-wrapper">
+                <table class="tabla-usuarios">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Área</th>
+                            <th>Requiere Contraseña</th>
+                            <th>Contraseña</th>
+                            <th class="col-acciones">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-usuarios">
+                        <tr>
+                            <td colspan="6" class="texto-centro">Cargando usuarios...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL CREAR / EDITAR USUARIO -->
+    <div id="modal-usuario" class="modal-overlay" hidden>
+        <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+            <div class="modal-header">
+                <h2 id="modal-titulo">Nuevo Usuario</h2>
+                <button type="button" id="btn-cerrar-modal" class="btn-cerrar-x" aria-label="Cerrar">&times;</button>
+            </div>
+
+            <form id="form-usuario" autocomplete="off">
+                <input type="hidden" id="usuario-id">
+
+                <div class="campo-grupo">
+                    <label for="campo-usuario">Nombre de Usuario *</label>
+                    <input type="text" id="campo-usuario" required placeholder="Ej: jperez">
+                </div>
+
+                <div class="campo-grupo">
+                    <label for="campo-area">Área / Planta *</label>
+                    <input type="text" id="campo-area" list="lista-areas-sugeridas" required placeholder="Ej: CHOCOLATES, GOLOSINAS, SISTEMAS...">
+                    <datalist id="lista-areas-sugeridas">
+                        <option value="SISTEMAS">
+                        <option value="CHOCOLATES">
+                        <option value="GOLOSINAS">
+                        <option value="MANTENIMIENTO">
+                        <option value="PROGRAMACION">
+                        <option value="RRHH">
+                    </datalist>
+                </div>
+
+                <div class="campo-grupo campo-checkbox">
+                    <label class="switch-label">
+                        <input type="checkbox" id="campo-requiere-clave" checked>
+                        <span>Requiere contraseña para ingresar</span>
+                    </label>
+                </div>
+
+                <div class="campo-grupo" id="grupo-clave">
+                    <label for="campo-clave" id="label-clave">Contraseña *</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="campo-clave" placeholder="Ingresá la contraseña">
+                        <button type="button" id="btn-toggle-clave" class="btn-toggle-pass" title="Ver contraseña">
+                            <svg id="icono-ojo" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <small id="ayuda-clave" class="texto-ayuda" hidden>Dejá este campo vacío si no querés cambiar la contraseña actual.</small>
+                </div>
+
+                <div id="error-modal" class="alerta alerta-error" hidden></div>
+
+                <div class="modal-footer">
+                    <button type="button" id="btn-cancelar-modal" class="btn-secundario">Cancelar</button>
+                    <button type="submit" id="btn-guardar-usuario" class="btn-primario">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let listaUsuarios = [];
+
+        function headersApi(extra = {}) {
+            return {
+                'X-Usuario': usuarioActual ? usuarioActual.usuario : '',
+                ...extra
+            };
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (usuarioActual) {
+                const spanUser = document.getElementById('info-usuario');
+                if (spanUser) spanUser.textContent = `Usuario: ${usuarioActual.usuario}`;
+            }
+
+            cargarUsuarios();
+
+            document.getElementById('btn-nuevo-usuario').addEventListener('click', abrirModalNuevo);
+            document.getElementById('btn-cerrar-modal').addEventListener('click', cerrarModal);
+            document.getElementById('btn-cancelar-modal').addEventListener('click', cerrarModal);
+            document.getElementById('form-usuario').addEventListener('submit', guardarUsuario);
+            document.getElementById('input-buscar').addEventListener('input', filtrarTabla);
+
+            // Mostrar/ocultar campo contraseña según el checkbox
+            const chkReq = document.getElementById('campo-requiere-clave');
+            chkReq.addEventListener('change', actualizarVisibilidadClave);
+
+            const inpClave = document.getElementById('campo-clave');
+            const btnOjo = document.getElementById('btn-toggle-clave');
+            const iconoOjo = document.getElementById('icono-ojo');
+
+            btnOjo.addEventListener('click', () => {
+                const esPass = inpClave.type === 'password';
+                inpClave.type = esPass ? 'text' : 'password';
+                btnOjo.title = esPass ? 'Ocultar contraseña' : 'Ver contraseña';
+                iconoOjo.innerHTML = esPass
+                    ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>`
+                    : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
+            });
+
+            document.getElementById('modal-usuario').addEventListener('click', (e) => {
+                if (e.target.id === 'modal-usuario') cerrarModal();
+            });
+        });
+
+        function actualizarVisibilidadClave() {
+            const requiere = document.getElementById('campo-requiere-clave').checked;
+            const grupoClave = document.getElementById('grupo-clave');
+            const inpClave = document.getElementById('campo-clave');
+            const esNuevo = !document.getElementById('usuario-id').value;
+
+            grupoClave.hidden = !requiere;
+            inpClave.required = requiere && esNuevo;
+            if (!requiere) {
+                inpClave.value = '';
+            }
+        }
+
+        async function cargarUsuarios() {
+            const tbody = document.getElementById('tbody-usuarios');
+            try {
+                const resp = await fetch('/api/usuarios', { headers: headersApi() });
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    throw new Error(data.detail || 'Error al obtener usuarios');
+                }
+
+                // Soporta tanto array directo [...] como { datos: [...] }
+                listaUsuarios = Array.isArray(data) ? data : (data.datos || []);
+                renderizarTabla(listaUsuarios);
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="6" class="texto-centro texto-error">${err.message}</td></tr>`;
+            }
+        }
+
+        function renderizarTabla(datos) {
+            const tbody = document.getElementById('tbody-usuarios');
+            const contador = document.getElementById('contador-registros');
+            contador.textContent = `${datos.length} usuario${datos.length === 1 ? '' : 's'}`;
+
+            if (!datos.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="texto-centro">No se encontraron usuarios.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = datos.map(u => {
+                const reqClave = Boolean(u.requiere_contrasena);
+                const badgeArea = `<span class="badge">${escaparHtml(u.area || '-')}</span>`;
+                const badgeReq = reqClave
+                    ? `<span class="badge badge-activo">Sí</span>`
+                    : `<span class="badge badge-inactivo">No (directo)</span>`;
+
+                const celdaClave = reqClave
+                    ? `<span class="clave-oculta" data-clave="${escaparHtml(u.contrasena || '••••••••')}">••••••••</span>
+                       <button type="button" class="btn-mini-ojo" onclick="toggleClaveFila(this)" title="Ver / Ocultar clave">👁</button>`
+                    : `<span class="texto-ayuda">Sin clave</span>`;
+
+                return `
+                    <tr>
+                        <td>${u.id}</td>
+                        <td><strong>${escaparHtml(u.usuario)}</strong></td>
+                        <td>${badgeArea}</td>
+                        <td>${badgeReq}</td>
+                        <td class="celda-clave">${celdaClave}</td>
+                        <td class="col-acciones">
+                            <button type="button" class="btn-accion btn-editar" onclick="abrirModalEditar(${u.id})">Editar</button>
+                            <button type="button" class="btn-accion btn-eliminar" onclick="eliminarUsuario(${u.id}, '${escaparHtml(u.usuario)}')">Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function toggleClaveFila(btn) {
+            const span = btn.previousElementSibling;
+            const visible = span.dataset.visible === 'true';
+            if (visible) {
+                span.textContent = '••••••••';
+                span.dataset.visible = 'false';
+            } else {
+                span.textContent = span.dataset.clave;
+                span.dataset.visible = 'true';
+            }
+        }
+
+        function filtrarTabla() {
+            const q = document.getElementById('input-buscar').value.trim().toLowerCase();
+            if (!q) {
+                renderizarTabla(listaUsuarios);
+                return;
+            }
+            const filtrados = listaUsuarios.filter(u =>
+                (u.usuario || '').toLowerCase().includes(q) ||
+                (u.area || '').toLowerCase().includes(q)
+            );
+            renderizarTabla(filtrados);
+        }
+
+        function abrirModalNuevo() {
+            document.getElementById('modal-titulo').textContent = 'Nuevo Usuario';
+            document.getElementById('usuario-id').value = '';
+            document.getElementById('campo-usuario').value = '';
+            document.getElementById('campo-area').value = '';
+            document.getElementById('campo-requiere-clave').checked = true;
+            document.getElementById('campo-clave').value = '';
+            document.getElementById('campo-clave').type = 'password';
+            document.getElementById('label-clave').textContent = 'Contraseña *';
+            document.getElementById('ayuda-clave').hidden = true;
+            ocultarErrorModal();
+            actualizarVisibilidadClave();
+
+            document.getElementById('modal-usuario').hidden = false;
+            document.getElementById('campo-usuario').focus();
+        }
+
+        function abrirModalEditar(id) {
+            const user = listaUsuarios.find(u => u.id === id);
+            if (!user) return;
+
+            document.getElementById('modal-titulo').textContent = `Editar Usuario #${user.id}`;
+            document.getElementById('usuario-id').value = user.id;
+            document.getElementById('campo-usuario').value = user.usuario || '';
+            document.getElementById('campo-area').value = user.area || '';
+            document.getElementById('campo-requiere-clave').checked = Boolean(user.requiere_contrasena);
+            document.getElementById('campo-clave').value = '';
+            document.getElementById('campo-clave').type = 'password';
+            document.getElementById('label-clave').textContent = 'Nueva Contraseña (opcional)';
+            document.getElementById('ayuda-clave').hidden = false;
+            ocultarErrorModal();
+            actualizarVisibilidadClave();
+
+            document.getElementById('modal-usuario').hidden = false;
+            document.getElementById('campo-usuario').focus();
+        }
+
+        function cerrarModal() {
+            document.getElementById('modal-usuario').hidden = true;
+        }
+
+        async function guardarUsuario(e) {
+            e.preventDefault();
+            ocultarErrorModal();
+
+            const id = document.getElementById('usuario-id').value;
+            const usuario = document.getElementById('campo-usuario').value.trim();
+            const area = document.getElementById('campo-area').value.trim().toUpperCase();
+            const requiere_contrasena = document.getElementById('campo-requiere-clave').checked;
+            const contrasena = document.getElementById('campo-clave').value.trim();
+
+            if (!usuario || !area) {
+                mostrarErrorModal('Completá el usuario y el área.');
+                return;
+            }
+            if (!id && requiere_contrasena && !contrasena) {
+                mostrarErrorModal('Ingresá una contraseña para el nuevo usuario.');
+                return;
+            }
+
+            const btnGuardar = document.getElementById('btn-guardar-usuario');
+            btnGuardar.disabled = true;
+            btnGuardar.textContent = 'Guardando...';
+
+            try {
+                const url = id ? `/api/usuarios/${id}` : '/api/usuarios';
+                const method = id ? 'PUT' : 'POST';
+
+                const resp = await fetch(url, {
+                    method,
+                    headers: headersApi({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({
+                        usuario,
+                        area,
+                        requiere_contrasena,
+                        contrasena: requiere_contrasena ? contrasena : null
+                    })
+                });
+
+                const data = await resp.json();
+                if (!resp.ok) {
+                    throw new Error(data.detail || 'No se pudo guardar el usuario.');
+                }
+
+                cerrarModal();
+                mostrarAlerta(data.message || 'Usuario guardado correctamente.', 'exito');
+                await cargarUsuarios();
+            } catch (err) {
+                mostrarErrorModal(err.message);
+            } finally {
+                btnGuardar.disabled = false;
+                btnGuardar.textContent = 'Guardar';
+            }
+        }
+
+        async function eliminarUsuario(id, nombre) {
+            if (usuarioActual && Number(usuarioActual.id) === Number(id)) {
+                mostrarAlerta('No podés eliminar tu propio usuario con sesión activa.', 'error');
+                return;
+            }
+
+            if (!confirm(`¿Seguro que querés eliminar el usuario "${nombre}"? Esta acción no se puede deshacer.`)) {
+                return;
+            }
+
+            try {
+                const resp = await fetch(`/api/usuarios/${id}`, {
+                    method: 'DELETE',
+                    headers: headersApi()
+                });
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    throw new Error(data.detail || 'No se pudo eliminar el usuario.');
+                }
+
+                mostrarAlerta(data.message || 'Usuario eliminado.', 'exito');
+                await cargarUsuarios();
+            } catch (err) {
+                mostrarAlerta(err.message, 'error');
+            }
+        }
+
+        function mostrarAlerta(texto, tipo = 'exito') {
+            const box = document.getElementById('alerta-global');
+            box.textContent = texto;
+            box.className = `alerta ${tipo === 'error' ? 'alerta-error' : 'alerta-exito'}`;
+            box.hidden = false;
+            setTimeout(() => { box.hidden = true; }, 4500);
+        }
+
+        function mostrarErrorModal(texto) {
+            const box = document.getElementById('error-modal');
+            box.textContent = texto;
+            box.hidden = false;
+        }
+
+        function ocultarErrorModal() {
+            document.getElementById('error-modal').hidden = true;
+        }
+
+        function escaparHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+    </script>
+</body>
+</html>

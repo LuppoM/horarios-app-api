@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Sectores</title>
-     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
     <link rel="stylesheet" href="/archivos/sectoresvista.css">
+    <script src="/archivos/seguridad.js"></script>
     <script src="/archivos/relojespera.js" defer></script>
 </head>
 <body>
@@ -44,10 +45,22 @@
             </div>
 
             <div style="margin-bottom: 10px;">
+                <label style="display:block; font-size: 10pt; font-weight:bold;">Área:</label>
+                <select id="abmArea" style="width: 100%; padding: 5px; margin-top: 2px;">
+                    <option value="PRODUCCION">PRODUCCION</option>
+                    <option value="MECANICOS">MECANICOS</option>
+                    <option value="CALIDAD">CALIDAD</option>
+                    <option value="DEPOSITOMP">DEPOSITOMP</option>
+                    <option value="DEPOSITOPT">DEPOSITOPT</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 10px;">
                 <label style="display:block; font-size: 10pt; font-weight:bold;">Planta:</label>
                 <select id="abmPlanta" style="width: 100%; padding: 5px; margin-top: 2px;">
                     <option value="Chocolate">Chocolate</option>
                     <option value="Golosinas">Golosinas</option>
+                    <option value="General">General (Ambas)</option>
                 </select>
             </div>
 
@@ -59,8 +72,8 @@
             <div style="margin-bottom: 10px;">
                 <label style="display:block; font-size: 10pt; font-weight:bold;">Requiere Dotación:</label>
                 <select id="abmDotacion" style="width: 100%; padding: 5px; margin-top: 2px;">
-                    <option value="1">Sí</option>
-                    <option value="0">No</option>
+                    <option value="Sí">Sí</option>
+                    <option value="No">No</option>
                 </select>
             </div>
 
@@ -84,14 +97,15 @@
             const data = await response.json();
 
             columnasOriginales = data.columnas || [];
+            if (!columnasOriginales.includes("Área")) {
+                columnasOriginales.push("Área");
+            }
             datosOriginales = data.datos || [];
             tiposHorarioGlobal = data.tipos_horario || ["ROTATIVO", "CENTRAL"];
 
-            // Llenar combo de tipos de horario en el modal
             const comboTipo = document.getElementById('abmTipoHorario');
             comboTipo.innerHTML = tiposHorarioGlobal.map(t => `<option value="${t}">${t}</option>`).join('');
 
-            // Poblar de forma fija y segura las opciones del combobox de Requiere Dotación
             const comboDotacion = document.getElementById('abmDotacion');
             comboDotacion.innerHTML = `
                 <option value="Sí">Sí</option>
@@ -99,7 +113,6 @@
             `;
 
             renderizarTabla(datosOriginales);
-            
             filaSeleccionadaIdx = null;
         } catch (err) {
             console.error("Error cargando sectores:", err);
@@ -121,6 +134,7 @@
         document.getElementById('tablaCuerpo').innerHTML = datosAMostrar.map((fila) => {
             let filaVisual = [...fila];
             filaVisual[4] = filaVisual[4] === 1 ? 'Sí' : 'No';
+            if (filaVisual.length < 6) filaVisual.push('PRODUCCION');
 
             let idxOriginal = datosOriginales.indexOf(fila);
 
@@ -157,14 +171,15 @@
             idRegistroActual = null;
             document.getElementById('abmTitulo').innerText = "Agregar sector";
             document.getElementById('abmNombre').value = "";
+            document.getElementById('abmArea').value = "PRODUCCION";
             document.getElementById('abmPlanta').value = "Chocolate";
-            if(tiposHorarioGlobal.length > 0) document.getElementById('abmTipoHorario').value = tiposHorarioGlobal[0];
+            if (tiposHorarioGlobal.length > 0) document.getElementById('abmTipoHorario').value = tiposHorarioGlobal[0];
             document.getElementById('abmDotacion').value = "Sí";
             document.getElementById('modalAbm').style.display = 'flex';
 
         } else if (accion === 'modificar') {
             const fila = datosOriginales[filaSeleccionadaIdx];
-            idRegistroActual = fila[0]; // ID
+            idRegistroActual = fila[0];
 
             const res = await fetch(`/api/sectores/obtener/${idRegistroActual}`);
             const data = await res.json();
@@ -176,10 +191,9 @@
 
             document.getElementById('abmTitulo').innerText = "Modificar sector";
             document.getElementById('abmNombre').value = data.nombre_sector || "";
+            document.getElementById('abmArea').value = (data.area || "PRODUCCION").toUpperCase();
             document.getElementById('abmPlanta').value = data.planta || "Chocolate";
             document.getElementById('abmTipoHorario').value = data.tipo_horario || "";
-            
-            // Asignación correcta y validada del valor de requiere_dotacion
             document.getElementById('abmDotacion').value = (data.requiere_dotacion === 1 || data.requiere_dotacion === "1") ? "Sí" : "No";
             
             document.getElementById('modalAbm').style.display = 'flex';
@@ -201,12 +215,13 @@
 
     async function guardarAbm() {
         const nombre = document.getElementById('abmNombre').value.trim();
+        const area = document.getElementById('abmArea').value;
         const planta = document.getElementById('abmPlanta').value;
         const tipoHorario = document.getElementById('abmTipoHorario').value;
         const reqText = document.getElementById('abmDotacion').value;
         const requiereDotacion = (reqText === "Sí") ? 1 : 0;
 
-        if (!nombre || !planta || !tipoHorario) {
+        if (!nombre || !area || !planta || !tipoHorario) {
             alert("Complete todos los campos obligatorios");
             return;
         }
@@ -216,6 +231,7 @@
             id: idRegistroActual,
             datos: {
                 nombre_sector: nombre,
+                area: area,
                 planta: planta,
                 tipo_horario: tipoHorario,
                 requiere_dotacion: requiereDotacion

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingreso - Carga de Horarios</title>
+    <link rel="stylesheet" href="/archivos/loginvista.css">
+    <link rel="icon" type="image/x-icon" href="/static/icono.ico">
+
+    <style>
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+        .password-wrapper input {
+            width: 100%;
+            padding-right: 42px;
+        }
+        .btn-toggle-pass {
+            position: absolute;
+            right: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+        }
+        .btn-toggle-pass:hover {
+            color: #0f172a;
+        }
+        [hidden] {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <main class="login-contenedor">
+        <h1 class="login-titulo">Carga de Horarios</h1>
+        <p class="login-subtitulo">Ingresá con tu usuario</p>
+
+        <form id="form-login" class="login-form" autocomplete="on" novalidate>
+            <label for="usuario">Usuario</label>
+            <input type="text" id="usuario" name="usuario" autocomplete="username" required autofocus>
+
+            <div id="bloque-clave" hidden>
+                <label for="clave">Contraseña</label>
+                <div class="password-wrapper">
+                    <input type="password" id="clave" name="clave" autocomplete="current-password">
+                    <button type="button" id="btn-toggle-clave" class="btn-toggle-pass" aria-label="Mostrar u ocultar contraseña" title="Ver contraseña">
+                        <svg id="icono-ojo" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <p id="mensaje-error" class="mensaje-error" role="alert" hidden></p>
+
+            <button type="submit" id="btn-ingresar" class="btn-ingresar">Ingresar</button>
+        </form>
+    </main>
+
+    <script>
+        if (sessionStorage.getItem('usuario_sesion')) {
+            window.location.replace('/');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('form-login');
+            const inpUsuario = document.getElementById('usuario');
+            const bloqueClave = document.getElementById('bloque-clave');
+            const inpClave = document.getElementById('clave');
+            const btnToggleClave = document.getElementById('btn-toggle-clave');
+            const iconoOjo = document.getElementById('icono-ojo');
+            const msgError = document.getElementById('mensaje-error');
+            const btnIngresar = document.getElementById('btn-ingresar');
+
+            let requiereClave = false;
+            let ultimoUsuarioConsultado = '';
+
+            btnToggleClave.addEventListener('click', () => {
+                const esPassword = inpClave.type === 'password';
+                inpClave.type = esPassword ? 'text' : 'password';
+                btnToggleClave.title = esPassword ? 'Ocultar contraseña' : 'Ver contraseña';
+                iconoOjo.innerHTML = esPassword
+                    ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>`
+                    : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
+            });
+
+            function mostrarError(texto) {
+                msgError.textContent = texto;
+                msgError.hidden = false;
+            }
+
+            async function chequearUsuario(usuario) {
+                if (!usuario || usuario === ultimoUsuarioConsultado) return;
+                ultimoUsuarioConsultado = usuario;
+
+                try {
+                    const resp = await fetch(`/api/usuario-config/${encodeURIComponent(usuario)}`);
+                    if (!resp.ok) {
+                        requiereClave = false;
+                        bloqueClave.hidden = true;
+                        inpClave.value = '';
+                        return;
+                    }
+                    const data = await resp.json();
+                    requiereClave = Boolean(data.requiere_contrasena);
+                    bloqueClave.hidden = !requiereClave;
+
+                    if (requiereClave) {
+                        inpClave.focus();
+                    } else {
+                        inpClave.value = '';
+                    }
+                } catch (_) {
+                    // Si falla el chequeo previo, el submit igual valida en backend
+                }
+            }
+
+            inpUsuario.addEventListener('blur', () => {
+                chequearUsuario(inpUsuario.value.trim().toLowerCase());
+            });
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                msgError.hidden = true;
+
+                const usuario = inpUsuario.value.trim();
+                if (!usuario) {
+                    mostrarError('Ingresá tu usuario.');
+                    return;
+                }
+
+                // Si apretó Enter directo sin salir del input, chequeamos primero si pide clave
+                if (usuario.toLowerCase() !== ultimoUsuarioConsultado) {
+                    await chequearUsuario(usuario.toLowerCase());
+                    if (requiereClave) return;
+                }
+
+                const clave = inpClave.value;
+                if (requiereClave && !clave) {
+                    mostrarError('Ingresá tu contraseña.');
+                    inpClave.focus();
+                    return;
+                }
+
+                btnIngresar.disabled = true;
+                btnIngresar.textContent = 'Ingresando...';
+
+                try {
+                    const resp = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ usuario, clave })
+                    });
+
+                    const data = await resp.json();
+
+                    if (!resp.ok || !data.ok) {
+                        mostrarError(data.detail || 'Usuario o contraseña incorrectos.');
+                        btnIngresar.disabled = false;
+                        btnIngresar.textContent = 'Ingresar';
+                        return;
+                    }
+
+                    sessionStorage.setItem('usuario_sesion', JSON.stringify({
+                        id: data.id,
+                        usuario: data.usuario,
+                        area: data.area
+                    }));
+
+                    window.location.href = '/';
+                } catch (err) {
+                    mostrarError('Error de conexión con el servidor.');
+                    btnIngresar.disabled = false;
+                    btnIngresar.textContent = 'Ingresar';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
