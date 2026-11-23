@@ -27,6 +27,15 @@ class ModMoiModel:
 
     TABLAS_AREA_MOI = ("mecanicos", "analistascalidad", "depositomp", "depositopt")
     TODAS_LAS_TABLAS = ("modymoi", "mecanicos", "analistascalidad", "depositomp", "depositopt")
+    COLUMNAS_CONSOLIDADO = [
+        "id",
+        "calificacion_mano_obra",
+        "operario",
+        "semana",
+        "Horario",
+        "Sector",
+        "Planta",
+    ]
 
     def __init__(self, conexion_db=None):
         if conexion_db:
@@ -65,6 +74,24 @@ class ModMoiModel:
             self._modelo_principal.eliminar_datos_semanas_anteriores(semana_actual=semana_actual)
         except Exception as e:
             print(f"Error al ejecutar limpieza desde ModMoiModel: {e}")
+
+    def _formatear_filas_consolidado(self, filas):
+        datos = []
+        for f in filas:
+            if isinstance(f, dict):
+                datos.append([
+                    f.get("id"),
+                    f.get("calificacion_mano_obra"),
+                    f.get("operario"),
+                    f.get("semana"),
+                    f.get("Horario"),
+                    f.get("Sector"),
+                    f.get("Planta"),
+                ])
+            else:
+                fila_lst = list(f)
+                datos.append(fila_lst[:7])
+        return datos
 
     def obtener_datos(self, filtro_columna=None, filtro_valor=None, semana_actual=None, area=None, vista="Semana"):
         """
@@ -132,22 +159,12 @@ class ModMoiModel:
 
         # 4. Usuario Producción -> tabla modymoi
         cursor = None
+        columnas = list(self.COLUMNAS_CONSOLIDADO)
         try:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
 
             cursor = self.conexion_db.cursor()
-
-            columnas = [
-                "id",
-                "calificacion_mano_obra",
-                "operario",
-                "semana",
-                "Horario",
-                "Sector",
-                "Planta",
-                "origen_tabla"
-            ]
 
             query_base = """
                 SELECT 
@@ -157,8 +174,7 @@ class ModMoiModel:
                     COALESCE(semana::text, '') AS semana,
                     COALESCE("Horario"::text, '') AS "Horario",
                     COALESCE("Sector"::text, '') AS "Sector",
-                    COALESCE("Planta"::text, '') AS "Planta",
-                    'modymoi' AS origen_tabla
+                    COALESCE("Planta"::text, '') AS "Planta"
                 FROM modymoi
                 WHERE 1=1
             """
@@ -175,48 +191,20 @@ class ModMoiModel:
             cursor.execute(query_base, params)
 
             filas = cursor.fetchall()
-
-            datos = []
-            for f in filas:
-                if isinstance(f, dict):
-                    datos.append([
-                        f.get("id"),
-                        f.get("calificacion_mano_obra"),
-                        f.get("operario"),
-                        f.get("semana"),
-                        f.get("Horario"),
-                        f.get("Sector"),
-                        f.get("Planta"),
-                        f.get("origen_tabla", "modymoi")
-                    ])
-                else:
-                    datos.append(list(f))
-
-            return columnas, datos
+            return columnas, self._formatear_filas_consolidado(filas)
 
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error al consultar modymoi en Supabase: {e}")
-            return [
-                "id", "calificacion_mano_obra", "operario", "semana", "Horario", "Sector", "Planta", "origen_tabla"
-            ], []
+            return columnas, []
         finally:
             if cursor:
                 cursor.close()
 
     def _obtener_datos_todas_las_areas(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         """Unifica las 5 tablas (modymoi + 4 áreas MOI) exclusivamente para admin."""
-        columnas = [
-            "id",
-            "calificacion_mano_obra",
-            "operario",
-            "semana",
-            "Horario",
-            "Sector",
-            "Planta",
-            "origen_tabla"
-        ]
+        columnas = list(self.COLUMNAS_CONSOLIDADO)
 
         cursor = None
         try:
@@ -226,7 +214,15 @@ class ModMoiModel:
             cursor = self.conexion_db.cursor()
 
             query_base = """
-                SELECT * FROM (
+                SELECT
+                    id,
+                    calificacion_mano_obra,
+                    operario,
+                    semana,
+                    "Horario",
+                    "Sector",
+                    "Planta"
+                FROM (
                     SELECT 
                         id,
                         COALESCE(calificacion_mano_obra::text, 'MOD') AS calificacion_mano_obra,
@@ -310,24 +306,7 @@ class ModMoiModel:
             cursor.execute(query_base, params)
 
             filas = cursor.fetchall()
-
-            datos = []
-            for f in filas:
-                if isinstance(f, dict):
-                    datos.append([
-                        f.get("id"),
-                        f.get("calificacion_mano_obra"),
-                        f.get("operario"),
-                        f.get("semana"),
-                        f.get("Horario"),
-                        f.get("Sector"),
-                        f.get("Planta"),
-                        f.get("origen_tabla")
-                    ])
-                else:
-                    datos.append(list(f))
-
-            return columnas, datos
+            return columnas, self._formatear_filas_consolidado(filas)
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
@@ -345,16 +324,7 @@ class ModMoiModel:
         if nombre_tabla not in self.TABLAS_AREA_MOI:
             raise ValueError(f"Tabla MOI no permitida: {nombre_tabla}")
 
-        columnas = [
-            "id",
-            "calificacion_mano_obra",
-            "operario",
-            "semana",
-            "Horario",
-            "Sector",
-            "Planta",
-            "origen_tabla"
-        ]
+        columnas = list(self.COLUMNAS_CONSOLIDADO)
 
         cursor = None
         try:
@@ -371,8 +341,7 @@ class ModMoiModel:
                     COALESCE(semana::text, '') AS semana,
                     COALESCE(horario::text, '') AS "Horario",
                     COALESCE(sector::text, '') AS "Sector",
-                    COALESCE(planta::text, '') AS "Planta",
-                    '{nombre_tabla}' AS origen_tabla
+                    COALESCE(planta::text, '') AS "Planta"
                 FROM {nombre_tabla}
                 WHERE 1=1
             """
@@ -399,24 +368,7 @@ class ModMoiModel:
             cursor.execute(query_base, params)
 
             filas = cursor.fetchall()
-
-            datos = []
-            for f in filas:
-                if isinstance(f, dict):
-                    datos.append([
-                        f.get("id"),
-                        f.get("calificacion_mano_obra"),
-                        f.get("operario"),
-                        f.get("semana"),
-                        f.get("Horario"),
-                        f.get("Sector"),
-                        f.get("Planta"),
-                        f.get("origen_tabla", nombre_tabla)
-                    ])
-                else:
-                    datos.append(list(f))
-
-            return columnas, datos
+            return columnas, self._formatear_filas_consolidado(filas)
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
