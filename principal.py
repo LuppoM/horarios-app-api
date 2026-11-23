@@ -93,13 +93,9 @@ def home(request: Request):
     info_estado = {"estado": "PENDIENTE", "modificado_por": "", "fecha_modificacion": None}
 
     try:
-        # Obtenemos el número de semana actual de producción
         semana_calculada = str(modelo_base.obtener_numero_semana_personalizado())
-        
-        # Limpieza de semanas pasadas
         modelo_base.eliminar_datos_semanas_anteriores(semana_actual=semana_calculada)
 
-        # Consultamos el estado de la semana actual desde modeloprincipal
         if semana_calculada:
             info_estado = modelo_base.obtener_estado_programacion(semana_calculada)
 
@@ -112,11 +108,9 @@ def home(request: Request):
         except Exception:
             semana_calculada = ""
     finally:
-        if hasattr(modelo_base, 'cerrar_conexion'):
+        if hasattr(modelo_base, "cerrar_conexion"):
             modelo_base.cerrar_conexion()
 
-    # Le enviamos la semana actual y el estado a Jinja2 para Principal.html
-   # Le enviamos la semana actual y el estado a Jinja2 para Principal.html
     return templates.TemplateResponse(
         request=request,
         name="Principal.html",
@@ -127,63 +121,80 @@ def home(request: Request):
             "fecha_modificacion": info_estado.get("fecha_modificacion", ""),
         },
     )
+
+
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
-    return templates.TemplateResponse("modmoi.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="modmoi.html")
+
 
 @app.get("/sectores", response_class=HTMLResponse)
 def vista_sectores(request: Request):
-    return templates.TemplateResponse("sectores.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="sectores.html")
+
 
 @app.get("/tipohorarios", response_class=HTMLResponse)
 def vista_tipos_horario(request: Request):
-    return templates.TemplateResponse("tipohorarios.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="tipohorarios.html")
+
 
 @app.get("/hchoco", response_class=HTMLResponse)
 def vista_hchoco(request: Request):
-    return templates.TemplateResponse("hchoco.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="hchoco.html")
+
 
 @app.get("/hchocofinde", response_class=HTMLResponse)
 def vista_hchocofinde(request: Request):
-    return templates.TemplateResponse("hchocofinde.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="hchocofinde.html")
+
 
 @app.get("/hgolo", response_class=HTMLResponse)
 def vista_hgolo(request: Request):
-    return templates.TemplateResponse("hgolo.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="hgolo.html")
+
 
 @app.get("/hgolo/finde", response_class=HTMLResponse)
 def vista_hgolo_finde(request: Request, semana: str = None):
-    return templates.TemplateResponse("hgolofinde.html", {
-        "request": request,
-        "semana": semana
-    })
+    return templates.TemplateResponse(
+        request=request,
+        name="hgolofinde.html",
+        context={"semana": semana},
+    )
+
 
 @app.get("/mecanicos", response_class=HTMLResponse)
 def vista_mecanicos(request: Request):
-    return templates.TemplateResponse("mecanicos.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="mecanicos.html")
+
 
 @app.get("/dtprogramada", response_class=HTMLResponse)
 def vista_dtprogramada(request: Request):
-    return templates.TemplateResponse("dtprogramada.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="dtprogramada.html")
+
 
 @app.get("/login", response_class=HTMLResponse)
 def vista_login(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="login.html")
+
 
 @app.get("/abmusuarios", response_class=HTMLResponse)
 def vista_abm_usuarios(request: Request):
-    return templates.TemplateResponse("abmusuarios.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="abmusuarios.html")
+
+
 @app.get("/analistascalidad", response_class=HTMLResponse)
 def vista_analistascalidad(request: Request):
-    return templates.TemplateResponse("calidad.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="calidad.html")
+
 
 @app.get("/depositomp", response_class=HTMLResponse)
 def vista_depositomp(request: Request):
-    return templates.TemplateResponse("depositomp.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="depositomp.html")
+
 
 @app.get("/depositopt", response_class=HTMLResponse)
 def vista_depositopt(request: Request):
-    return templates.TemplateResponse("depositopt.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="depositopt.html")
 
 
 # ==========================================
