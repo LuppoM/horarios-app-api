@@ -12,37 +12,18 @@
 
     <!-- Top bar -->
     <div class="top-bar">
-        <button class="btn-accion btn-guardar" onclick="guardarMecanicos()">Guardar</button>
-        <button class="btn-accion btn-cerrar" onclick="location.href='/'">Cerrar</button>
-        
+        <button type="button" class="btn-accion btn-guardar" onclick="guardarMecanicos()">Guardar</button>
+        <button type="button" class="btn-accion btn-cerrar" onclick="location.href='/'">Cerrar</button>
+
         <span class="semana-label">Semana actual:</span>
         <input type="text" id="inputSemana" class="semana-input" readonly>
     </div>
 
-    <!-- Contenedor General con las tarjetas de planta y vacaciones -->
-    <div class="plantas-container">
-        
-        <!-- CARGA DATOS - GOLOSINAS -->
-        <div class="card-carga">
-            <h3 class="card-titulo">GOLOSINAS</h3>
-            <div id="bloquesGolosinas"></div>
-        </div>
-
-        <!-- CARGA DATOS - CHOCOLATES -->
-        <div class="card-carga">
-            <h3 class="card-titulo">CHOCOLATES</h3>
-            <div id="bloquesChocolates"></div>
-        </div>
-
-        <!-- CARGA DATOS - VACACIONES -->
-        <div class="card-carga">
-            <h3 class="card-titulo">PERSONAL DE VACACIONES</h3>
-            <div id="bloquesVacaciones"></div>
-        </div>
-
-    </div>
+    <!-- Contenedor dinámico de sectores desde la BD -->
+    <div id="gridContenedor" class="plantas-container grid-sectores"></div>
 
     <script>
+        let datosGlobales = {};
         let mecanicosDisponibles = [];
         let semanaActualGlobal = "";
 
@@ -54,120 +35,94 @@
 
         async function cargarDatos() {
             try {
-                const res = await fetch(`/api/mecanicos/datos?semana=${semanaActualGlobal}`);
-                const data = await res.json();
+                const querySemana = semanaActualGlobal ? `?semana=${encodeURIComponent(semanaActualGlobal)}` : "";
+                const res = await fetch(`/api/mecanicos/datos${querySemana}`);
+                datosGlobales = await res.json();
 
-                semanaActualGlobal = data.semana || semanaActualGlobal;
-                document.getElementById('inputSemana').value = semanaActualGlobal;
-                mecanicosDisponibles = data.disponibles || [];
+                semanaActualGlobal = datosGlobales.semana || semanaActualGlobal;
+                const inputSemana = document.getElementById('inputSemana');
+                if (inputSemana) inputSemana.value = semanaActualGlobal;
 
-                const sectores = data.sectores || [];
-                const asignados = data.asignados || [];
-
-                const sectoresGolo = sectores.filter(s => (s.planta || '').toLowerCase().includes('golos'));
-                const sectoresChoco = sectores.filter(s => (s.planta || '').toLowerCase().includes('choco'));
-                const sectoresSinPlanta = sectores.filter(s => {
-                    const p = (s.planta || '').toLowerCase();
-                    return !p.includes('golos') && !p.includes('choco');
-                });
-
-                renderizarSectores('Golosinas', 'bloquesGolosinas', sectoresGolo, asignados);
-                renderizarSectores('Chocolates', 'bloquesChocolates', sectoresChoco.concat(sectoresSinPlanta), asignados);
-                renderizarVacaciones('Vacaciones', 'bloquesVacaciones', asignados);
-
+                mecanicosDisponibles = datosGlobales.disponibles || datosGlobales.operarios_disponibles || [];
+                renderizarUI();
             } catch (error) {
                 console.error("Error al cargar mecánicos:", error);
                 alert("Error al obtener los datos de mecánicos.");
             }
         }
 
-        function renderizarSectores(nombrePlanta, idContenedor, listaSectores, asignados) {
-            const contenedor = document.getElementById(idContenedor);
-            contenedor.innerHTML = "";
+        function renderizarUI() {
+            const grid = document.getElementById('gridContenedor');
+            grid.innerHTML = "";
 
-            listaSectores.forEach(secObj => {
-                const nombreSector = secObj.sector;
-                const turnos = secObj.turnos || [];
+            const sectores = datosGlobales.sectores || [];
+            if (sectores.length === 0) {
+                grid.innerHTML = `<p style="padding:20px; color:#555;">No hay sectores configurados en la base de datos para este módulo.</p>`;
+                return;
+            }
 
-                const secCard = document.createElement('div');
-                secCard.className = "sector-bloque";
-                secCard.innerHTML = `<h4 class="sector-subtitulo">${escaparHtml(nombreSector)}</h4>`;
+            const asignados = datosGlobales.asignados || [];
+
+            sectores.forEach(secObj => {
+                const nombreSector = String(secObj.sector || "").trim();
+                const plantaSector = String(secObj.planta || nombreSector).trim();
+                const turnos = Array.isArray(secObj.turnos) ? secObj.turnos : [];
+
+                const card = document.createElement('div');
+                card.className = "card-carga sector-card";
+                card.innerHTML = `<h3 class="card-titulo">${escaparHtml(nombreSector)}</h3>`;
 
                 turnos.forEach(horario => {
-                    const blockDiv = document.createElement('div');
-                    blockDiv.className = "horario-block";
-                    blockDiv.dataset.horario = horario;
-                    blockDiv.dataset.planta = nombrePlanta;
-                    blockDiv.dataset.sector = nombreSector;
+                    const turnoLimpio = String(horario || "").trim();
+                    if (!turnoLimpio) return;
 
-                    const idContRows = `container_${limpiarId(nombrePlanta)}_${limpiarId(nombreSector)}_${limpiarId(horario)}`;
+                    const idContRows = `container_${limpiarId(nombreSector)}_${limpiarId(turnoLimpio)}`;
+
+                    const blockDiv = document.createElement('div');
+                    blockDiv.className = "horario-block turno-box";
+                    blockDiv.dataset.horario = turnoLimpio;
+                    blockDiv.dataset.planta = plantaSector;
+                    blockDiv.dataset.sector = nombreSector;
 
                     blockDiv.innerHTML = `
                         <div class="horario-header">
-                            <strong>Horario: ${escaparHtml(horario)}</strong>
+                            <strong>Horario: ${escaparHtml(turnoLimpio)}</strong>
                             <button type="button" class="btn-agregar-op" onclick="agregarFilaOperario('${idContRows}')">+ Agregar operario</button>
                         </div>
-                        <div class="rows-container" id="${idContRows}"></div>
+                        <div class="rows-container filas-container" id="${idContRows}"></div>
                     `;
 
-                    secCard.appendChild(blockDiv);
+                    card.appendChild(blockDiv);
 
-                    const asignadosEnBloque = asignados.filter(a =>
-                        a[2] === horario &&
-                        a[3] && a[3].toLowerCase() === nombrePlanta.toLowerCase()
-                    );
+                    const asignadosEnBloque = asignados.filter(a => {
+                        const horAsig = String(a[2] || "").trim();
+                        const planAsig = String(a[3] || "").trim().toLowerCase();
+                        return horAsig === turnoLimpio && (
+                            !planAsig ||
+                            planAsig === plantaSector.toLowerCase() ||
+                            planAsig === nombreSector.toLowerCase()
+                        );
+                    });
 
                     asignadosEnBloque.forEach(a => {
                         agregarFilaOperario(idContRows, a[0], a[1]);
                     });
                 });
 
-                contenedor.appendChild(secCard);
-            });
-        }
-
-        function renderizarVacaciones(nombrePlanta, idContenedor, asignados) {
-            const contenedor = document.getElementById(idContenedor);
-            contenedor.innerHTML = "";
-
-            const horario = "VACACIONES";
-            const idContRows = `container_${limpiarId(nombrePlanta)}_${limpiarId(horario)}`;
-
-            const blockDiv = document.createElement('div');
-            blockDiv.className = "horario-block";
-            blockDiv.dataset.horario = horario;
-            blockDiv.dataset.planta = nombrePlanta;
-
-            blockDiv.innerHTML = `
-                <div class="horario-header">
-                    <strong>Mecánicos</strong>
-                    <button type="button" class="btn-agregar-op" onclick="agregarFilaOperario('${idContRows}')">+ Agregar operario</button>
-                </div>
-                <div class="rows-container" id="${idContRows}"></div>
-            `;
-
-            contenedor.appendChild(blockDiv);
-
-            const asignadosVac = asignados.filter(a =>
-                a[2] === horario &&
-                a[3] && a[3].toLowerCase() === nombrePlanta.toLowerCase()
-            );
-
-            asignadosVac.forEach(a => {
-                agregarFilaOperario(idContRows, a[0], a[1]);
+                grid.appendChild(card);
             });
         }
 
         function limpiarId(cadena) {
-            return String(cadena || '').replace(/[^a-zA-Z0-9]/g, '_');
+            return String(cadena || "").replace(/[^a-zA-Z0-9]/g, "_");
         }
 
         function escaparHtml(str) {
-            return String(str ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
+            return String(str ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
         }
 
         function agregarFilaOperario(idContRows, idVal = "", nombreVal = "") {
@@ -191,7 +146,7 @@
                 const opt = document.createElement('option');
                 opt.value = id;
                 opt.textContent = nombre;
-                if (parseInt(id) === parseInt(idVal) || nombre === nombreVal) {
+                if (parseInt(id, 10) === parseInt(idVal, 10) || String(nombre).trim() === String(nombreVal).trim()) {
                     opt.selected = true;
                     inputId.value = id;
                 }
@@ -216,7 +171,7 @@
         }
 
         async function guardarMecanicos() {
-            let registros = [];
+            const registros = [];
 
             document.querySelectorAll('.horario-block').forEach(bloque => {
                 const horario = bloque.dataset.horario;
@@ -225,7 +180,7 @@
                 bloque.querySelectorAll('.fila-operario').forEach(fila => {
                     const idOp = fila.querySelector('.input-id-box').value;
                     if (idOp) {
-                        registros.push([parseInt(idOp), horario, planta]);
+                        registros.push([parseInt(idOp, 10), horario, planta]);
                     }
                 });
             });
@@ -234,7 +189,10 @@
                 const res = await fetch('/api/mecanicos/guardar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ semana: semanaActualGlobal, registros: registros })
+                    body: JSON.stringify({
+                        semana: semanaActualGlobal,
+                        registros: registros
+                    })
                 });
 
                 const r = await res.json();
@@ -242,7 +200,7 @@
                     alert("Horarios de mecánicos guardados correctamente.");
                     await cargarDatos();
                 } else {
-                    alert("Error al guardar: " + r.message);
+                    alert("Error al guardar: " + (r.message || r.mensaje || ""));
                 }
             } catch (error) {
                 console.error("Error al guardar:", error);
