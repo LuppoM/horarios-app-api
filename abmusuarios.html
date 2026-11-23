@@ -27,7 +27,7 @@
                 <div>
                     <a href="/" class="btn-volver">← Volver al Menú Principal</a>
                     <h1>Gestión de Usuarios</h1>
-                    <p class="abm-subtitulo">Administración de usuarios, áreas y acceso con contraseña</p>
+                    <p class="abm-subtitulo">Administración de usuarios, áreas, permisos y acceso con contraseña</p>
                 </div>
                 <div class="header-acciones">
                     <span id="info-usuario" class="usuario-pill"></span>
@@ -51,6 +51,7 @@
                             <th>ID</th>
                             <th>Usuario</th>
                             <th>Área</th>
+                            <th>Botones Visibles</th>
                             <th>Requiere Contraseña</th>
                             <th>Contraseña</th>
                             <th class="col-acciones">Acciones</th>
@@ -58,7 +59,7 @@
                     </thead>
                     <tbody id="tbody-usuarios">
                         <tr>
-                            <td colspan="6" class="texto-centro">Cargando usuarios...</td>
+                            <td colspan="7" class="texto-centro">Cargando usuarios...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -79,20 +80,42 @@
 
                 <div class="campo-grupo">
                     <label for="campo-usuario">Nombre de Usuario *</label>
-                    <input type="text" id="campo-usuario" required placeholder="Ej: jperez">
+                    <input type="text" id="campo-usuario" required placeholder="Ej: calidad">
                 </div>
 
                 <div class="campo-grupo">
                     <label for="campo-area">Área / Planta *</label>
-                    <input type="text" id="campo-area" list="lista-areas-sugeridas" required placeholder="Ej: CHOCOLATES, GOLOSINAS, SISTEMAS...">
+                    <input type="text" id="campo-area" list="lista-areas-sugeridas" required placeholder="Ej: PRODUCCION, CALIDAD, MANTENIMIENTO...">
                     <datalist id="lista-areas-sugeridas">
-                        <option value="SISTEMAS">
-                        <option value="CHOCOLATES">
-                        <option value="GOLOSINAS">
+                        <option value="ADMIN">
+                        <option value="PRODUCCION">
                         <option value="MANTENIMIENTO">
-                        <option value="PROGRAMACION">
-                        <option value="RRHH">
+                        <option value="CALIDAD">
+                        <option value="DEPOSITO MATERIA PRIMA">
+                        <option value="DEPOSITO PRODUCTO TERMINADO">
                     </datalist>
+                </div>
+
+                <div class="campo-grupo">
+                    <label style="display:block; margin-bottom:6px;">Botones visibles en Menú Principal *</label>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; padding:10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc;">
+                        <label class="switch-label" style="margin:0;">
+                            <input type="checkbox" name="permiso_btn" value="HORARIOS" checked>
+                            <span>Horarios</span>
+                        </label>
+                        <label class="switch-label" style="margin:0;">
+                            <input type="checkbox" name="permiso_btn" value="CONSOLIDADO" checked>
+                            <span>Consolidado</span>
+                        </label>
+                        <label class="switch-label" style="margin:0;">
+                            <input type="checkbox" name="permiso_btn" value="DOTACION_PROGRAMADA">
+                            <span>Dotación Programada</span>
+                        </label>
+                        <label class="switch-label" style="margin:0;">
+                            <input type="checkbox" name="permiso_btn" value="PARAMETROS">
+                            <span>Parámetros</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="campo-grupo campo-checkbox">
@@ -128,6 +151,13 @@
 
     <script>
         let listaUsuarios = [];
+
+        const ETIQUETAS_PERMISOS = {
+            'HORARIOS': 'Horarios',
+            'CONSOLIDADO': 'Consolidado',
+            'DOTACION_PROGRAMADA': 'Dotación Prog.',
+            'PARAMETROS': 'Parámetros'
+        };
 
         function headersApi(extra = {}) {
             return {
@@ -185,6 +215,18 @@
             }
         }
 
+        function setPermisosCheckboxes(permisosLista) {
+            const setPermisos = new Set((permisosLista || []).map(p => String(p).toUpperCase()));
+            document.querySelectorAll('input[name="permiso_btn"]').forEach(chk => {
+                chk.checked = setPermisos.has(chk.value);
+            });
+        }
+
+        function getPermisosCheckboxes() {
+            return Array.from(document.querySelectorAll('input[name="permiso_btn"]:checked'))
+                .map(chk => chk.value);
+        }
+
         async function cargarUsuarios() {
             const tbody = document.getElementById('tbody-usuarios');
             try {
@@ -199,7 +241,7 @@
                 listaUsuarios = Array.isArray(data) ? data : (data.datos || []);
                 renderizarTabla(listaUsuarios);
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="6" class="texto-centro texto-error">${err.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="texto-centro texto-error">${err.message}</td></tr>`;
             }
         }
 
@@ -209,13 +251,19 @@
             contador.textContent = `${datos.length} usuario${datos.length === 1 ? '' : 's'}`;
 
             if (!datos.length) {
-                tbody.innerHTML = `<tr><td colspan="6" class="texto-centro">No se encontraron usuarios.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="texto-centro">No se encontraron usuarios.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = datos.map(u => {
                 const reqClave = Boolean(u.requiere_contrasena);
                 const badgeArea = `<span class="badge">${escaparHtml(u.area || '-')}</span>`;
+
+                const permisosArr = Array.isArray(u.permisos) ? u.permisos : [];
+                const badgesPermisos = permisosArr.length
+                    ? permisosArr.map(p => `<span class="badge" style="margin:2px; font-size:11px;">${escaparHtml(ETIQUETAS_PERMISOS[p] || p)}</span>`).join('')
+                    : `<span class="texto-ayuda">Ninguno</span>`;
+
                 const badgeReq = reqClave
                     ? `<span class="badge badge-activo">Sí</span>`
                     : `<span class="badge badge-inactivo">No (directo)</span>`;
@@ -230,6 +278,7 @@
                         <td>${u.id}</td>
                         <td><strong>${escaparHtml(u.usuario)}</strong></td>
                         <td>${badgeArea}</td>
+                        <td>${badgesPermisos}</td>
                         <td>${badgeReq}</td>
                         <td class="celda-clave">${celdaClave}</td>
                         <td class="col-acciones">
@@ -271,6 +320,7 @@
             document.getElementById('usuario-id').value = '';
             document.getElementById('campo-usuario').value = '';
             document.getElementById('campo-area').value = '';
+            setPermisosCheckboxes(['HORARIOS', 'CONSOLIDADO']);
             document.getElementById('campo-requiere-clave').checked = true;
             document.getElementById('campo-clave').value = '';
             document.getElementById('campo-clave').type = 'password';
@@ -291,6 +341,7 @@
             document.getElementById('usuario-id').value = user.id;
             document.getElementById('campo-usuario').value = user.usuario || '';
             document.getElementById('campo-area').value = user.area || '';
+            setPermisosCheckboxes(user.permisos || ['HORARIOS', 'CONSOLIDADO']);
             document.getElementById('campo-requiere-clave').checked = Boolean(user.requiere_contrasena);
             document.getElementById('campo-clave').value = '';
             document.getElementById('campo-clave').type = 'password';
@@ -314,6 +365,7 @@
             const id = document.getElementById('usuario-id').value;
             const usuario = document.getElementById('campo-usuario').value.trim();
             const area = document.getElementById('campo-area').value.trim().toUpperCase();
+            const permisos = getPermisosCheckboxes();
             const requiere_contrasena = document.getElementById('campo-requiere-clave').checked;
             const contrasena = document.getElementById('campo-clave').value.trim();
 
@@ -340,6 +392,7 @@
                     body: JSON.stringify({
                         usuario,
                         area,
+                        permisos,
                         requiere_contrasena,
                         contrasena: requiere_contrasena ? contrasena : null
                     })
@@ -348,6 +401,16 @@
                 const data = await resp.json();
                 if (!resp.ok) {
                     throw new Error(data.detail || 'No se pudo guardar el usuario.');
+                }
+
+                // Sincroniza sessionStorage al instante si se editó el usuario actualmente logueado
+                if (id && usuarioActual && Number(usuarioActual.id) === Number(id)) {
+                    usuarioActual.usuario = usuario;
+                    usuarioActual.area = area;
+                    usuarioActual.permisos = permisos;
+                    sessionStorage.setItem('usuario_sesion', JSON.stringify(usuarioActual));
+                    const spanUser = document.getElementById('info-usuario');
+                    if (spanUser) spanUser.textContent = `Usuario: ${usuario}`;
                 }
 
                 cerrarModal();

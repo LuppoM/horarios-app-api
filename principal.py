@@ -32,7 +32,8 @@ import abmusuariosmodelo
 from modelocalidad import ModeloAnalistasCalidadWeb
 from modelodepositomp import ModeloDepositoMPWeb
 from modelodepositopt import ModeloDepositoPTWeb
-
+import usuariosmodelo
+from typing import Optional, List
 
 modelo_dtprog = ModeloDTProgramadaWeb()
 app = FastAPI(title="ARMADO DE HORARIOS")
@@ -189,20 +190,24 @@ def vista_depositopt(request: Request):
 
 @app.get("/api/modmoi/datos")
 def api_obtener_modmoi(
-    vista: str = "Semana", columna: str = None, filtro: str = None
+    vista: str = "Semana",
+    columna: str = None,
+    filtro: str = None,
+    area: str = None,
 ):
     modelo = ModMoiModel()
     try:
-        # Traer los datos según la vista
-        if vista == "Mecanicos":
-            columnas, datos = modelo.obtener_datos_mecanicos(columna, filtro)
-        elif vista == "Fin de Semana":
-            columnas, datos = modelo.obtener_datos_finde(columna, filtro)
-        else:
-            columnas, datos = modelo.obtener_datos(columna, filtro)
+        columnas, datos = modelo.obtener_datos(
+            filtro_columna=columna,
+            filtro_valor=filtro,
+            area=area,
+            vista=vista,
+        )
 
-        # Contar MOD y MOI especificando la vista seleccionada por el usuario
-        mod_count, moi_count = modelo.contar_mano_de_obra(vista=vista)
+        mod_count, moi_count = modelo.contar_mano_de_obra(
+            vista=vista,
+            area=area,
+        )
 
         return {
             "columnas": columnas,
@@ -218,92 +223,106 @@ def api_obtener_modmoi(
 
 
 @app.get("/api/modmoi/exportar-excel")
-def api_exportar_excel(vista: str = "Semana"):
-    semana_actual = modmoi_modelo.obtener_numero_semana_personalizado(date.today())
-
-    if vista == "Mecanicos":
-        columnas, datos = modmoi_modelo.obtener_datos_mecanicos(semana_actual=semana_actual)
-        nombre_hoja = "Horarios Mecanicos"
-        nombre_archivo = f"Consolidado Mecanicos semana {semana_actual}.xlsx"
-    elif vista == "Fin de Semana":
-        columnas, datos = modmoi_modelo.obtener_datos_finde(semana_actual=semana_actual)
-        nombre_hoja = "Horarios Finde"
-        nombre_archivo = f"Consolidado Finde semana {semana_actual}.xlsx"
-    else:
-        columnas, datos = modmoi_modelo.obtener_datos(semana_actual=semana_actual)
-        nombre_hoja = "Horarios Semana"
-        nombre_archivo = f"Consolidado Semana {semana_actual}.xlsx"
-
-    if not datos:
-        return {"error": "No hay datos registrados para exportar."}
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = nombre_hoja
-
-    encabezado_font = Font(bold=True, color="FFFFFF")
-    encabezado_fill = PatternFill("solid", fgColor="4F81BD")
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-
-    for i, col in enumerate(columnas, start=1):
-        celda = ws.cell(row=1, column=i, value=col)
-        celda.font = encabezado_font
-        celda.fill = encabezado_fill
-        celda.border = thin_border
-        celda.alignment = Alignment(horizontal="center", vertical="center")
-
-    for fila_idx, fila in enumerate(datos, start=2):
-        for col_idx, valor in enumerate(fila, start=1):
-            celda = ws.cell(row=fila_idx, column=col_idx, value=valor)
-            celda.border = thin_border
-            celda.alignment = Alignment(vertical="center", wrap_text=True)
-
-    for col_idx, col in enumerate(columnas, start=1):
-        max_length = len(str(col))
-        for fila in datos:
-            val_celda = fila[col_idx - 1]
-            texto_val = str(val_celda) if val_celda is not None else ""
-            if len(texto_val) > max_length:
-                max_length = len(texto_val)
-
-        letra_col = get_column_letter(col_idx)
-        ws.column_dimensions[letra_col].width = max(15, min(max_length + 2, 50))
-
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-
-    headers = {"Content-Disposition": f'attachment; filename="{nombre_archivo}"'}
-
-    return StreamingResponse(
-        output,
-        headers=headers,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
-@app.get("/api/modmoi/obtener/{id_registro}")
-def api_obtener_registro(id_registro: int):
-    # Instanciamos el modelo unificado que se conecta a Supabase
+def api_exportar_excel(vista: str = "Semana", area: str = None):
     modelo = ModMoiModel()
     try:
-        data = modelo.obtener_por_id(id_registro)
+        semana_actual = modelo.obtener_numero_semana_personalizado(date.today())
+
+        columnas, datos = modelo.obtener_datos(
+            semana_actual=semana_actual,
+            area=area,
+            vista=vista,
+        )
+        nombre_hoja = f"Horarios {vista}"[:31]
+        nombre_archivo = f"Consolidado {vista} semana {semana_actual}.xlsx"
+
+        if not datos:
+            return {"error": "No hay datos registrados para exportar."}
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = nombre_hoja
+
+        encabezado_font = Font(bold=True, color="FFFFFF")
+        encabezado_fill = PatternFill("solid", fgColor="4F81BD")
+        thin_border = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
+        )
+
+        for i, col in enumerate(columnas, start=1):
+            celda = ws.cell(row=1, column=i, value=col)
+            celda.font = encabezado_font
+            celda.fill = encabezado_fill
+            celda.border = thin_border
+            celda.alignment = Alignment(horizontal="center", vertical="center")
+
+        for fila_idx, fila in enumerate(datos, start=2):
+            for col_idx, valor in enumerate(fila, start=1):
+                celda = ws.cell(row=fila_idx, column=col_idx, value=valor)
+                celda.border = thin_border
+                celda.alignment = Alignment(vertical="center", wrap_text=True)
+
+        for col_idx, col in enumerate(columnas, start=1):
+            max_length = len(str(col))
+            for fila in datos:
+                val_celda = fila[col_idx - 1]
+                texto_val = str(val_celda) if val_celda is not None else ""
+                if len(texto_val) > max_length:
+                    max_length = len(texto_val)
+
+            letra_col = get_column_letter(col_idx)
+            ws.column_dimensions[letra_col].width = max(15, min(max_length + 2, 50))
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        headers = {"Content-Disposition": f'attachment; filename="{nombre_archivo}"'}
+
+        return StreamingResponse(
+            output,
+            headers=headers,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    finally:
+        modelo.cerrar_conexion()
+
+
+@app.get("/api/modmoi/obtener/{id_registro}")
+def api_obtener_registro(
+    id_registro: int,
+    vista: str = "Semana",
+    area: str = None,
+    origen_tabla: str = None,
+):
+    modelo = ModMoiModel()
+    try:
+        data = modelo.obtener_por_id(
+            id_registro,
+            area=area,
+            origen_tabla=origen_tabla,
+            vista=vista,
+        )
         if data:
             return {"status": "ok", "data": data}
         return {"status": "error", "mensaje": "Registro no encontrado"}
     except Exception as e:
         print(f"Error al obtener registro {id_registro}: {e}")
         return {"status": "error", "mensaje": str(e)}
+    finally:
+        modelo.cerrar_conexion()
 
 
 @app.post("/api/modmoi/guardar")
 def api_guardar_modmoi(payload: dict = Body(...)):
     modo = payload.get("modo")
     id_reg = payload.get("id")
+    vista = payload.get("vista", "Semana")
+    area = payload.get("area")
+    origen_tabla = payload.get("origen_tabla")
     datos = payload.get("datos", {})
 
     operario = datos.get("operario", "").strip()
@@ -315,12 +334,25 @@ def api_guardar_modmoi(payload: dict = Body(...)):
     modelo = ModMoiModel()
     try:
         if modo == "modificar" and id_reg:
-            exito = modelo.actualizar_registro(int(id_reg), calificacion, operario)
+            exito = modelo.actualizar_registro(
+                int(id_reg),
+                calificacion,
+                operario,
+                area=area,
+                origen_tabla=origen_tabla,
+                vista=vista,
+            )
             if exito:
                 return {"status": "ok"}
             return {"status": "error", "mensaje": "No se pudo actualizar el registro en Supabase."}
         elif modo == "insertar":
-            exito = modelo.agregar_registro(calificacion, operario)
+            exito = modelo.agregar_registro(
+                calificacion,
+                operario,
+                area=area,
+                origen_tabla=origen_tabla,
+                vista=vista,
+            )
             if exito:
                 return {"status": "ok"}
             return {"status": "error", "mensaje": "No se pudo agregar el registro en Supabase."}
@@ -335,10 +367,20 @@ def api_guardar_modmoi(payload: dict = Body(...)):
 
 
 @app.delete("/api/modmoi/eliminar/{id_registro}")
-def api_eliminar_registro(id_registro: int):
+def api_eliminar_registro(
+    id_registro: int,
+    vista: str = "Semana",
+    area: str = None,
+    origen_tabla: str = None,
+):
     modelo = ModMoiModel()
     try:
-        exito = modelo.eliminar_registro(id_registro)
+        exito = modelo.eliminar_registro(
+            id_registro,
+            area=area,
+            origen_tabla=origen_tabla,
+            vista=vista,
+        )
         if exito:
             return {"status": "ok"}
         return {"status": "error", "message": "No se pudo eliminar el registro en Supabase."}
@@ -354,16 +396,24 @@ def api_eliminar_registro(id_registro: int):
 def api_guardar_edicion(payload: dict = Body(...)):
     id_reg = payload.get("id")
     operario = payload.get("operario", "").strip()
-    
     calificacion = payload.get("calificacion_mano_obra", "MOD").strip()
+    area = payload.get("area")
+    origen_tabla = payload.get("origen_tabla")
+    vista = payload.get("vista", "Semana")
 
     if not id_reg or not operario:
         return {"status": "error", "mensaje": "Datos incompletos"}
 
     modelo = ModMoiModel()
     try:
-        # Se pasan exactamente los 4 argumentos: id_registro, calificacion, operario
-        exito = modelo.actualizar_registro(id_reg, calificacion, operario)
+        exito = modelo.actualizar_registro(
+            int(id_reg),
+            calificacion,
+            operario,
+            area=area,
+            origen_tabla=origen_tabla,
+            vista=vista,
+        )
         if exito:
             return {"status": "ok"}
         return {"status": "error", "mensaje": "No se pudo actualizar el registro en Supabase"}
@@ -377,12 +427,14 @@ def api_guardar_edicion(payload: dict = Body(...)):
 
 @app.post("/api/modmoi/limpiar-semanas")
 def api_limpiar_semanas_manual():
+    modelo = ModMoiModel()
     try:
-        modmoi_modelo.limpiar_semanas_anteriores()
+        modelo.limpiar_semanas_anteriores()
         return {"status": "ok", "message": "Puestos blanqueados correctamente en Supabase."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
-
+    finally:
+        modelo.cerrar_conexion()
 
 # ==========================================
 # 3. MÓDULO: SECTORES
@@ -1386,6 +1438,14 @@ async def api_mecanicos_guardar(request: Request):
 # 9. MÓDULO: Usuarios y login
 # ==========================================
 
+class UsuarioABMRequest(BaseModel):
+    usuario: str
+    area: str
+    requiere_contrasena: bool = True
+    contrasena: Optional[str] = None
+    permisos: Optional[List[str]] = None
+
+
 @app.get("/api/usuario-config/{usuario}")
 def api_usuario_config(usuario: str):
     config = verificar_requiere_clave(usuario)
@@ -1393,12 +1453,19 @@ def api_usuario_config(usuario: str):
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return {"ok": True, **config}
 
+
 @app.post("/api/login")
 def api_login(datos: LoginRequest):
     user = validar_usuario(datos.usuario, datos.clave)
     if not user:
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
     return {"ok": True, **user}
+
+
+@app.get("/api/usuarios-login")
+def obtener_usuarios_login():
+    return usuariosmodelo.listar_usuarios_login()
+
 
 # --- ENDPOINTS CRUD PARA GESTIÓN DE USUARIOS ---
 
@@ -1409,25 +1476,37 @@ def api_listar_usuarios():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/usuarios")
 def api_crear_usuario(datos: UsuarioABMRequest):
     try:
         nuevo_id = abmusuariosmodelo.crear_usuario(
-            datos.usuario, datos.area, datos.requiere_contrasena, datos.contrasena
+            datos.usuario,
+            datos.area,
+            datos.requiere_contrasena,
+            datos.contrasena,
+            permisos=datos.permisos,
         )
         return {"ok": True, "id": nuevo_id, "message": "Usuario creado correctamente."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.put("/api/usuarios/{user_id}")
 def api_editar_usuario(user_id: int, datos: UsuarioABMRequest):
     try:
         abmusuariosmodelo.editar_usuario(
-            user_id, datos.usuario, datos.area, datos.requiere_contrasena, datos.contrasena
+            user_id,
+            datos.usuario,
+            datos.area,
+            datos.requiere_contrasena,
+            datos.contrasena,
+            permisos=datos.permisos,
         )
         return {"ok": True, "message": "Usuario actualizado correctamente."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.delete("/api/usuarios/{user_id}")
 def api_eliminar_usuario(user_id: int):
@@ -1436,6 +1515,7 @@ def api_eliminar_usuario(user_id: int):
         return {"ok": True, "message": "Usuario eliminado correctamente."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
     
 # --- ANALISTAS DE CALIDAD ---
 @app.get("/api/analistascalidad/datos")

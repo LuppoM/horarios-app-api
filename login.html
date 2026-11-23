@@ -8,6 +8,20 @@
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
 
     <style>
+        .login-form select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: #ffffff;
+            color: #0f172a;
+            cursor: pointer;
+        }
+        .login-form select:focus {
+            outline: none;
+            border-color: #8b2635;
+        }
         .password-wrapper {
             position: relative;
             display: flex;
@@ -41,11 +55,13 @@
 <body>
     <main class="login-contenedor">
         <h1 class="login-titulo">Carga de Horarios</h1>
-        <p class="login-subtitulo">Ingresá con tu usuario</p>
+        <p class="login-subtitulo">Seleccioná tu usuario para ingresar</p>
 
         <form id="form-login" class="login-form" autocomplete="on" novalidate>
             <label for="usuario">Usuario</label>
-            <input type="text" id="usuario" name="usuario" autocomplete="username" required autofocus>
+            <select id="usuario" name="usuario" required autofocus>
+                <option value="">Cargando usuarios...</option>
+            </select>
 
             <div id="bloque-clave" hidden>
                 <label for="clave">Contraseña</label>
@@ -71,9 +87,9 @@
             window.location.replace('/');
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const form = document.getElementById('form-login');
-            const inpUsuario = document.getElementById('usuario');
+            const selUsuario = document.getElementById('usuario');
             const bloqueClave = document.getElementById('bloque-clave');
             const inpClave = document.getElementById('clave');
             const btnToggleClave = document.getElementById('btn-toggle-clave');
@@ -82,7 +98,6 @@
             const btnIngresar = document.getElementById('btn-ingresar');
 
             let requiereClave = false;
-            let ultimoUsuarioConsultado = '';
 
             btnToggleClave.addEventListener('click', () => {
                 const esPassword = inpClave.type === 'password';
@@ -98,50 +113,59 @@
                 msgError.hidden = false;
             }
 
-            async function chequearUsuario(usuario) {
-                if (!usuario || usuario === ultimoUsuarioConsultado) return;
-                ultimoUsuarioConsultado = usuario;
-
+            async function cargarUsuariosCombo() {
                 try {
-                    const resp = await fetch(`/api/usuario-config/${encodeURIComponent(usuario)}`);
-                    if (!resp.ok) {
-                        requiereClave = false;
-                        bloqueClave.hidden = true;
-                        inpClave.value = '';
-                        return;
-                    }
-                    const data = await resp.json();
-                    requiereClave = Boolean(data.requiere_contrasena);
-                    bloqueClave.hidden = !requiereClave;
+                    const resp = await fetch('/api/usuarios-login');
+                    if (!resp.ok) throw new Error('Error al obtener usuarios');
+                    const usuarios = await resp.json();
 
-                    if (requiereClave) {
-                        inpClave.focus();
-                    } else {
-                        inpClave.value = '';
-                    }
-                } catch (_) {
-                    // Si falla el chequeo previo, el submit igual valida en backend
+                    selUsuario.innerHTML = '<option value="">-- Seleccioná un usuario --</option>';
+                    usuarios.forEach(u => {
+                        const opt = document.createElement('option');
+                        opt.value = u.usuario;
+                        opt.textContent = u.area ? `${u.usuario} (${u.area})` : u.usuario;
+                        opt.dataset.requiereClave = u.requiere_contrasena ? '1' : '0';
+                        selUsuario.appendChild(opt);
+                    });
+                } catch (err) {
+                    selUsuario.innerHTML = '<option value="">Error al cargar usuarios</option>';
+                    mostrarError('No se pudieron cargar los usuarios.');
                 }
             }
 
-            inpUsuario.addEventListener('blur', () => {
-                chequearUsuario(inpUsuario.value.trim().toLowerCase());
+            selUsuario.addEventListener('change', () => {
+                msgError.hidden = true;
+                const opcion = selUsuario.options[selUsuario.selectedIndex];
+
+                if (!opcion || !opcion.value) {
+                    requiereClave = false;
+                    bloqueClave.hidden = true;
+                    inpClave.value = '';
+                    return;
+                }
+
+                requiereClave = opcion.dataset.requiereClave === '1';
+                bloqueClave.hidden = !requiereClave;
+
+                if (requiereClave) {
+                    inpClave.value = '';
+                    inpClave.focus();
+                } else {
+                    inpClave.value = '';
+                }
             });
+
+            await cargarUsuariosCombo();
 
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 msgError.hidden = true;
 
-                const usuario = inpUsuario.value.trim();
+                const usuario = selUsuario.value.trim();
                 if (!usuario) {
-                    mostrarError('Ingresá tu usuario.');
+                    mostrarError('Seleccioná un usuario.');
+                    selUsuario.focus();
                     return;
-                }
-
-                // Si apretó Enter directo sin salir del input, chequeamos primero si pide clave
-                if (usuario.toLowerCase() !== ultimoUsuarioConsultado) {
-                    await chequearUsuario(usuario.toLowerCase());
-                    if (requiereClave) return;
                 }
 
                 const clave = inpClave.value;
@@ -173,7 +197,8 @@
                     sessionStorage.setItem('usuario_sesion', JSON.stringify({
                         id: data.id,
                         usuario: data.usuario,
-                        area: data.area
+                        area: data.area,
+                        permisos: data.permisos || []
                     }));
 
                     window.location.href = '/';

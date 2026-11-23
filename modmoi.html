@@ -35,7 +35,6 @@
             <option value="Calidad">Calidad</option>
             <option value="Depositomp">Deposito MP</option>
             <option value="depositopt">Deposito PT</option>
-
         </select>
 
         <span class="filtro-label">Columna:</span>
@@ -77,7 +76,7 @@
         <div class="modal-content" style="width: 380px;">
             <h3 id="abmTitulo">Orden de Trabajo</h3>
             
-            <div style="margin-bottom: 10px;">
+            <div id="bloqueTipoMo" style="margin-bottom: 10px;">
                 <label style="display:block; font-size: 10pt; font-weight:bold;">Calificación Mano de Obra:</label>
                 <select id="abmTipoMo" style="width: 100%; padding: 5px; margin-top: 2px;">
                     <option value="MOD">MOD</option>
@@ -89,7 +88,6 @@
                 <label style="display:block; font-size: 10pt; font-weight:bold;">Operario:</label>
                 <input type="text" id="abmOperario" style="width: 95%; padding: 5px; margin-top: 2px;">
             </div>
-
 
             <div class="modal-buttons">
                 <button class="btn-confirm" id="btnGuardarAbm" onclick="guardarAbm()">Guardar</button>
@@ -105,80 +103,138 @@
     let datosOriginales = [];
     let columnasOriginales = [];
     let idRegistroActual = null;
+    let origenTablaActual = null;
+    let areaUsuarioActual = '';
 
-    async function cargarDatos() {
-    const vista = document.getElementById('comboVista').value;
-    const comboCol = document.getElementById('comboColumnas');
-    const columna = comboCol.value || '';
-    const filtro = document.getElementById('inputFiltro').value.trim();
+    const VISTAS_PERMITIDAS_POR_AREA = {
+        'ADMIN': ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'depositopt'],
+        'ADMINISTRADOR': ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'depositopt'],
+        'PRODUCCION': ['Semana', 'Fin de Semana'],
+        'PRODUCCIÓN': ['Semana', 'Fin de Semana'],
+        'MANTENIMIENTO': ['Mecanicos'],
+        'CALIDAD': ['Calidad'],
+        'DEPOSITO MATERIA PRIMA': ['Depositomp'],
+        'DEPÓSITO MATERIA PRIMA': ['Depositomp'],
+        'DEPOSITOMP': ['Depositomp'],
+        'DEPOSITO MP': ['Depositomp'],
+        'DEPOSITO PRODUCTO TERMINADO': ['depositopt'],
+        'DEPÓSITO PRODUCTO TERMINADO': ['depositopt'],
+        'DEPOSITOPT': ['depositopt'],
+        'DEPOSITO PT': ['depositopt']
+    };
 
-    const url = `/api/modmoi/datos?vista=${encodeURIComponent(vista)}&columna=${encodeURIComponent(columna)}&filtro=${encodeURIComponent(filtro)}`;
-
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-
-        columnasOriginales = data.columnas || [];
-        datosOriginales = data.datos || [];
-
-        // --- CONTEO DIRECTO EN EL CLIENTE DESDE LOS DATOS RECIBIDOS ---
-        let cantMod = 0;
-        let cantMoi = 0;
-
-        if (vista === 'Mecanicos') {
-            // En la vista de mecánicos, todos los registros se consideran MOI
-            cantMoi = datosOriginales.length;
-        } else {
-            // Buscamos el índice de la columna calificacion_mano_obra
-            const idxCalificacion = columnasOriginales.indexOf("calificacion_mano_obra");
-
-            datosOriginales.forEach(fila => {
-                let valor = "";
-                if (idxCalificacion !== -1) {
-                    valor = String(fila[idxCalificacion] || "").trim().toUpperCase();
-                } else {
-                    // Si no está la columna por nombre, usamos la segunda posición (índice 1) por defecto
-                    valor = String(fila[1] || "").trim().toUpperCase();
-                }
-
-                if (valor === 'MOD') {
-                    cantMod++;
-                } else if (valor === 'MOI') {
-                    cantMoi++;
-                }
-            });
+    function aplicarPermisosVistaPorArea() {
+        const sesionRaw = sessionStorage.getItem('usuario_sesion');
+        if (!sesionRaw) {
+            window.location.replace('/login');
+            return;
         }
 
-        // Actualizamos la etiqueta con el conteo calculado localmente
-        document.getElementById('contadorLabel').innerText = `MOD (Directa): ${cantMod}   |   MOI (Indirecta): ${cantMoi}`;
+        let sesion = {};
+        try {
+            sesion = JSON.parse(sesionRaw);
+        } catch (e) {
+            window.location.replace('/login');
+            return;
+        }
 
-        // --- RECONSTRUCCIÓN DE COLUMNAS Y TABLA ---
-        const colSel = comboCol.value;
-        comboCol.innerHTML = '<option value="">-- Todas las columnas --</option>';
-        columnasOriginales.forEach(col => {
-            const opt = document.createElement('option');
-            opt.value = col;
-            opt.innerText = col;
-            if (col === colSel) opt.selected = true;
-            comboCol.appendChild(opt);
+        areaUsuarioActual = String(sesion.area || '').trim().toUpperCase();
+        const userActual = String(sesion.usuario || '').trim().toUpperCase();
+        const permitidas = VISTAS_PERMITIDAS_POR_AREA[areaUsuarioActual]
+                        || VISTAS_PERMITIDAS_POR_AREA[userActual]
+                        || ['Semana', 'Fin de Semana'];
+
+        const comboVista = document.getElementById('comboVista');
+
+        Array.from(comboVista.options).forEach(opt => {
+            if (!permitidas.includes(opt.value)) {
+                opt.remove();
+            }
         });
 
-        // Generar Encabezados
-        document.getElementById('tablaEncabezados').innerHTML = columnasOriginales.map(c => `<th>${c}</th>`).join('');
-
-        // Generar Filas
-        document.getElementById('tablaCuerpo').innerHTML = datosOriginales.map((fila, idx) => {
-            return `<tr onclick="seleccionarFila(${idx}, this)">
-                ${fila.map(val => `<td>${val !== null ? val : ''}</td>`).join('')}
-            </tr>`;
-        }).join('');
-
-        filaSeleccionadaIdx = null;
-
-    } catch (err) {
-        console.error("Error cargando datos:", err);
+        if (comboVista.options.length > 0) {
+            comboVista.selectedIndex = 0;
+        }
     }
-}
+
+    function obtenerOrigenTablaFila(fila) {
+        const idxOrigen = columnasOriginales.indexOf("origen_tabla");
+        if (idxOrigen !== -1 && fila[idxOrigen]) {
+            return String(fila[idxOrigen]).trim();
+        }
+        return "";
+    }
+
+    async function cargarDatos() {
+        const vista = document.getElementById('comboVista').value;
+        const comboCol = document.getElementById('comboColumnas');
+        const columna = comboCol.value || '';
+        const filtro = document.getElementById('inputFiltro').value.trim();
+
+        const url = `/api/modmoi/datos?vista=${encodeURIComponent(vista)}&columna=${encodeURIComponent(columna)}&filtro=${encodeURIComponent(filtro)}&area=${encodeURIComponent(areaUsuarioActual)}`;
+
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+
+            columnasOriginales = data.columnas || [];
+            datosOriginales = data.datos || [];
+
+            // --- CONTEO DIRECTO EN EL CLIENTE DESDE LOS DATOS RECIBIDOS ---
+            let cantMod = 0;
+            let cantMoi = 0;
+            const vistasSoloMoi = ['Mecanicos', 'Calidad', 'Depositomp', 'depositopt'];
+
+            if (vistasSoloMoi.includes(vista)) {
+                cantMoi = datosOriginales.length;
+            } else {
+                const idxCalificacion = columnasOriginales.indexOf("calificacion_mano_obra");
+
+                datosOriginales.forEach(fila => {
+                    let valor = "";
+                    if (idxCalificacion !== -1) {
+                        valor = String(fila[idxCalificacion] || "").trim().toUpperCase();
+                    } else {
+                        valor = String(fila[1] || "").trim().toUpperCase();
+                    }
+
+                    if (valor === 'MOD') {
+                        cantMod++;
+                    } else if (valor === 'MOI') {
+                        cantMoi++;
+                    }
+                });
+            }
+
+            document.getElementById('contadorLabel').innerText = `MOD (Directa): ${cantMod}   |   MOI (Indirecta): ${cantMoi}`;
+
+            // --- RECONSTRUCCIÓN DE COLUMNAS Y TABLA ---
+            const colSel = comboCol.value;
+            comboCol.innerHTML = '<option value="">-- Todas las columnas --</option>';
+            columnasOriginales.forEach(col => {
+                const opt = document.createElement('option');
+                opt.value = col;
+                opt.innerText = col;
+                if (col === colSel) opt.selected = true;
+                comboCol.appendChild(opt);
+            });
+
+            document.getElementById('tablaEncabezados').innerHTML = columnasOriginales.map(c => `<th>${c}</th>`).join('');
+
+            document.getElementById('tablaCuerpo').innerHTML = datosOriginales.map((fila, idx) => {
+                return `<tr onclick="seleccionarFila(${idx}, this)">
+                    ${fila.map(val => `<td>${val !== null ? val : ''}</td>`).join('')}
+                </tr>`;
+            }).join('');
+
+            filaSeleccionadaIdx = null;
+            origenTablaActual = null;
+
+        } catch (err) {
+            console.error("Error cargando datos:", err);
+        }
+    }
+
     function seleccionarFila(idx, elem) {
         document.querySelectorAll('#tablaCuerpo tr').forEach(tr => tr.classList.remove('selected'));
         elem.classList.add('selected');
@@ -218,10 +274,24 @@
 
     function exportarExcel() {
         const vista = document.getElementById('comboVista').value;
-        window.location.href = `/api/modmoi/exportar-excel?vista=${encodeURIComponent(vista)}`;
+        window.location.href = `/api/modmoi/exportar-excel?vista=${encodeURIComponent(vista)}&area=${encodeURIComponent(areaUsuarioActual)}`;
+    }
+
+    function configurarModalSegunVista(vista, tipoMoDefault = "MOD") {
+        const vistasSoloMoi = ['Mecanicos', 'Calidad', 'Depositomp', 'depositopt'];
+        const selectTipo = document.getElementById('abmTipoMo');
+        if (vistasSoloMoi.includes(vista) || (origenTablaActual && origenTablaActual !== 'modymoi')) {
+            selectTipo.value = "MOI";
+            selectTipo.disabled = true;
+        } else {
+            selectTipo.disabled = false;
+            selectTipo.value = tipoMoDefault;
+        }
     }
 
     async function ejecutarAccion() {
+        const vistaActual = document.getElementById('comboVista').value;
+
         if (accionPendiente === 'limpiar_tabla') {
             if (confirm("¿Estás seguro de que deseas blanquear las asignaciones de horarios, sectores y plantas de la semana?")) {
                 try {
@@ -240,17 +310,19 @@
 
         } else if (accionPendiente === 'agregar') {
             idRegistroActual = null;
-            document.getElementById('abmTitulo').innerText = "Agregar Orden de Trabajo";
-            document.getElementById('abmTipoMo').value = "MOD";
+            origenTablaActual = null;
+            document.getElementById('abmTitulo').innerText = "Agregar Operario";
+            configurarModalSegunVista(vistaActual, "MOD");
             document.getElementById('abmOperario').value = "";
             document.getElementById('modalAbm').style.display = 'flex';
 
         } else if (accionPendiente === 'modificar') {
             const fila = datosOriginales[filaSeleccionadaIdx];
             idRegistroActual = fila[0];
+            origenTablaActual = obtenerOrigenTablaFila(fila);
 
             try {
-                const res = await fetch(`/api/modmoi/obtener/${idRegistroActual}`);
+                const res = await fetch(`/api/modmoi/obtener/${idRegistroActual}?vista=${encodeURIComponent(vistaActual)}&area=${encodeURIComponent(areaUsuarioActual)}&origen_tabla=${encodeURIComponent(origenTablaActual)}`);
                 const resData = await res.json();
                 const reg = resData.data || resData;
 
@@ -270,8 +342,8 @@
                     tipoMoVal = reg.calificacion_mano_obra || "MOD";
                 }
 
-                document.getElementById('abmTitulo').innerText = "Modificar Orden de Trabajo";
-                document.getElementById('abmTipoMo').value = tipoMoVal;
+                document.getElementById('abmTitulo').innerText = "Modificar Operario";
+                configurarModalSegunVista(vistaActual, tipoMoVal);
                 document.getElementById('abmOperario').value = operarioVal;
                 document.getElementById('modalAbm').style.display = 'flex';
 
@@ -283,8 +355,10 @@
         } else if (accionPendiente === 'eliminar') {
             const fila = datosOriginales[filaSeleccionadaIdx];
             idRegistroActual = fila[0];
+            origenTablaActual = obtenerOrigenTablaFila(fila);
+
             if (confirm(`¿Seguro que deseas eliminar el operario con ID ${idRegistroActual}?`)) {
-                const res = await fetch(`/api/modmoi/eliminar/${idRegistroActual}`, { method: 'DELETE' });
+                const res = await fetch(`/api/modmoi/eliminar/${idRegistroActual}?vista=${encodeURIComponent(vistaActual)}&area=${encodeURIComponent(areaUsuarioActual)}&origen_tabla=${encodeURIComponent(origenTablaActual)}`, { method: 'DELETE' });
                 const resData = await res.json();
                 if (resData.status === 'ok') {
                     cargarDatos();
@@ -296,6 +370,7 @@
     }
 
     async function guardarAbm() {
+        const vistaActual = document.getElementById('comboVista').value;
         const tipoMo = document.getElementById('abmTipoMo').value;
         const operario = document.getElementById('abmOperario').value.trim();
 
@@ -309,6 +384,9 @@
         const payload = {
             modo: idParseado ? "modificar" : "insertar",
             id: idParseado,
+            vista: vistaActual,
+            area: areaUsuarioActual,
+            origen_tabla: origenTablaActual,
             datos: {
                 calificacion_mano_obra: tipoMo,
                 operario: operario
@@ -336,8 +414,10 @@
         }
     }
 
-    // Carga inicial al ingresar
-    document.addEventListener('DOMContentLoaded', cargarDatos);
+    document.addEventListener('DOMContentLoaded', () => {
+        aplicarPermisosVistaPorArea();
+        cargarDatos();
+    });
 </script>
 </body>
 </html>

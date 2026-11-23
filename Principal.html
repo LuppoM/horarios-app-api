@@ -5,14 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ARMADO DE HORARIOS</title>
 
-    <!-- Ícono ubicado en la carpeta static -->
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
-
-    <!-- CSS ubicado en la misma carpeta raíz -->
     <link rel="stylesheet" href="/archivos/principalvista.css">
 
     <style>
-        /* Estilos para el badge de estado en los botones */
+        /* Oculta la barra hasta aplicar permisos para evitar parpadeo */
+        .button-frame {
+            visibility: hidden;
+        }
+        .button-frame.listo {
+            visibility: visible;
+        }
+
         .badge-estado {
             font-size: 11px;
             padding: 3px 8px;
@@ -35,10 +39,10 @@
 <body>
 
     <div class="fondo-frame">
-        <div class="button-frame">
+        <div id="barraBotones" class="button-frame">
 
             <!-- 1. MENÚ DESPLEGABLE: HORARIOS -->
-            <div class="dropdown">
+            <div id="btnModuloHorarios" class="dropdown">
                 <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuHorarios')">HORARIOS ▼</button>
                 <div id="menuHorarios" class="dropdown-menu">
                     <a href="/hchoco">Chocolates</a>
@@ -51,10 +55,10 @@
             </div>
 
             <!-- 2. BOTÓN FIJO -->
-            <a href="/modmoi" class="custom-button">CONSOLIDADO</a>
+            <a id="btnModuloConsolidado" href="/modmoi" class="custom-button">CONSOLIDADO</a>
 
             <!-- 3. MENÚ DESPLEGABLE: DOTACIÓN PROGRAMADA -->
-            <div class="dropdown">
+            <div id="btnModuloDotacion" class="dropdown">
                 <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuDtProgramada')">
                     DOTACION PROGRAMADA <span id="badgeEstadoDt" class="badge-estado badge-pendiente">...</span> ▼
                 </button>
@@ -68,7 +72,7 @@
             </div>
 
             <!-- 4. MENÚ DESPLEGABLE: PARÁMETROS -->
-            <div class="dropdown">
+            <div id="btnModuloParametros" class="dropdown">
                 <button class="dropdown-btn" onclick="toggleDropdown(event, 'menuParametros')">PARÁMETROS ▼</button>
                 <div id="menuParametros" class="dropdown-menu">
                     <a href="/sectores">Sectores</a>
@@ -88,9 +92,111 @@
             window.location.replace('/login');
         }
 
+        const RUTAS_HORARIOS_POR_AREA = {
+            'ADMIN': ['/hchoco', '/hgolo', '/mecanicos', '/analistascalidad', '/depositomp', '/depositopt'],
+            'ADMINISTRADOR': ['/hchoco', '/hgolo', '/mecanicos', '/analistascalidad', '/depositomp', '/depositopt'],
+            'PRODUCCION': ['/hchoco', '/hgolo'],
+            'PRODUCCIÓN': ['/hchoco', '/hgolo'],
+            'MANTENIMIENTO': ['/mecanicos'],
+            'CALIDAD': ['/analistascalidad'],
+            'DEPOSITO MATERIA PRIMA': ['/depositomp'],
+            'DEPÓSITO MATERIA PRIMA': ['/depositomp'],
+            'DEPOSITOMP': ['/depositomp'],
+            'DEPOSITO MP': ['/depositomp'],
+            'DEPOSITO PRODUCTO TERMINADO': ['/depositopt'],
+            'DEPÓSITO PRODUCTO TERMINADO': ['/depositopt'],
+            'DEPOSITOPT': ['/depositopt'],
+            'DEPOSITO PT': ['/depositopt']
+        };
+
+        function renderizarPermisosEnDOM(sesion) {
+            const areaActual = String(sesion.area || '').trim().toUpperCase();
+            const usuarioActual = String(sesion.usuario || '').trim().toUpperCase();
+            const esAdmin = areaActual === 'ADMIN' || usuarioActual === 'ADMIN';
+
+            let permisos = Array.isArray(sesion.permisos)
+                ? sesion.permisos.map(p => String(p).toUpperCase())
+                : (esAdmin ? ['HORARIOS', 'CONSOLIDADO', 'DOTACION_PROGRAMADA', 'PARAMETROS'] : ['HORARIOS', 'CONSOLIDADO']);
+
+            const mapaBotones = {
+                'HORARIOS': 'btnModuloHorarios',
+                'CONSOLIDADO': 'btnModuloConsolidado',
+                'DOTACION_PROGRAMADA': 'btnModuloDotacion',
+                'PARAMETROS': 'btnModuloParametros'
+            };
+
+            Object.entries(mapaBotones).forEach(([clavePermiso, idElemento]) => {
+                const el = document.getElementById(idElemento);
+                if (el && !permisos.includes(clavePermiso)) {
+                    el.remove();
+                }
+            });
+
+            const rutasPermitidas = RUTAS_HORARIOS_POR_AREA[areaActual]
+                                 || RUTAS_HORARIOS_POR_AREA[usuarioActual]
+                                 || [];
+
+            const menuHorarios = document.getElementById('menuHorarios');
+            if (menuHorarios) {
+                Array.from(menuHorarios.querySelectorAll('a')).forEach(enlace => {
+                    const href = enlace.getAttribute('href');
+                    if (!rutasPermitidas.includes(href)) {
+                        enlace.remove();
+                    }
+                });
+            }
+
+            const barra = document.getElementById('barraBotones');
+            if (barra) barra.classList.add('listo');
+        }
+
+        async function iniciarPermisosMenuPrincipal() {
+            if (!sesionRaw) return;
+
+            let sesion = {};
+            try {
+                sesion = JSON.parse(sesionRaw);
+            } catch (e) {
+                window.location.replace('/login');
+                return;
+            }
+
+            // 1. Aplica al instante lo guardado en sessionStorage y muestra la barra sin parpadeo
+            renderizarPermisosEnDOM(sesion);
+
+            // 2. Sincroniza en segundo plano con el servidor por si cambiaron permisos en BD
+            try {
+                const usuarioActual = String(sesion.usuario || '').trim().toUpperCase();
+                const resp = await fetch('/api/usuarios', {
+                    headers: { 'X-Usuario': sesion.usuario || '' }
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const lista = Array.isArray(data) ? data : (data.datos || []);
+                    const encontrado = lista.find(
+                        u => String(u.usuario || '').trim().toUpperCase() === usuarioActual
+                    );
+                    if (encontrado && Array.isArray(encontrado.permisos)) {
+                        const anteriores = JSON.stringify(sesion.permisos || []);
+                        const nuevos = JSON.stringify(encontrado.permisos);
+                        if (anteriores !== nuevos) {
+                            sesion.permisos = encontrado.permisos;
+                            sessionStorage.setItem('usuario_sesion', JSON.stringify(sesion));
+                            window.location.reload();
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('No se pudieron refrescar permisos desde API.');
+            }
+        }
+
+        // Ejecuta apenas se parsea el DOM, sin esperar imágenes ni scripts externos
+        iniciarPermisosMenuPrincipal();
+
         function toggleDropdown(event, menuId) {
             event.stopPropagation();
-            
+
             document.querySelectorAll('.dropdown-menu').forEach(menu => {
                 if (menu.id !== menuId) {
                     menu.classList.remove('show');
@@ -110,27 +216,26 @@
         });
 
         document.addEventListener('DOMContentLoaded', function() {
-            fetch('/api/dtprogramada/datos?semana={{ semana_actual }}')
-                .then(res => res.json())
-                .then(data => {
-                    const badge = document.getElementById('badgeEstadoDt');
-                    if (!badge) return;
-
-                    if (data.finalizado || data.estado === "FINALIZADO") {
-                        badge.className = 'badge-estado badge-ok';
-                        badge.innerText = '✅ LISTO';
-                        badge.title = `Semana ${data.semana} finalizada por ${data.modificado_por || 'Programación'}`;
-                    } else {
-                        badge.className = 'badge-estado badge-pendiente';
-                        badge.innerText = '⚠️ PENDIENTE';
-                        badge.title = `Semana ${data.semana} pendiente de carga`;
-                    }
-                })
-                .catch(err => {
-                    console.error('Error al obtener estado de dotación:', err);
-                    const badge = document.getElementById('badgeEstadoDt');
-                    if (badge) badge.style.display = 'none';
-                });
+            const badge = document.getElementById('badgeEstadoDt');
+            if (badge) {
+                fetch('/api/dtprogramada/datos?semana={{ semana_actual }}')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.finalizado || data.estado === "FINALIZADO") {
+                            badge.className = 'badge-estado badge-ok';
+                            badge.innerText = '✅ LISTO';
+                            badge.title = `Semana ${data.semana} finalizada por ${data.modificado_por || 'Programación'}`;
+                        } else {
+                            badge.className = 'badge-estado badge-pendiente';
+                            badge.innerText = '⚠️ PENDIENTE';
+                            badge.title = `Semana ${data.semana} pendiente de carga`;
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error al obtener estado de dotación:', err);
+                        badge.style.display = 'none';
+                    });
+            }
         });
 
         function cerrarSesion(e) {
