@@ -1425,17 +1425,10 @@ def api_mecanicos_datos(semana: Optional[str] = ""):
         for row in sectores_raw:
             sec, tipo, req = row[0], row[1], row[2]
             planta_sec = row[3] if len(row) > 3 else ""
-            t_horario = str(tipo).strip().upper() if tipo else "ROTATIVO"
+            t_horario = str(tipo).strip().upper() if tipo else ""
 
             if t_horario not in cache_turnos:
-                turnos = modelo.obtener_turnos_por_tipo(t_horario)
-                if not turnos:
-                    turnos = (
-                        ["08:00 a 16:00"]
-                        if t_horario == "CENTRAL"
-                        else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
-                    )
-                cache_turnos[t_horario] = turnos
+                cache_turnos[t_horario] = modelo.obtener_turnos_por_tipo(t_horario) if t_horario else []
 
             sectores_info.append({
                 "sector": sec,
