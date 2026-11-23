@@ -117,14 +117,16 @@ def home(request: Request):
 
     # Le enviamos la semana actual y el estado a Jinja2 para Principal.html
    # Le enviamos la semana actual y el estado a Jinja2 para Principal.html
-    return templates.TemplateResponse("Principal.html", {
-        "request": request,
-        "semana_actual": semana_calculada,
-        "estado_programacion": info_estado.get("estado", "PENDIENTE"),
-        "modificado_por": info_estado.get("modificado_por", ""),
-        "fecha_modificacion": info_estado.get("fecha_modificacion", "")
-    })
-
+    return templates.TemplateResponse(
+        request=request,
+        name="Principal.html",
+        context={
+            "semana_actual": semana_calculada,
+            "estado_programacion": info_estado.get("estado", "PENDIENTE"),
+            "modificado_por": info_estado.get("modificado_por", ""),
+            "fecha_modificacion": info_estado.get("fecha_modificacion", ""),
+        },
+    )
 @app.get("/modmoi", response_class=HTMLResponse)
 def vista_modmoi(request: Request):
     return templates.TemplateResponse("modmoi.html", {"request": request})
