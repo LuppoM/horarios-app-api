@@ -1418,15 +1418,42 @@ def api_mecanicos_datos(semana: Optional[str] = ""):
 
         mecanicos_disponibles = modelo.obtener_mecanicos_disponibles()
         asignados = modelo.obtener_asignaciones_semana(semana)
+        sectores_raw = modelo.obtener_sectores_mantenimiento()
+
+        cache_turnos = {}
+        sectores_info = []
+        for row in sectores_raw:
+            sec, tipo, req = row[0], row[1], row[2]
+            planta_sec = row[3] if len(row) > 3 else ""
+            t_horario = str(tipo).strip().upper() if tipo else "ROTATIVO"
+
+            if t_horario not in cache_turnos:
+                turnos = modelo.obtener_turnos_por_tipo(t_horario)
+                if not turnos:
+                    turnos = (
+                        ["08:00 a 16:00"]
+                        if t_horario == "CENTRAL"
+                        else ["06:00 a 14:00", "14:00 a 22:00", "22:00 a 06:00"]
+                    )
+                cache_turnos[t_horario] = turnos
+
+            sectores_info.append({
+                "sector": sec,
+                "planta": planta_sec,
+                "tipo_horario": t_horario,
+                "requiere_dotacion": req,
+                "turnos": cache_turnos[t_horario],
+            })
 
         return {
             "semana": semana,
             "disponibles": mecanicos_disponibles,
-            "asignados": asignados
+            "asignados": asignados,
+            "sectores": sectores_info,
         }
     finally:
         modelo.cerrar_conexion()
-        if hasattr(modelo_base, 'cerrar_conexion'):
+        if hasattr(modelo_base, "cerrar_conexion"):
             modelo_base.cerrar_conexion()
 
 

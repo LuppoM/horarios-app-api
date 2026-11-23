@@ -58,3 +58,70 @@ class ModeloMecanicosWeb:
                 self.conexion_db.close()
             except Exception:
                 pass
+    def _filas(self, cursor):
+        filas = cursor.fetchall()
+        if not filas:
+            return []
+        if isinstance(filas[0], dict):
+            return [tuple(f.values()) for f in filas]
+        return filas
+
+    def obtener_sectores_mantenimiento(self, planta=None):
+        """Obtiene sectores del área MANTENIMIENTO desde la tabla sectores."""
+        cursor = self.conexion_db.cursor()
+        try:
+            if planta:
+                cursor.execute(
+                    """
+                    SELECT nombre_sector, tipo_horario, requiere_dotacion, planta
+                    FROM sectores
+                    WHERE LOWER(TRIM(COALESCE(area, ''))) IN ('mantenimiento', 'mecánicos', 'mecanicos')
+                      AND LOWER(TRIM(COALESCE(planta, ''))) = LOWER(TRIM(%s))
+                    ORDER BY id ASC;
+                    """,
+                    (planta,)
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT nombre_sector, tipo_horario, requiere_dotacion, planta
+                    FROM sectores
+                    WHERE LOWER(TRIM(COALESCE(area, ''))) IN ('mantenimiento', 'mecánicos', 'mecanicos')
+                    ORDER BY id ASC;
+                    """
+                )
+            return self._filas(cursor)
+        except Exception as e:
+            print(f"Error al obtener sectores de mantenimiento: {e}")
+            return []
+
+    def obtener_turnos_por_tipo(self, tipo_horario):
+        """Obtiene los horarios/turnos asociados a un tipo_horario."""
+        cursor = self.conexion_db.cursor()
+        tipo_norm = str(tipo_horario or "ROTATIVO").strip().upper()
+        try:
+            cursor.execute(
+                """
+                SELECT horarios_definidos
+                FROM tipos_horario
+                WHERE UPPER(TRIM(tipo)) = %s
+                LIMIT 1;
+                """,
+                (tipo_norm,)
+            )
+            fila = cursor.fetchone()
+            if not fila:
+                return []
+            raw = fila[0] if not isinstance(fila, dict) else fila.get("horarios_definidos")
+            if isinstance(raw, list):
+                return [str(x).strip() for x in raw if str(x).strip()]
+            if isinstance(raw, str):
+                # Soporta texto separado por coma, salto de línea o punto y coma
+                for sep in ["\n", ";", ","]:
+                    if sep in raw:
+                        return [p.strip() for p in raw.split(sep) if p.strip()]
+                return [raw.strip()] if raw.strip() else []
+            return []
+        except Exception as e:
+            print(f"Error al obtener turnos para tipo {tipo_norm}: {e}")
+            return []            

@@ -43,14 +43,6 @@
     </div>
 
     <script>
-        const HORARIOS_DEFINIDOS = [
-            "06:00 a 14:00",
-            "07:00 a 15:00",
-            "08:30 a 16:30",
-            "14:00 a 22:00",
-            "22:00 a 06:00"
-        ];
-
         let mecanicosDisponibles = [];
         let semanaActualGlobal = "";
 
@@ -69,12 +61,19 @@
                 document.getElementById('inputSemana').value = semanaActualGlobal;
                 mecanicosDisponibles = data.disponibles || [];
 
-                // Renderizamos Golosinas y Chocolates con los horarios normales
-                renderizarPlanta('Golosinas', 'bloquesGolosinas', data.asignados || [], HORARIOS_DEFINIDOS);
-                renderizarPlanta('Chocolates', 'bloquesChocolates', data.asignados || [], HORARIOS_DEFINIDOS);
+                const sectores = data.sectores || [];
+                const asignados = data.asignados || [];
 
-                // Renderizamos Vacaciones con bloque único "VACACIONES"
-                renderizarPlanta('Vacaciones', 'bloquesVacaciones', data.asignados || [], ["VACACIONES"]);
+                const sectoresGolo = sectores.filter(s => (s.planta || '').toLowerCase().includes('golos'));
+                const sectoresChoco = sectores.filter(s => (s.planta || '').toLowerCase().includes('choco'));
+                const sectoresSinPlanta = sectores.filter(s => {
+                    const p = (s.planta || '').toLowerCase();
+                    return !p.includes('golos') && !p.includes('choco');
+                });
+
+                renderizarSectores('Golosinas', 'bloquesGolosinas', sectoresGolo, asignados);
+                renderizarSectores('Chocolates', 'bloquesChocolates', sectoresChoco.concat(sectoresSinPlanta), asignados);
+                renderizarVacaciones('Vacaciones', 'bloquesVacaciones', asignados);
 
             } catch (error) {
                 console.error("Error al cargar mecánicos:", error);
@@ -82,56 +81,108 @@
             }
         }
 
-        function renderizarPlanta(nombrePlanta, idContenedor, asignados, listaHorarios) {
+        function renderizarSectores(nombrePlanta, idContenedor, listaSectores, asignados) {
             const contenedor = document.getElementById(idContenedor);
             contenedor.innerHTML = "";
 
-            listaHorarios.forEach(horario => {
-                const blockDiv = document.createElement('div');
-                blockDiv.className = "horario-block";
-                blockDiv.dataset.horario = horario;
-                blockDiv.dataset.planta = nombrePlanta;
+            listaSectores.forEach(secObj => {
+                const nombreSector = secObj.sector;
+                const turnos = secObj.turnos || [];
 
-                blockDiv.innerHTML = `
-                    <div class="horario-header">
-                        <strong>${horario === 'VACACIONES' ? 'Mecánicos' : 'Horario: ' + horario}</strong>
-                        <button class="btn-agregar-op" onclick="agregarFilaOperario('${nombrePlanta}', '${horario}')">+ Agregar operario</button>
-                    </div>
-                    <div class="rows-container" id="container_${limpiarId(nombrePlanta)}_${limpiarId(horario)}"></div>
-                `;
+                const secCard = document.createElement('div');
+                secCard.className = "sector-bloque";
+                secCard.innerHTML = `<h4 class="sector-subtitulo">${escaparHtml(nombreSector)}</h4>`;
 
-                contenedor.appendChild(blockDiv);
+                turnos.forEach(horario => {
+                    const blockDiv = document.createElement('div');
+                    blockDiv.className = "horario-block";
+                    blockDiv.dataset.horario = horario;
+                    blockDiv.dataset.planta = nombrePlanta;
+                    blockDiv.dataset.sector = nombreSector;
 
-                // Filtrar mecánicos asignados a esta planta/categoría y horario
-                const asignadosEnBloque = asignados.filter(a => 
-                    (a[2] === horario) && (a[3] && a[3].toLowerCase() === nombrePlanta.toLowerCase())
-                );
+                    const idContRows = `container_${limpiarId(nombrePlanta)}_${limpiarId(nombreSector)}_${limpiarId(horario)}`;
 
-                asignadosEnBloque.forEach(a => {
-                    agregarFilaOperario(nombrePlanta, horario, a[0], a[1]);
+                    blockDiv.innerHTML = `
+                        <div class="horario-header">
+                            <strong>Horario: ${escaparHtml(horario)}</strong>
+                            <button type="button" class="btn-agregar-op" onclick="agregarFilaOperario('${idContRows}')">+ Agregar operario</button>
+                        </div>
+                        <div class="rows-container" id="${idContRows}"></div>
+                    `;
+
+                    secCard.appendChild(blockDiv);
+
+                    const asignadosEnBloque = asignados.filter(a =>
+                        a[2] === horario &&
+                        a[3] && a[3].toLowerCase() === nombrePlanta.toLowerCase()
+                    );
+
+                    asignadosEnBloque.forEach(a => {
+                        agregarFilaOperario(idContRows, a[0], a[1]);
+                    });
                 });
+
+                contenedor.appendChild(secCard);
+            });
+        }
+
+        function renderizarVacaciones(nombrePlanta, idContenedor, asignados) {
+            const contenedor = document.getElementById(idContenedor);
+            contenedor.innerHTML = "";
+
+            const horario = "VACACIONES";
+            const idContRows = `container_${limpiarId(nombrePlanta)}_${limpiarId(horario)}`;
+
+            const blockDiv = document.createElement('div');
+            blockDiv.className = "horario-block";
+            blockDiv.dataset.horario = horario;
+            blockDiv.dataset.planta = nombrePlanta;
+
+            blockDiv.innerHTML = `
+                <div class="horario-header">
+                    <strong>Mecánicos</strong>
+                    <button type="button" class="btn-agregar-op" onclick="agregarFilaOperario('${idContRows}')">+ Agregar operario</button>
+                </div>
+                <div class="rows-container" id="${idContRows}"></div>
+            `;
+
+            contenedor.appendChild(blockDiv);
+
+            const asignadosVac = asignados.filter(a =>
+                a[2] === horario &&
+                a[3] && a[3].toLowerCase() === nombrePlanta.toLowerCase()
+            );
+
+            asignadosVac.forEach(a => {
+                agregarFilaOperario(idContRows, a[0], a[1]);
             });
         }
 
         function limpiarId(cadena) {
-            return cadena.replace(/[^a-zA-Z0-9]/g, '_');
+            return String(cadena || '').replace(/[^a-zA-Z0-9]/g, '_');
         }
 
-        function agregarFilaOperario(nombrePlanta, horario, idVal = "", nombreVal = "") {
-            const container = document.getElementById(`container_${limpiarId(nombrePlanta)}_${limpiarId(horario)}`);
+        function escaparHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function agregarFilaOperario(idContRows, idVal = "", nombreVal = "") {
+            const container = document.getElementById(idContRows);
             if (!container) return;
 
             const filaDiv = document.createElement('div');
             filaDiv.className = "fila-operario";
 
-            // Box ID
             const inputId = document.createElement('input');
             inputId.type = "text";
             inputId.className = "input-id-box";
             inputId.value = idVal;
             inputId.readOnly = true;
 
-            // Combobox Operarios
             const selectOp = document.createElement('select');
             selectOp.className = "select-operario-mecanico";
             selectOp.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
@@ -151,8 +202,8 @@
                 inputId.value = e.target.value;
             };
 
-            // Botón eliminar
             const btnEliminar = document.createElement('button');
+            btnEliminar.type = "button";
             btnEliminar.className = "btn-eliminar-op";
             btnEliminar.textContent = "Eliminar";
             btnEliminar.onclick = () => filaDiv.remove();
@@ -174,7 +225,6 @@
                 bloque.querySelectorAll('.fila-operario').forEach(fila => {
                     const idOp = fila.querySelector('.input-id-box').value;
                     if (idOp) {
-                        // [id_mecanico, horario, planta]
                         registros.push([parseInt(idOp), horario, planta]);
                     }
                 });

@@ -58,14 +58,15 @@ class ModeloHGolo(modeloprincipal):
         return self.operarios_dict
 
     def obtener_sectores_golosinas(self):
-        """Obtiene los sectores, su tipo de horario y si requieren dotación de Golosinas desde la base de datos"""
+        """Obtiene los sectores de producción, su tipo de horario y si requieren dotación de Golosinas desde la base de datos"""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
                 """
-                SELECT nombre_sector, tipo_horario, requiere_dotacion 
-                FROM sectores 
+                SELECT nombre_sector, tipo_horario, requiere_dotacion
+                FROM sectores
                 WHERE LOWER(TRIM(planta)) IN ('golosinas', 'golosina')
+                  AND LOWER(TRIM(COALESCE(area, ''))) IN ('produccion', 'producción')
                 ORDER BY id ASC
                 """
             )
