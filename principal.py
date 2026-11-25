@@ -1600,7 +1600,7 @@ def api_depositomp_datos(semana: Optional[str] = None):
             "semana": semana,
             "sectores": _armar_sectores_info_area(modelo, sectores),
             "asignados": modelo.obtener_asignaciones_semana(semana),
-            "operarios_disponibles": modelo.obtener_operarios_disponibles(),
+            "operarios_disponibles": modelo.obtener_operarios_disponibles(semana),
         }
     finally:
         modelo.cerrar_conexion()

@@ -45,9 +45,15 @@ class ModeloDepositoMPWeb:
 
         return self._cache_turnos.get(str(tipo_horario).upper().strip(), [])
 
-    def obtener_operarios_disponibles(self):
+    def obtener_operarios_disponibles(self, semana):
         cursor = self.conexion_db.cursor()
-        cursor.execute("SELECT id, operario FROM operarios ORDER BY operario ASC;")
+        sem_val = int(semana) if str(semana).isdigit() else semana
+        cursor.execute("""
+            SELECT id, operario
+            FROM depositomp
+            WHERE semana = %s AND operario IS NOT NULL AND TRIM(operario) != ''
+            ORDER BY operario ASC;
+        """, (sem_val,))
         filas = cursor.fetchall()
         return [
             [f[0], f[1]] if not isinstance(f, dict) else [f["id"], f["operario"]]
