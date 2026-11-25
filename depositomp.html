@@ -114,8 +114,6 @@
                 const disponibles = datosGlobales.operarios_disponibles || [];
                 const encontrada = disponibles.find(item => (item[1] || "").trim() === nombreSel);
                 inputId.value = encontrada ? encontrada[0] : "";
-
-                actualizarOpcionesSelects();
             };
 
             const btnDel = document.createElement('button');
@@ -123,7 +121,6 @@
             btnDel.textContent = "Eliminar";
             btnDel.onclick = () => {
                 filaDiv.remove();
-                actualizarOpcionesSelects();
             };
 
             filaDiv.appendChild(inputId);
@@ -131,51 +128,45 @@
             filaDiv.appendChild(btnDel);
 
             container.appendChild(filaDiv);
-            actualizarOpcionesSelects();
+            poblarSelect(selectOp, operarioVal);
+        }
 
-            if (operarioVal) {
-                selectOp.value = operarioVal.trim();
+        function poblarSelect(selectOp, valorInicial = "") {
+            const valorActual = (selectOp.value || valorInicial || selectOp.getAttribute('data-operario-inicial') || '').trim();
+            selectOp.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
+
+            const libres = datosGlobales.operarios_disponibles || [];
+            let encontrado = false;
+
+            libres.forEach(item => {
+                const nombre = (item[1] || "").trim();
+                if (!nombre) return;
+                const opt = document.createElement('option');
+                opt.value = nombre;
+                opt.textContent = nombre;
+                if (nombre === valorActual) {
+                    opt.selected = true;
+                    encontrado = true;
+                }
+                selectOp.appendChild(opt);
+            });
+
+            if (valorActual && !encontrado) {
+                const opt = document.createElement('option');
+                opt.value = valorActual;
+                opt.textContent = valorActual;
+                opt.selected = true;
+                selectOp.appendChild(opt);
+            }
+
+            if (valorActual) {
+                selectOp.value = valorActual;
             }
         }
 
         function actualizarOpcionesSelects() {
-            const seleccionados = new Set();
             document.querySelectorAll('.fila-operario select').forEach(sel => {
-                const val = (sel.value || sel.getAttribute('data-operario-inicial') || '').trim();
-                if (val) seleccionados.add(val);
-            });
-
-            const libres = datosGlobales.operarios_disponibles || [];
-
-            document.querySelectorAll('.fila-operario select').forEach(sel => {
-                const valorActual = (sel.value || sel.getAttribute('data-operario-inicial') || '').trim();
-                sel.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
-                let encontrado = false;
-
-                libres.forEach(item => {
-                    const nombre = (item[1] || "").trim();
-                    if (!nombre) return;
-                    if (!seleccionados.has(nombre) || nombre === valorActual) {
-                        const opt = document.createElement('option');
-                        opt.value = nombre;
-                        opt.textContent = nombre;
-                        if (nombre === valorActual) {
-                            opt.selected = true;
-                            encontrado = true;
-                        }
-                        sel.appendChild(opt);
-                    }
-                });
-
-                if (valorActual && !encontrado) {
-                    const opt = document.createElement('option');
-                    opt.value = valorActual;
-                    opt.textContent = valorActual;
-                    opt.selected = true;
-                    sel.appendChild(opt);
-                }
-
-                if (valorActual) sel.value = valorActual;
+                poblarSelect(sel);
             });
         }
 
