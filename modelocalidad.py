@@ -47,9 +47,12 @@ class ModeloAnalistasCalidadWeb:
 
     def obtener_analistas_disponibles(self):
         cursor = self.conexion_db.cursor()
-        cursor.execute("SELECT id, operario FROM analistascalidad ORDER BY operario ASC;")
+        cursor.execute("SELECT id, operario FROM operarios ORDER BY operario ASC;")
         filas = cursor.fetchall()
-        return [[f[0], f[1]] if not isinstance(f, dict) else [f["id"], f["operario"]] for f in filas]
+        return [
+            [f[0], f[1]] if not isinstance(f, dict) else [f["id"], f["operario"]]
+            for f in filas
+        ]
 
     def obtener_asignaciones_semana(self, semana):
         cursor = self.conexion_db.cursor()
