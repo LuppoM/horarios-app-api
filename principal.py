@@ -1586,40 +1586,45 @@ def api_analistascalidad_guardar(payload: dict = Body(...)):
         modelo.cerrar_conexion()
 
 
-# --- DEPÓSITO MP ---
 @app.get("/api/depositomp/datos")
 def api_depositomp_datos(semana: Optional[str] = None):
     modelo = ModeloDepositoMPWeb()
-    modelo_base = modeloprincipal()
+    modelo_base = None
     try:
-        if not semana or semana.lower() == "none" or semana.strip() == "":
+        if not semana or str(semana).lower() == "none" or str(semana).strip() == "":
+            modelo_base = modeloprincipal()
             semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
 
         sectores = modelo.obtener_sectores_area()
+        sectores_info = _armar_sectores_info_area(modelo, sectores)
+        asignados = modelo.obtener_asignaciones_semana(semana)
+        operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
+
         return {
-            "semana": semana,
-            "sectores": _armar_sectores_info_area(modelo, sectores),
-            "asignados": modelo.obtener_asignaciones_semana(semana),
-            "operarios_disponibles": modelo.obtener_operarios_disponibles(semana),
+            "semana": str(semana),
+            "sectores": sectores_info,
+            "asignados": asignados,
+            "operarios_disponibles": operarios_disponibles,
+        }
+    except Exception as e:
+        print(f"Error en /api/depositomp/datos: {e}")
+        return {
+            "semana": str(semana or ""),
+            "sectores": [],
+            "asignados": [],
+            "operarios_disponibles": [],
+            "error": str(e),
         }
     finally:
-        modelo.cerrar_conexion()
-        if hasattr(modelo_base, "cerrar_conexion"):
-            modelo_base.cerrar_conexion()
-
-
-@app.post("/api/depositomp/guardar")
-def api_depositomp_guardar(payload: dict = Body(...)):
-    semana = payload.get("semana")
-    registros = payload.get("registros", [])
-    modelo = ModeloDepositoMPWeb()
-    try:
-        modelo.guardar_asignaciones_depositomp(semana, registros)
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "mensaje": str(e)}
-    finally:
-        modelo.cerrar_conexion()
+        try:
+            modelo.cerrar_conexion()
+        except Exception:
+            pass
+        if modelo_base is not None and hasattr(modelo_base, "cerrar_conexion"):
+            try:
+                modelo_base.cerrar_conexion()
+            except Exception:
+                pass
 
 
 # --- DEPÓSITO PT ---
