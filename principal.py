@@ -1585,46 +1585,25 @@ def api_analistascalidad_guardar(payload: dict = Body(...)):
     finally:
         modelo.cerrar_conexion()
 
+# --- DEPOSITO MATERIA PRIMA ---
 
-@app.get("/api/depositomp/datos")
-def api_depositomp_datos(semana: Optional[str] = None):
+@app.post("/api/depositomp/guardar")
+def api_depositomp_guardar(payload: dict = Body(...)):
+    semana = payload.get("semana")
+    registros = payload.get("registros", [])
     modelo = ModeloDepositoMPWeb()
-    modelo_base = None
     try:
-        if not semana or str(semana).lower() == "none" or str(semana).strip() == "":
-            modelo_base = modeloprincipal()
-            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
-
-        sectores = modelo.obtener_sectores_area()
-        sectores_info = _armar_sectores_info_area(modelo, sectores)
-        asignados = modelo.obtener_asignaciones_semana(semana)
-        operarios_disponibles = modelo.obtener_operarios_disponibles(semana)
-
-        return {
-            "semana": str(semana),
-            "sectores": sectores_info,
-            "asignados": asignados,
-            "operarios_disponibles": operarios_disponibles,
-        }
+        modelo.guardar_asignaciones_depositomp(semana, registros)
+        return {"status": "ok"}
     except Exception as e:
-        print(f"Error en /api/depositomp/datos: {e}")
-        return {
-            "semana": str(semana or ""),
-            "sectores": [],
-            "asignados": [],
-            "operarios_disponibles": [],
-            "error": str(e),
-        }
+        detalle = str(e).strip() or repr(e)
+        print(f"Error en /api/depositomp/guardar: {detalle}")
+        return {"status": "error", "mensaje": detalle}
     finally:
         try:
             modelo.cerrar_conexion()
         except Exception:
             pass
-        if modelo_base is not None and hasattr(modelo_base, "cerrar_conexion"):
-            try:
-                modelo_base.cerrar_conexion()
-            except Exception:
-                pass
 
 
 # --- DEPÓSITO PT ---
