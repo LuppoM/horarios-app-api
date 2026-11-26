@@ -1587,6 +1587,28 @@ def api_analistascalidad_guardar(payload: dict = Body(...)):
 
 # --- DEPOSITO MATERIA PRIMA ---
 
+# --- DEPÓSITO MP ---
+@app.get("/api/depositomp/datos")
+def api_depositomp_datos(semana: Optional[str] = None):
+    modelo = ModeloDepositoMPWeb()
+    modelo_base = modeloprincipal()
+    try:
+        if not semana or semana.lower() == "none" or semana.strip() == "":
+            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+
+        sectores = modelo.obtener_sectores_area()
+        return {
+            "semana": semana,
+            "sectores": _armar_sectores_info_area(modelo, sectores),
+            "asignados": modelo.obtener_asignaciones_semana(semana),
+            "operarios_disponibles": modelo.obtener_operarios_disponibles(semana),
+        }
+    finally:
+        modelo.cerrar_conexion()
+        if hasattr(modelo_base, "cerrar_conexion"):
+            modelo_base.cerrar_conexion()
+
+
 @app.post("/api/depositomp/guardar")
 def api_depositomp_guardar(payload: dict = Body(...)):
     semana = payload.get("semana")
@@ -1597,13 +1619,9 @@ def api_depositomp_guardar(payload: dict = Body(...)):
         return {"status": "ok"}
     except Exception as e:
         detalle = str(e).strip() or repr(e)
-        print(f"Error en /api/depositomp/guardar: {detalle}")
         return {"status": "error", "mensaje": detalle}
     finally:
-        try:
-            modelo.cerrar_conexion()
-        except Exception:
-            pass
+        modelo.cerrar_conexion()
 
 
 # --- DEPÓSITO PT ---
