@@ -1586,8 +1586,6 @@ def api_analistascalidad_guardar(payload: dict = Body(...)):
         modelo.cerrar_conexion()
 
 # --- DEPOSITO MATERIA PRIMA ---
-
-# --- DEPÓSITO MP ---
 @app.get("/api/depositomp/datos")
 def api_depositomp_datos(semana: Optional[str] = None):
     modelo = ModeloDepositoMPWeb()
@@ -1604,9 +1602,16 @@ def api_depositomp_datos(semana: Optional[str] = None):
             "operarios_disponibles": modelo.obtener_operarios_disponibles(semana),
         }
     finally:
-        modelo.cerrar_conexion()
+        if hasattr(modelo, "cerrar_conexion"):
+            try:
+                modelo.cerrar_conexion()
+            except Exception:
+                pass
         if hasattr(modelo_base, "cerrar_conexion"):
-            modelo_base.cerrar_conexion()
+            try:
+                modelo_base.cerrar_conexion()
+            except Exception:
+                pass
 
 
 @app.post("/api/depositomp/guardar")
@@ -1621,7 +1626,11 @@ def api_depositomp_guardar(payload: dict = Body(...)):
         detalle = str(e).strip() or repr(e)
         return {"status": "error", "mensaje": detalle}
     finally:
-        modelo.cerrar_conexion()
+        if hasattr(modelo, "cerrar_conexion"):
+            try:
+                modelo.cerrar_conexion()
+            except Exception:
+                pass
 
 
 # --- DEPÓSITO PT ---
