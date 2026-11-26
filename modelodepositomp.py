@@ -155,7 +155,7 @@ class ModeloDepositoMPWeb:
 
             # 2. Traer finde desde depositomp_finde
             cursor.execute("""
-                SELECT operario_id, operario, turno, sector
+                SELECT operario_id, operario, turno, sector, COALESCE(planta, '') AS planta
                 FROM depositomp_finde
                 WHERE semana = %s
             """, (sem_val,))
@@ -164,11 +164,12 @@ class ModeloDepositoMPWeb:
             for f in filas_finde:
                 if isinstance(f, dict):
                     sec_val = f["sector"]
-                    pla_val = self._resolver_planta_sector(sec_val)
+                    pla_val = self._resolver_planta_sector(sec_val, f.get("planta"))
                     resultado.append([f["operario_id"], f["operario"], f["turno"], sec_val, pla_val])
                 else:
                     sec_val = f[3]
-                    pla_val = self._resolver_planta_sector(sec_val)
+                    pla_guardada = f[4] if len(f) > 4 else None
+                    pla_val = self._resolver_planta_sector(sec_val, pla_guardada)
                     resultado.append([f[0], f[1], f[2], sec_val, pla_val])
 
             return resultado
@@ -205,9 +206,9 @@ class ModeloDepositoMPWeb:
 
                 if "FIN DE SEMANA" in sector_limpio.upper():
                     cursor.execute("""
-                        INSERT INTO depositomp_finde (semana, sector, turno, operario_id, operario)
-                        VALUES (%s, %s, %s, %s, %s);
-                    """, (sem_val, sector_limpio, turno_limpio, id_op_val, operario_limpio))
+                        INSERT INTO depositomp_finde (semana, sector, turno, operario_id, operario, planta, tabla)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s);
+                    """, (sem_val, sector_limpio, turno_limpio, id_op_val, operario_limpio, planta_resuelta, "depositomp_finde"))
                 else:
                     cursor.execute("""
                         UPDATE depositomp
