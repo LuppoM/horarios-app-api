@@ -58,18 +58,22 @@ class Modelohchoco(modeloprincipal):
         return self.operarios_dict
 
     def obtener_sectores_chocolates(self):
-        """Obtiene los sectores, su tipo de horario y si requieren dotación de Chocolates"""
+        """Obtiene los sectores de producción de Chocolates filtrados por área"""
         cursor = self.conexion_db.cursor()
         try:
             cursor.execute(
                 """
-                SELECT nombre_sector, tipo_horario, requiere_dotacion 
-                FROM sectores 
+                SELECT nombre_sector, tipo_horario, requiere_dotacion, area
+                FROM sectores
                 WHERE LOWER(TRIM(planta)) IN ('chocolate', 'chocolates')
+                  AND LOWER(TRIM(COALESCE(area, ''))) IN ('produccion', 'producción', 'chocolates', 'chocolate')
                 ORDER BY id ASC
                 """
             )
-            return _filas(cursor) or []
+            filas = _filas(cursor) or []
+            # Devolvemos (nombre_sector, tipo_horario, requiere_dotacion) para mantener
+            # intacto el desempaquetado en /api/hchoco/datos
+            return [(r[0], r[1], r[2]) for r in filas]
         except Exception as e:
             print(f"Error al obtener sectores de chocolates: {e}")
             return []
