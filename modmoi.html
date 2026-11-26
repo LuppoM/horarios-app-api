@@ -124,6 +124,8 @@
         'DEPOSITO PT': ['depositopt']
     };
 
+    const VISTAS_SOLO_MOI = ['Mecanicos', 'Calidad', 'Depositomp', 'DepositompFinde', 'depositopt'];
+
     function aplicarPermisosVistaPorArea() {
         const sesionRaw = sessionStorage.getItem('usuario_sesion');
         if (!sesionRaw) {
@@ -184,9 +186,8 @@
             // --- CONTEO DIRECTO EN EL CLIENTE DESDE LOS DATOS RECIBIDOS ---
             let cantMod = 0;
             let cantMoi = 0;
-            const vistasSoloMoi = ['Mecanicos', 'Calidad', 'Depositomp', 'depositopt'];
 
-            if (vistasSoloMoi.includes(vista)) {
+            if (VISTAS_SOLO_MOI.includes(vista)) {
                 cantMoi = datosOriginales.length;
             } else {
                 const idxCalificacion = columnasOriginales.indexOf("calificacion_mano_obra");
@@ -279,9 +280,8 @@
     }
 
     function configurarModalSegunVista(vista, tipoMoDefault = "MOD") {
-        const vistasSoloMoi = ['Mecanicos', 'Calidad', 'Depositomp', 'depositopt'];
         const selectTipo = document.getElementById('abmTipoMo');
-        if (vistasSoloMoi.includes(vista) || (origenTablaActual && origenTablaActual !== 'modymoi')) {
+        if (VISTAS_SOLO_MOI.includes(vista) || (origenTablaActual && origenTablaActual !== 'modymoi')) {
             selectTipo.value = "MOI";
             selectTipo.disabled = true;
         } else {
