@@ -25,8 +25,10 @@ class ModMoiModel:
         "depósito pt": "depositopt",
     }
 
-    TABLAS_AREA_MOI = ("mecanicos", "analistascalidad", "depositomp", "depositopt")
-    TODAS_LAS_TABLAS = ("modymoi", "mecanicos", "analistascalidad", "depositomp", "depositopt")
+    TABLAS_AREA_MOI = ("mecanicos", "analistascalidad", "depositomp", "depositopt", "depositomp_finde")
+    TODAS_LAS_TABLAS = ("modymoi", "mecanicos", "analistascalidad", "depositomp", "depositopt", "depositomp_finde")
+    VISTAS_DEPOSITOMP_FINDE = {"depositompfinde", "deposito mp fin de semana", "dp fin de semana"}
+
     COLUMNAS_CONSOLIDADO = [
         "id",
         "calificacion_mano_obra",
@@ -54,6 +56,11 @@ class ModMoiModel:
         if not area:
             return True  # Compatibilidad si no se envía área
         return str(area).strip().lower() in {"produccion", "producción"}
+
+    def _es_vista_depositomp_finde(self, vista=None):
+        if not vista:
+            return False
+        return str(vista).strip().lower() in self.VISTAS_DEPOSITOMP_FINDE
 
     def _resolver_tabla_por_area(self, area=None):
         """Devuelve la tabla asignada al área del usuario (o 'ALL' si es admin)."""
@@ -99,14 +106,14 @@ class ModMoiModel:
         - produccion -> modymoi (Semana) o modymoi_finde (Fin de Semana)
         - mantenimiento -> mecanicos
         - calidad -> analistascalidad
-        - depositomp -> depositomp
+        - depositomp -> depositomp (Depositomp) o depositomp_finde (DepositompFinde)
         - depositopt -> depositopt
-        - admin -> modymoi_finde (Fin de Semana), tabla específica o las 5 tablas unificadas (Semana)
+        - admin -> modymoi_finde (Fin de Semana), tabla específica o las tablas principales unificadas (Semana)
         """
         vista_norm = str(vista or "Semana").strip().lower()
         tabla = self._resolver_tabla_por_area(area)
 
-        # 1. Vista Fin de Semana: solo habilitada para Producción y Admin
+        # 1. Vista Fin de Semana (Producción): solo habilitada para Producción y Admin
         if vista_norm == "fin de semana":
             if self._es_admin(area) or self._es_produccion(area):
                 return self.obtener_datos_finde(
@@ -122,7 +129,17 @@ class ModMoiModel:
                 semana_actual=semana_actual,
             )
 
-        # 2. Usuario Admin: puede consultar una vista específica o todas juntas
+        # 2. Vista Deposito MP Fin de Semana: habilitada para Deposito MP y Admin
+        if self._es_vista_depositomp_finde(vista_norm):
+            if self._es_admin(area) or tabla == "depositomp":
+                return self.obtener_datos_deposito_mp_finde(
+                    filtro_columna=filtro_columna,
+                    filtro_valor=filtro_valor,
+                    semana_actual=semana_actual,
+                )
+            return list(self.COLUMNAS_CONSOLIDADO), []
+
+        # 3. Usuario Admin: puede consultar una vista específica o todas juntas
         if tabla == "ALL":
             vistas_especificas_admin = {
                 "mecanicos": "mecanicos",
@@ -148,7 +165,7 @@ class ModMoiModel:
                 semana_actual=semana_actual,
             )
 
-        # 3. Usuarios de áreas MOI (mantenimiento, calidad, depositomp, depositopt)
+        # 4. Usuarios de áreas MOI (mantenimiento, calidad, depositomp, depositopt)
         if tabla != "modymoi":
             return self._obtener_datos_tabla_area_moi(
                 nombre_tabla=tabla,
@@ -157,7 +174,7 @@ class ModMoiModel:
                 semana_actual=semana_actual,
             )
 
-        # 4. Usuario Producción -> tabla modymoi
+        # 5. Usuario Producción -> tabla modymoi
         cursor = None
         columnas = list(self.COLUMNAS_CONSOLIDADO)
         try:
@@ -324,6 +341,13 @@ class ModMoiModel:
         if nombre_tabla not in self.TABLAS_AREA_MOI:
             raise ValueError(f"Tabla MOI no permitida: {nombre_tabla}")
 
+        if nombre_tabla == "depositomp_finde":
+            return self.obtener_datos_deposito_mp_finde(
+                filtro_columna=filtro_columna,
+                filtro_valor=filtro_valor,
+                semana_actual=semana_actual,
+            )
+
         columnas = list(self.COLUMNAS_CONSOLIDADO)
 
         cursor = None
@@ -373,6 +397,60 @@ class ModMoiModel:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error al consultar {nombre_tabla} en Supabase: {e}")
+            return columnas, []
+        finally:
+            if cursor:
+                cursor.close()
+
+    def obtener_datos_deposito_mp_finde(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
+        """Consulta depositomp_finde con el formato estándar del consolidado."""
+        columnas = list(self.COLUMNAS_CONSOLIDADO)
+        cursor = None
+        try:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+
+            cursor = self.conexion_db.cursor()
+            query_base = """
+                SELECT 
+                    id,
+                    'MOI' AS calificacion_mano_obra,
+                    operario,
+                    COALESCE(semana::text, '') AS semana,
+                    COALESCE(turno::text, '') AS "Horario",
+                    COALESCE(sector::text, '') AS "Sector",
+                    COALESCE(sector::text, '') AS "Planta"
+                FROM depositomp_finde
+                WHERE 1=1
+            """
+            params = []
+
+            if filtro_columna and filtro_valor:
+                col_map = {
+                    "id": "id",
+                    "operario": "operario",
+                    "semana": "semana",
+                    "horario": "turno",
+                    "horario_semana": "turno",
+                    "sector": "sector",
+                    "sector_semana": "sector",
+                    "planta": "sector",
+                    "planta_semana": "sector",
+                }
+                col_filtro = col_map.get(filtro_columna.lower())
+                if col_filtro:
+                    query_base += f" AND {col_filtro}::text ILIKE %s"
+                    params.append("%" + str(filtro_valor) + "%")
+
+            query_base += " ORDER BY operario ASC"
+            cursor.execute(query_base, params)
+
+            filas = cursor.fetchall()
+            return columnas, self._formatear_filas_consolidado(filas)
+        except Exception as e:
+            if hasattr(self.conexion_db, 'rollback'):
+                self.conexion_db.rollback()
+            print(f"Error al consultar depositomp_finde en Supabase: {e}")
             return columnas, []
         finally:
             if cursor:
@@ -457,9 +535,12 @@ class ModMoiModel:
     def _resolver_tabla_escritura(self, area=None, origen_tabla=None, vista=None):
         """Resuelve la tabla concreta para INSERT/UPDATE/DELETE según el área del usuario y la vista."""
         tabla_usuario = self._resolver_tabla_por_area(area)
+        vista_es_dp_finde = self._es_vista_depositomp_finde(vista)
 
         # Si NO es admin, forzamos estrictamente la tabla de su área
         if tabla_usuario != "ALL":
+            if tabla_usuario == "depositomp" and vista_es_dp_finde:
+                return "depositomp_finde"
             return tabla_usuario
 
         # Si ES admin, priorizamos origen_tabla explícita
@@ -468,6 +549,8 @@ class ModMoiModel:
 
         # Si ES admin y viene la vista seleccionada en el combo
         if vista:
+            if vista_es_dp_finde:
+                return "depositomp_finde"
             vistas_admin = {
                 "mecanicos": "mecanicos",
                 "mecánicos": "mecanicos",
@@ -488,6 +571,9 @@ class ModMoiModel:
     def agregar_registro(self, calificacion, operario, area=None, origen_tabla=None, vista=None):
         """Agrega un operario en la tabla correspondiente al área del usuario."""
         tabla = self._resolver_tabla_escritura(area=area, origen_tabla=origen_tabla, vista=vista)
+        if tabla == "depositomp_finde":
+            return False  # Las asignaciones de finde se cargan desde la grilla de Depósito MP
+
         cursor = None
         try:
             if hasattr(self.conexion_db, 'rollback'):
@@ -571,6 +657,11 @@ class ModMoiModel:
             vista_norm = (vista or "Semana").strip().lower()
             tabla_usuario = self._resolver_tabla_por_area(area)
 
+            if self._es_vista_depositomp_finde(vista_norm) and (tabla_usuario in {"ALL", "depositomp"}):
+                cursor.execute("SELECT COUNT(*) FROM depositomp_finde;")
+                res = cursor.fetchone()
+                return (0, int(res[0] or 0) if res else 0)
+
             if vista_norm == "fin de semana" and (tabla_usuario in {"ALL", "modymoi"}):
                 cursor.execute("""
                     SELECT 
@@ -610,7 +701,7 @@ class ModMoiModel:
                 mod_total = int(res_prod[0] or 0) if res_prod else 0
                 moi_total = int(res_prod[1] or 0) if res_prod else 0
 
-                for t_moi in self.TABLAS_AREA_MOI:
+                for t_moi in ("mecanicos", "analistascalidad", "depositomp", "depositopt"):
                     cursor.execute(f"SELECT COUNT(*) FROM {t_moi};")
                     r = cursor.fetchone()
                     moi_total += int(r[0] or 0) if r else 0
@@ -684,6 +775,15 @@ class ModMoiModel:
                     """
                     SELECT id, calificacion_mano_obra, operario, "Horario", "Sector", "Planta", semana 
                     FROM modymoi 
+                    WHERE id = %s
+                    """,
+                    (int(id_registro),)
+                )
+            elif tabla == "depositomp_finde":
+                cursor.execute(
+                    """
+                    SELECT id, 'MOI' AS calificacion_mano_obra, operario, turno, sector, sector, semana 
+                    FROM depositomp_finde 
                     WHERE id = %s
                     """,
                     (int(id_registro),)

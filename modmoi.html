@@ -28,12 +28,13 @@
     <!-- FILTROS -->
     <div class="filtro-frame">
         <span class="filtro-label-bold">Ver horarios:</span>
-        <select id="comboVista" class="filtro-control" style="width: 140px;" onchange="document.getElementById('comboColumnas').innerHTML=''; cargarDatos();">
+        <select id="comboVista" class="filtro-control" style="width: 170px;" onchange="document.getElementById('comboColumnas').innerHTML=''; cargarDatos();">
             <option value="Semana">Semana</option>
             <option value="Fin de Semana">Fin de Semana</option>
             <option value="Mecanicos">Mecánicos</option>
             <option value="Calidad">Calidad</option>
             <option value="Depositomp">Deposito MP</option>
+            <option value="DepositompFinde">Deposito MP Fin de Semana</option>
             <option value="depositopt">Deposito PT</option>
         </select>
 
@@ -107,16 +108,16 @@
     let areaUsuarioActual = '';
 
     const VISTAS_PERMITIDAS_POR_AREA = {
-        'ADMIN': ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'depositopt'],
-        'ADMINISTRADOR': ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'depositopt'],
+        'ADMIN': ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'DepositompFinde', 'depositopt'],
+        'ADMINISTRADOR': ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'DepositompFinde', 'depositopt'],
         'PRODUCCION': ['Semana', 'Fin de Semana'],
         'PRODUCCIÓN': ['Semana', 'Fin de Semana'],
         'MANTENIMIENTO': ['Mecanicos'],
         'CALIDAD': ['Calidad'],
-        'DEPOSITO MATERIA PRIMA': ['Depositomp'],
-        'DEPÓSITO MATERIA PRIMA': ['Depositomp'],
-        'DEPOSITOMP': ['Depositomp'],
-        'DEPOSITO MP': ['Depositomp'],
+        'DEPOSITO MATERIA PRIMA': ['Depositomp', 'DepositompFinde'],
+        'DEPÓSITO MATERIA PRIMA': ['Depositomp', 'DepositompFinde'],
+        'DEPOSITOMP': ['Depositomp', 'DepositompFinde'],
+        'DEPOSITO MP': ['Depositomp', 'DepositompFinde'],
         'DEPOSITO PRODUCTO TERMINADO': ['depositopt'],
         'DEPÓSITO PRODUCTO TERMINADO': ['depositopt'],
         'DEPOSITOPT': ['depositopt'],
