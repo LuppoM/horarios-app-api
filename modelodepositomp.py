@@ -63,38 +63,85 @@ class ModeloDepositoMPWeb:
     def obtener_asignaciones_semana(self, semana):
         cursor = self.conexion_db.cursor()
         sem_val = int(semana) if str(semana).isdigit() else semana
+        
+        # 1. Traer semana desde depositomp
         cursor.execute("""
             SELECT id, operario, horario, COALESCE(NULLIF(TRIM(sector), ''), planta) AS sector_asig
             FROM depositomp
             WHERE semana = %s AND horario IS NOT NULL AND TRIM(horario) != ''
-            ORDER BY horario ASC, operario ASC;
         """, (sem_val,))
-        filas = cursor.fetchall()
-        return [
+        filas_semana = cursor.fetchall()
+        
+        resultado = [
             [f["id"], f["operario"], f["horario"], f["sector_asig"]]
             if isinstance(f, dict) else [f[0], f[1], f[2], f[3]]
-            for f in filas
+            for f in filas_semana
         ]
+
+        # 2. Traer finde desde depositomp_finde
+        cursor.execute("""
+            SELECT operario_id, operario, turno, sector
+            FROM depositomp_finde
+            WHERE semana = %s
+        """, (sem_val,))
+        filas_finde = cursor.fetchall()
+
+        for f in filas_finde:
+            if isinstance(f, dict):
+                resultado.append([f["operario_id"], f["operario"], f["turno"], f["sector"]])
+            else:
+                resultado.append([f[0], f[1], f[2], f[3]])
+
+        return resultado
 
     def guardar_asignaciones_depositomp(self, semana, registros):
         """registros: [[id_operario, operario, turno, sector], ...]"""
         cursor = self.conexion_db.cursor()
         sem_val = int(semana) if str(semana).isdigit() else semana
 
+        # Limpiar semana (UPDATE) y finde (DELETE) antes de guardar
         cursor.execute("UPDATE depositomp SET horario = NULL, sector = NULL WHERE semana = %s;", (sem_val,))
+        cursor.execute("DELETE FROM depositomp_finde WHERE semana = %s;", (sem_val,))
 
-        for id_op, _, turno, sector in registros:
-            cursor.execute("""
-                UPDATE depositomp
-                SET horario = %s, sector = %s, planta = %s, semana = %s
-                WHERE id = %s;
-            """, (turno, sector, sector, sem_val, id_op))
+        for id_op, operario, turno, sector in registros:
+            if "FIN DE SEMANA" in str(sector).upper():
+                # Guardar en tabla aparte con INSERT
+                cursor.execute("""
+                    INSERT INTO depositomp_finde (semana, sector, turno, operario_id, operario)
+                    VALUES (%s, %s, %s, %s, %s);
+                """, (sem_val, sector, turno, id_op, operario))
+            else:
+                # Mantener lógica original con UPDATE
+                cursor.execute("""
+                    UPDATE depositomp
+                    SET horario = %s, sector = %s, planta = %s, semana = %s
+                    WHERE id = %s;
+                """, (turno, sector, sector, sem_val, id_op))
 
         self.conexion_db.commit()
 
-    def cerrar_conexion(self):
-        if hasattr(self, 'conexion_db') and self.conexion_db:
-            try:
-                self.conexion_db.close()
-            except Exception:
-                pass
+    def guardar_asignaciones_depositomp(self, semana, registros):
+        """registros: [[id_operario, operario, turno, sector], ...]"""
+        cursor = self.conexion_db.cursor()
+        sem_val = int(semana) if str(semana).isdigit() else semana
+
+        # Limpiar semana (UPDATE) y finde (DELETE) antes de guardar
+        cursor.execute("UPDATE depositomp SET horario = NULL, sector = NULL WHERE semana = %s;", (sem_val,))
+        cursor.execute("DELETE FROM depositomp_finde WHERE semana = %s;", (sem_val,))
+
+        for id_op, operario, turno, sector in registros:
+            if "FIN DE SEMANA" in str(sector).upper():
+                # Guardar en tabla aparte con INSERT
+                cursor.execute("""
+                    INSERT INTO depositomp_finde (semana, sector, turno, operario_id, operario)
+                    VALUES (%s, %s, %s, %s, %s);
+                """, (sem_val, sector, turno, id_op, operario))
+            else:
+                # Mantener lógica original con UPDATE
+                cursor.execute("""
+                    UPDATE depositomp
+                    SET horario = %s, sector = %s, planta = %s, semana = %s
+                    WHERE id = %s;
+                """, (turno, sector, sector, sem_val, id_op))
+
+        self.conexion_db.commit()
