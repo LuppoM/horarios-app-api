@@ -6,10 +6,53 @@ class ModeloDepositoMPWeb:
     def __init__(self):
         self.conexion_db = conexion.obtener_conexion()
         self._cache_turnos = None
+        self._cache_plantas_sector = None
 
-    @staticmethod
-    def _resolver_planta_finde(sector):
-        sec_upper = str(sector or "").upper()
+    def _obtener_mapa_plantas_sector(self):
+        """Devuelve un dict {nombre_sector_upper: planta_real} desde la tabla sectores."""
+        if self._cache_plantas_sector is not None:
+            return self._cache_plantas_sector
+
+        mapa = {}
+        cursor = self.conexion_db.cursor()
+        try:
+            cursor.execute("""
+                SELECT nombre_sector, planta
+                FROM sectores
+                WHERE nombre_sector IS NOT NULL
+            """)
+            for row in cursor.fetchall():
+                sec = row["nombre_sector"] if isinstance(row, dict) else row[0]
+                pla = row["planta"] if isinstance(row, dict) else row[1]
+                if sec:
+                    mapa[str(sec).strip().upper()] = str(pla or "").strip()
+        except Exception as e:
+            print(f"Error al consultar plantas de sectores: {e}")
+        finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+
+        self._cache_plantas_sector = mapa
+        return self._cache_plantas_sector
+
+    def _resolver_planta_sector(self, sector, planta_guardada=None):
+        """Obtiene la planta asociada al sector (Chocolate / Golosinas) evitando repetir el sector."""
+        if planta_guardada:
+            pla_limpia = str(planta_guardada).strip()
+            if pla_limpia and "DEPOSITO MP" not in pla_limpia.upper():
+                return pla_limpia
+
+        sec_limpio = str(sector or "").strip()
+        sec_upper = sec_limpio.upper()
+
+        mapa = self._obtener_mapa_plantas_sector()
+        if sec_upper in mapa and mapa[sec_upper]:
+            pla_bd = mapa[sec_upper]
+            if "DEPOSITO MP" not in pla_bd.upper():
+                return pla_bd
+
         if "CHOCOLATES" in sec_upper:
             return "Chocolate"
         if "GOLOSINAS" in sec_upper:
@@ -92,21 +135,27 @@ class ModeloDepositoMPWeb:
 
             # 1. Traer semana desde depositomp
             cursor.execute("""
-                SELECT id, operario, horario, COALESCE(NULLIF(TRIM(sector), ''), planta) AS sector_asig
+                SELECT id, operario, horario, COALESCE(NULLIF(TRIM(sector), ''), planta) AS sector_asig, planta
                 FROM depositomp
                 WHERE semana = %s AND horario IS NOT NULL AND TRIM(horario) != ''
             """, (sem_val,))
             filas_semana = cursor.fetchall()
 
-            resultado = [
-                [f["id"], f["operario"], f["horario"], f["sector_asig"]]
-                if isinstance(f, dict) else [f[0], f[1], f[2], f[3]]
-                for f in filas_semana
-            ]
+            resultado = []
+            for f in filas_semana:
+                if isinstance(f, dict):
+                    sec_val = f["sector_asig"]
+                    pla_val = self._resolver_planta_sector(sec_val, f.get("planta"))
+                    resultado.append([f["id"], f["operario"], f["horario"], sec_val, pla_val])
+                else:
+                    sec_val = f[3]
+                    pla_guardada = f[4] if len(f) > 4 else None
+                    pla_val = self._resolver_planta_sector(sec_val, pla_guardada)
+                    resultado.append([f[0], f[1], f[2], sec_val, pla_val])
 
-            # 2. Traer finde desde depositomp_finde (incluyendo planta)
+            # 2. Traer finde desde depositomp_finde
             cursor.execute("""
-                SELECT operario_id, operario, turno, sector, COALESCE(planta, '') AS planta
+                SELECT operario_id, operario, turno, sector
                 FROM depositomp_finde
                 WHERE semana = %s
             """, (sem_val,))
@@ -114,11 +163,13 @@ class ModeloDepositoMPWeb:
 
             for f in filas_finde:
                 if isinstance(f, dict):
-                    planta_val = f.get("planta") or self._resolver_planta_finde(f.get("sector"))
-                    resultado.append([f["operario_id"], f["operario"], f["turno"], f["sector"], planta_val])
+                    sec_val = f["sector"]
+                    pla_val = self._resolver_planta_sector(sec_val)
+                    resultado.append([f["operario_id"], f["operario"], f["turno"], sec_val, pla_val])
                 else:
-                    planta_val = f[4] if len(f) > 4 and f[4] else self._resolver_planta_finde(f[3])
-                    resultado.append([f[0], f[1], f[2], f[3], planta_val])
+                    sec_val = f[3]
+                    pla_val = self._resolver_planta_sector(sec_val)
+                    resultado.append([f[0], f[1], f[2], sec_val, pla_val])
 
             return resultado
         finally:
@@ -150,19 +201,19 @@ class ModeloDepositoMPWeb:
                 sector_limpio = str(sector).strip()
                 turno_limpio = str(turno).strip()
                 operario_limpio = str(operario).strip()
+                planta_resuelta = self._resolver_planta_sector(sector_limpio)
 
                 if "FIN DE SEMANA" in sector_limpio.upper():
-                    planta_finde = self._resolver_planta_finde(sector_limpio)
                     cursor.execute("""
-                        INSERT INTO depositomp_finde (semana, sector, turno, operario_id, operario, planta)
-                        VALUES (%s, %s, %s, %s, %s, %s);
-                    """, (sem_val, sector_limpio, turno_limpio, id_op_val, operario_limpio, planta_finde))
+                        INSERT INTO depositomp_finde (semana, sector, turno, operario_id, operario)
+                        VALUES (%s, %s, %s, %s, %s);
+                    """, (sem_val, sector_limpio, turno_limpio, id_op_val, operario_limpio))
                 else:
                     cursor.execute("""
                         UPDATE depositomp
                         SET horario = %s, sector = %s, planta = %s, semana = %s
                         WHERE id = %s;
-                    """, (turno_limpio, sector_limpio, sector_limpio, sem_val, id_op_val))
+                    """, (turno_limpio, sector_limpio, planta_resuelta or sector_limpio, sem_val, id_op_val))
 
             self.conexion_db.commit()
         except Exception as e:
