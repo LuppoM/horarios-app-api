@@ -125,23 +125,46 @@ class ModeloDepositoMPWeb:
         cursor = self.conexion_db.cursor()
         sem_val = int(semana) if str(semana).isdigit() else semana
 
-        # Limpiar semana (UPDATE) y finde (DELETE) antes de guardar
-        cursor.execute("UPDATE depositomp SET horario = NULL, sector = NULL WHERE semana = %s;", (sem_val,))
-        cursor.execute("DELETE FROM depositomp_finde WHERE semana = %s;", (sem_val,))
+        try:
+            if hasattr(self.conexion_db, "rollback"):
+                self.conexion_db.rollback()
 
-        for id_op, operario, turno, sector in registros:
-            if "FIN DE SEMANA" in str(sector).upper():
-                # Guardar en tabla aparte con INSERT
-                cursor.execute("""
-                    INSERT INTO depositomp_finde (semana, sector, turno, operario_id, operario)
-                    VALUES (%s, %s, %s, %s, %s);
-                """, (sem_val, sector, turno, id_op, operario))
-            else:
-                # Mantener lógica original con UPDATE
-                cursor.execute("""
-                    UPDATE depositomp
-                    SET horario = %s, sector = %s, planta = %s, semana = %s
-                    WHERE id = %s;
-                """, (turno, sector, sector, sem_val, id_op))
+            cursor.execute("UPDATE depositomp SET horario = NULL, sector = NULL WHERE semana = %s;", (sem_val,))
+            cursor.execute("DELETE FROM depositomp_finde WHERE semana = %s;", (sem_val,))
 
-        self.conexion_db.commit()
+            for item in (registros or []):
+                if not item or len(item) < 4:
+                    continue
+                id_op, operario, turno, sector = item[0], item[1], item[2], item[3]
+                if not id_op or not str(operario or "").strip():
+                    continue
+
+                id_op_val = int(id_op) if str(id_op).strip().isdigit() else id_op
+
+                if "FIN DE SEMANA" in str(sector or "").upper():
+                    cursor.execute("""
+                        INSERT INTO depositomp_finde (semana, sector, turno, operario_id, operario)
+                        VALUES (%s, %s, %s, %s, %s);
+                    """, (sem_val, str(sector).strip(), str(turno).strip(), id_op_val, str(operario).strip()))
+                else:
+                    cursor.execute("""
+                        UPDATE depositomp
+                        SET horario = %s, sector = %s, planta = %s, semana = %s
+                        WHERE id = %s;
+                    """, (str(turno).strip(), str(sector).strip(), str(sector).strip(), sem_val, id_op_val))
+
+            self.conexion_db.commit()
+        except Exception as e:
+            if hasattr(self.conexion_db, "rollback"):
+                try:
+                    self.conexion_db.rollback()
+                except Exception:
+                    pass
+            detalle = str(e).strip() or repr(e)
+            print(f"Error en guardar_asignaciones_depositomp: {detalle}")
+            raise RuntimeError(detalle) from e
+        finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass
