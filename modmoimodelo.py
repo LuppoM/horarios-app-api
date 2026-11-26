@@ -419,7 +419,11 @@ class ModMoiModel:
                     COALESCE(semana::text, '') AS semana,
                     COALESCE(turno::text, '') AS "Horario",
                     COALESCE(sector::text, '') AS "Sector",
-                    COALESCE(sector::text, '') AS "Planta"
+                    CASE
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE ''
+                    END AS "Planta"
                 FROM depositomp_finde
                 WHERE 1=1
             """
@@ -434,12 +438,20 @@ class ModMoiModel:
                     "horario_semana": "turno",
                     "sector": "sector",
                     "sector_semana": "sector",
-                    "planta": "sector",
-                    "planta_semana": "sector",
+                    "planta": """CASE
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE ''
+                    END""",
+                    "planta_semana": """CASE
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE ''
+                    END""",
                 }
                 col_filtro = col_map.get(filtro_columna.lower())
                 if col_filtro:
-                    query_base += f" AND {col_filtro}::text ILIKE %s"
+                    query_base += f" AND ({col_filtro})::text ILIKE %s"
                     params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY operario ASC"
