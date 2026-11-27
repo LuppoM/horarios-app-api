@@ -27,10 +27,15 @@
         let mecanicosDisponibles = [];
         let semanaActualGlobal = "";
 
-        async function init() {
+       async function init() {
             const urlParams = new URLSearchParams(window.location.search);
             semanaActualGlobal = urlParams.get('semana') || "";
             await cargarDatos();
+
+            if (semanaActualGlobal && !urlParams.get('semana')) {
+                const nuevaUrl = `${window.location.pathname}?semana=${encodeURIComponent(semanaActualGlobal)}`;
+                window.history.replaceState({}, '', nuevaUrl);
+            }
         }
 
         async function cargarDatos() {
