@@ -45,7 +45,10 @@
         <input type="text" id="inputFiltro" class="filtro-control" style="width: 200px;" onkeyup="if(event.key === 'Enter') cargarDatos()">
     </div>
 
-    <div class="contador-label" id="contadorLabel">MOD (Directa): 0   |   MOI (Indirecta): 0</div>
+    <div class="contador-label">
+        <span id="contadorLabel">MOD (Directa): 0   |   MOI (Indirecta): 0</span>
+        <span id="estadoConsolidado" style="margin-left: 20px; font-weight: bold;">Estado: Pendiente</span>
+    </div>
 
     <!-- TABLA DE DATOS -->
     <div class="tabla-frame">
@@ -107,9 +110,14 @@
     let origenTablaActual = null;
     let areaUsuarioActual = '';
 
+    const TODAS_LAS_VISTAS = ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'DepositompFinde', 'depositopt'];
+
     const VISTAS_PERMITIDAS_POR_AREA = {
-        'ADMIN': ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'DepositompFinde', 'depositopt'],
-        'ADMINISTRADOR': ['Semana', 'Fin de Semana', 'Mecanicos', 'Calidad', 'Depositomp', 'DepositompFinde', 'depositopt'],
+        'ADMIN': TODAS_LAS_VISTAS,
+        'ADMINISTRADOR': TODAS_LAS_VISTAS,
+        'RRHH': TODAS_LAS_VISTAS,
+        'RR.HH.': TODAS_LAS_VISTAS,
+        'RECURSOS HUMANOS': TODAS_LAS_VISTAS,
         'PRODUCCION': ['Semana', 'Fin de Semana'],
         'PRODUCCIÓN': ['Semana', 'Fin de Semana'],
         'MANTENIMIENTO': ['Mecanicos'],
@@ -125,6 +133,61 @@
     };
 
     const VISTAS_SOLO_MOI = ['Mecanicos', 'Calidad', 'Depositomp', 'DepositompFinde', 'depositopt'];
+
+    function esRrhh(area, usuario) {
+        const a = String(area || '').trim().toUpperCase();
+        const u = String(usuario || '').trim().toUpperCase();
+        return (
+            ['RRHH', 'RR.HH.', 'RECURSOS HUMANOS'].includes(a) ||
+            ['RRHH', 'RR.HH.', 'RECURSOS HUMANOS'].includes(u) ||
+            a.includes('RRHH') ||
+            a.includes('RECURSOS HUMANOS')
+        );
+    }
+
+    function aplicarRestriccionesRrhh() {
+        document.querySelectorAll('.toolstrip .btn-toolstrip').forEach(btn => {
+            const texto = (btn.innerText || '').trim().toLowerCase();
+            if (texto !== 'exportar a excel' && texto !== 'cerrar') {
+                btn.style.display = 'none';
+            }
+        });
+    }
+
+    function actualizarEstadoConsolidado(vista, columnas, filas) {
+        const el = document.getElementById('estadoConsolidado');
+        if (!el) return;
+
+        if (!filas || filas.length === 0) {
+            el.innerText = 'Estado: Pendiente (sin registros)';
+            el.style.color = '#b00020';
+            return;
+        }
+
+        const vistaLower = String(vista || '').toLowerCase();
+        const esFinde = vistaLower === 'fin de semana' || vistaLower === 'depositompfinde';
+
+        const idxSector = columnas.findIndex(c => String(c).toLowerCase() === 'sector');
+        const idxHorario = columnas.findIndex(c => ['horario', 'turno'].includes(String(c).toLowerCase()));
+
+        const incompletos = filas.filter(fila => {
+            const sectorVal = idxSector !== -1 ? String(fila[idxSector] ?? '').trim() : '';
+            const horarioVal = idxHorario !== -1 ? String(fila[idxHorario] ?? '').trim() : '';
+
+            if (esFinde) {
+                return !sectorVal || !horarioVal;
+            }
+            return !sectorVal;
+        });
+
+        if (incompletos.length === 0) {
+            el.innerText = 'Estado: Listo';
+            el.style.color = '#1b5e20';
+        } else {
+            el.innerText = `Estado: Pendiente (${incompletos.length} sin completar)`;
+            el.style.color = '#b00020';
+        }
+    }
 
     function aplicarPermisosVistaPorArea() {
         const sesionRaw = sessionStorage.getItem('usuario_sesion');
@@ -143,9 +206,16 @@
 
         areaUsuarioActual = String(sesion.area || '').trim().toUpperCase();
         const userActual = String(sesion.usuario || '').trim().toUpperCase();
-        const permitidas = VISTAS_PERMITIDAS_POR_AREA[areaUsuarioActual]
-                        || VISTAS_PERMITIDAS_POR_AREA[userActual]
-                        || ['Semana', 'Fin de Semana'];
+
+        if (!areaUsuarioActual && esRrhh('', userActual)) {
+            areaUsuarioActual = 'RRHH';
+        }
+
+        const permitidas = esRrhh(areaUsuarioActual, userActual)
+            ? TODAS_LAS_VISTAS
+            : (VISTAS_PERMITIDAS_POR_AREA[areaUsuarioActual]
+                || VISTAS_PERMITIDAS_POR_AREA[userActual]
+                || ['Semana', 'Fin de Semana']);
 
         const comboVista = document.getElementById('comboVista');
 
@@ -157,6 +227,10 @@
 
         if (comboVista.options.length > 0) {
             comboVista.selectedIndex = 0;
+        }
+
+        if (esRrhh(areaUsuarioActual, userActual)) {
+            aplicarRestriccionesRrhh();
         }
     }
 
@@ -209,6 +283,7 @@
             }
 
             document.getElementById('contadorLabel').innerText = `MOD (Directa): ${cantMod}   |   MOI (Indirecta): ${cantMoi}`;
+            actualizarEstadoConsolidado(vista, columnasOriginales, datosOriginales);
 
             // --- RECONSTRUCCIÓN DE COLUMNAS Y TABLA ---
             const colSel = comboCol.value;
