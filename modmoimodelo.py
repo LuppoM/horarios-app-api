@@ -56,6 +56,10 @@ class ModMoiModel:
         if not area:
             return True  # Compatibilidad si no se envía área
         return str(area).strip().lower() in {"produccion", "producción"}
+    def _es_rrhh(self, area=None):
+        if not area:
+            return False
+        return str(area).strip().lower() in {"rrhh", "recursos humanos", "recursoshumanos"}
 
     def _es_vista_depositomp_finde(self, vista=None):
         if not vista:
@@ -63,13 +67,15 @@ class ModMoiModel:
         return str(vista).strip().lower() in self.VISTAS_DEPOSITOMP_FINDE
 
     def _resolver_tabla_por_area(self, area=None):
-        """Devuelve la tabla asignada al área del usuario (o 'ALL' si es admin)."""
-        if self._es_admin(area):
+        """Devuelve la tabla asignada al área del usuario (o 'ALL' si es admin o rrhh)."""
+        if self._puede_ver_consolidado_total(area):
             return "ALL"
         if not area:
             return "modymoi"
         clave = str(area).strip().lower()
         return self.MAPA_TABLA_POR_AREA.get(clave, "modymoi")
+    def _puede_ver_consolidado_total(self, area=None):
+        return self._es_admin(area) or self._es_rrhh(area)
 
     def obtener_numero_semana_personalizado(self, fecha=None):
         return self._modelo_principal.obtener_numero_semana_personalizado(fecha)
@@ -108,14 +114,14 @@ class ModMoiModel:
         - calidad -> analistascalidad
         - depositomp -> depositomp (Depositomp) o depositomp_finde (DepositompFinde)
         - depositopt -> depositopt
-        - admin -> modymoi_finde (Fin de Semana), tabla específica o las tablas principales unificadas (Semana)
+        - admin / rrhh -> modymoi_finde (Fin de Semana), tabla específica o las tablas principales unificadas (Semana)
         """
         vista_norm = str(vista or "Semana").strip().lower()
         tabla = self._resolver_tabla_por_area(area)
 
-        # 1. Vista Fin de Semana (Producción): solo habilitada para Producción y Admin
+        # 1. Vista Fin de Semana (Producción): habilitada para Producción, Admin y RRHH
         if vista_norm == "fin de semana":
-            if self._es_admin(area) or self._es_produccion(area):
+            if self._puede_ver_consolidado_total(area) or self._es_produccion(area):
                 return self.obtener_datos_finde(
                     filtro_columna=filtro_columna,
                     filtro_valor=filtro_valor,
@@ -129,9 +135,9 @@ class ModMoiModel:
                 semana_actual=semana_actual,
             )
 
-        # 2. Vista Deposito MP Fin de Semana: habilitada para Deposito MP y Admin
+        # 2. Vista Deposito MP Fin de Semana: habilitada para Deposito MP, Admin y RRHH
         if self._es_vista_depositomp_finde(vista_norm):
-            if self._es_admin(area) or tabla == "depositomp":
+            if self._puede_ver_consolidado_total(area) or tabla == "depositomp":
                 return self.obtener_datos_deposito_mp_finde(
                     filtro_columna=filtro_columna,
                     filtro_valor=filtro_valor,
@@ -139,7 +145,7 @@ class ModMoiModel:
                 )
             return list(self.COLUMNAS_CONSOLIDADO), []
 
-        # 3. Usuario Admin: puede consultar una vista específica o todas juntas
+        # 3. Usuario Admin / RRHH: puede consultar una vista específica o todas juntas
         if tabla == "ALL":
             vistas_especificas_admin = {
                 "mecanicos": "mecanicos",
@@ -546,6 +552,9 @@ class ModMoiModel:
 
     def _resolver_tabla_escritura(self, area=None, origen_tabla=None, vista=None):
         """Resuelve la tabla concreta para INSERT/UPDATE/DELETE según el área del usuario y la vista."""
+        if self._es_rrhh(area):
+            raise PermissionError("El área RRHH solo tiene permisos de lectura y exportación.")
+
         tabla_usuario = self._resolver_tabla_por_area(area)
         vista_es_dp_finde = self._es_vista_depositomp_finde(vista)
 
