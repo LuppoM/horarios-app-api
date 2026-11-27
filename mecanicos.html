@@ -3,23 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horarios Mecánicos</title>
+    <title>Horarios de Mecánicos</title>
     <link rel="icon" type="image/x-icon" href="/static/icono.ico">
-    <link rel="stylesheet" href="/archivos/hchocovista.css">
-    <script src="/archivos/seguridad.js"></script>
+    <link rel="stylesheet" href="/archivos/mecanicosvista.css?v=3">
     <script src="/archivos/relojespera.js" defer></script>
 </head>
 <body>
 
+    <!-- Top bar -->
     <div class="top-bar">
-        <button class="btn-accion" onclick="guardarMecanicos()">Guardar</button>
-        <button class="btn-accion" style="background-color: #ffc7ce; color: #9c0006;" onclick="location.href='/'">Cerrar</button>
-        <span style="font-weight: bold; color: #004080; margin-left: 20px;">Semana actual:</span>
-        <span id="labelSemana" style="font-weight: bold; color: #333; font-size: 11pt; margin-left: 5px;">-</span>
-        <input type="hidden" id="inputSemana" value="">
+        <button type="button" class="btn-accion btn-guardar" onclick="guardarMecanicos()">Guardar</button>
+        <button type="button" class="btn-accion btn-cerrar" onclick="location.href='/'">Cerrar</button>
+
+        <span class="semana-label">Semana actual:</span>
+        <input type="text" id="inputSemana" class="semana-input" readonly>
     </div>
 
-    <div id="gridContenedor" class="grid-sectores"></div>
+    <!-- Contenedor dinámico de sectores desde la BD -->
+    <div id="gridContenedor" class="plantas-container grid-sectores"></div>
 
     <script>
         let datosGlobales = {};
@@ -55,8 +56,6 @@
                 datosGlobales = await res.json();
 
                 semanaActualGlobal = datosGlobales.semana || semanaActualGlobal;
-                const labelSemana = document.getElementById('labelSemana');
-                if (labelSemana) labelSemana.textContent = semanaActualGlobal;
                 const inputSemana = document.getElementById('inputSemana');
                 if (inputSemana) inputSemana.value = semanaActualGlobal;
 
@@ -85,6 +84,10 @@
                 .replace(/\s+a\s+/g, " a ");
         }
 
+        function limpiarId(cadena) {
+            return String(cadena || "").replace(/[^a-zA-Z0-9]/g, "_");
+        }
+
         function escaparHtml(str) {
             return String(str ?? "")
                 .replace(/&/g, "&amp;")
@@ -93,20 +96,34 @@
                 .replace(/"/g, "&quot;");
         }
 
-        function claveContenedor(sector, turno) {
-            const s = normalizarTexto(sector).toUpperCase();
-            const t = normalizarHorario(turno).toUpperCase();
-            return `filas_${s}_${t}`;
+        function clavePlantaOSector(plantaVal, sectorVal) {
+            const texto = `${normalizarTexto(sectorVal)} ${normalizarTexto(plantaVal)}`.trim();
+            if (texto.includes("vacac")) return "vacaciones";
+            if (texto.includes("golosin")) return "golosinas";
+            if (texto.includes("chocolat")) return "chocolates";
+            return limpiarId(normalizarTexto(sectorVal || plantaVal));
         }
 
-        function resolverSectorDestino(planta, sector) {
-            const sec = String(sector || "").trim();
-            if (sec) return sec;
-            const pla = normalizarTexto(planta);
-            if (pla.includes("chocolat")) return "PLANTA CHOCOLATES";
-            if (pla.includes("golosin")) return "PLANTA GOLOSINAS";
-            if (pla.includes("vacac")) return "PERSONAL DE VACACIONES";
-            return String(planta || "").trim();
+        function idContenedorTurno(plantaVal, sectorVal, horarioVal) {
+            const clave = clavePlantaOSector(plantaVal, sectorVal);
+            const turno = limpiarId(normalizarHorario(horarioVal));
+            return `cont_${clave}_${turno}`;
+        }
+
+        function buscarContenedorConsolidado(horarioVal, plantaVal, sectorVal) {
+            const idDirecto = idContenedorTurno(plantaVal, sectorVal, horarioVal);
+            const directo = document.getElementById(idDirecto);
+            if (directo) return directo;
+
+            const horNorm = normalizarHorario(horarioVal);
+            const clave = clavePlantaOSector(plantaVal, sectorVal);
+            const bloques = [...document.querySelectorAll('.horario-block')];
+
+            const match = bloques.find(b =>
+                normalizarHorario(b.dataset.horario) === horNorm &&
+                clavePlantaOSector(b.dataset.planta, b.dataset.sector) === clave
+            );
+            return match ? match.querySelector('.rows-container') : null;
         }
 
         function renderizarUI() {
@@ -119,46 +136,6 @@
                 return;
             }
 
-            sectores.forEach(secObj => {
-                const nombreSector = String(secObj.sector || "").trim();
-                const plantaSector = String(secObj.planta || nombreSector).trim();
-                const turnos = Array.isArray(secObj.turnos) ? secObj.turnos : [];
-
-                const card = document.createElement('div');
-                card.className = "card-carga sector-card";
-                card.dataset.planta = plantaSector;
-                card.dataset.sector = nombreSector;
-                card.innerHTML = `<h3 class="card-titulo">${escaparHtml(nombreSector)}</h3>`;
-
-                turnos.forEach(horario => {
-                    const turnoLimpio = String(horario || "").trim();
-                    if (!turnoLimpio) return;
-
-                    const idContRows = claveContenedor(nombreSector, turnoLimpio);
-
-                    const blockDiv = document.createElement('div');
-                    blockDiv.className = "horario-block turno-box";
-                    blockDiv.dataset.horario = turnoLimpio;
-                    blockDiv.dataset.planta = plantaSector;
-                    blockDiv.dataset.sector = nombreSector;
-
-                    const secEscapado = nombreSector.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-                    const turEscapado = turnoLimpio.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-
-                    blockDiv.innerHTML = `
-                        <div class="horario-header">
-                            <strong>Horario: ${escaparHtml(turnoLimpio)}</strong>
-                            <button type="button" class="btn-agregar-op" onclick="agregarFilaOperario('${secEscapado}', '${turEscapado}', '', '')">+ Agregar operario</button>
-                        </div>
-                        <div class="rows-container filas-container" id="${idContRows}"></div>
-                    `;
-
-                    card.appendChild(blockDiv);
-                });
-
-                grid.appendChild(card);
-            });
-
             const asignados = Array.isArray(datosGlobales.asignados) ? [...datosGlobales.asignados] : [];
             asignados.sort((x, y) => {
                 const idX = parseInt(x[0], 10);
@@ -169,20 +146,57 @@
                 return String(x[1] || "").localeCompare(String(y[1] || ""), "es");
             });
 
-            asignados.forEach(item => {
-                const idVal = item[0];
-                const operarioVal = item[1];
-                const horarioVal = item[2];
-                const plantaVal = item[3];
-                const sectorVal = item.length > 4 ? item[4] : item[3];
+            sectores.forEach(secObj => {
+                const nombreSector = String(secObj.sector || "").trim();
+                const plantaSector = String(secObj.planta || nombreSector).trim();
+                const turnos = Array.isArray(secObj.turnos) ? secObj.turnos : [];
 
-                const sectorDestino = resolverSectorDestino(plantaVal, sectorVal);
-                if (sectorDestino && horarioVal) {
-                    agregarFilaOperario(sectorDestino, horarioVal, idVal, operarioVal);
-                }
+                const card = document.createElement('div');
+                card.className = "card-carga sector-card";
+                card.innerHTML = `<h3 class="card-titulo">${escaparHtml(nombreSector)}</h3>`;
+
+                turnos.forEach(horario => {
+                    const turnoLimpio = String(horario || "").trim();
+                    if (!turnoLimpio) return;
+
+                    const idContRows = `container_${limpiarId(nombreSector)}_${limpiarId(turnoLimpio)}`;
+
+                    const blockDiv = document.createElement('div');
+                    blockDiv.className = "horario-block turno-box";
+                    blockDiv.dataset.horario = turnoLimpio;
+                    blockDiv.dataset.planta = plantaSector;
+                    blockDiv.dataset.sector = nombreSector;
+
+                    blockDiv.innerHTML = `
+                        <div class="horario-header">
+                            <strong>Horario: ${escaparHtml(turnoLimpio)}</strong>
+                            <button type="button" class="btn-agregar-op" onclick="agregarFilaOperario('${idContRows}')">+ Agregar operario</button>
+                        </div>
+                        <div class="rows-container filas-container" id="${idContRows}"></div>
+                    `;
+
+                    card.appendChild(blockDiv);
+
+                    const turnoNorm = normalizarTexto(turnoLimpio);
+                    const asignadosEnBloque = asignados.filter(a => {
+                        const horAsig = normalizarTexto(a[2]);
+                        if (horAsig !== turnoNorm) return false;
+
+                        const planAsig = normalizarTexto(a[3]);
+                        const secAsig = normalizarTexto(a[4]);
+                        const destino = secAsig || planAsig;
+
+                        if (!destino) return false;
+                        return coincidePlantaOSector(destino, plantaSector, nombreSector);
+                    });
+
+                    asignadosEnBloque.forEach(a => {
+                        agregarFilaOperario(idContRows, a[0], a[1]);
+                    });
+                });
+
+                grid.appendChild(card);
             });
-
-            actualizarOpcionesSelects();
         }
 
         function poblarSelectMecanico(selectOp, inputId, idInicial = "", nombreInicial = "") {
@@ -241,8 +255,8 @@
             });
         }
 
-        function agregarFilaOperario(sector, turno, idVal = "", nombreVal = "") {
-            const container = document.getElementById(claveContenedor(sector, turno));
+        function agregarFilaOperario(idContRows, idVal = "", nombreVal = "") {
+            const container = document.getElementById(idContRows);
             if (!container) return;
 
             const filaDiv = document.createElement('div');
@@ -327,6 +341,6 @@
         }
 
         window.onload = init;
-    </script>
+</script>
 </body>
 </html>
