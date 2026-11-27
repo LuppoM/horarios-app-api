@@ -27,7 +27,15 @@
         let mecanicosDisponibles = [];
         let semanaActualGlobal = "";
 
-       async function init() {
+        function ocultarRelojEspera() {
+            if (typeof ocultarCarga === "function") ocultarCarga();
+            if (typeof cerrarCargando === "function") cerrarCargando();
+            document.querySelectorAll(".reloj-espera, .cargando-overlay, #relojEspera, #overlayCarga").forEach(el => {
+                el.style.display = "none";
+            });
+        }
+
+        async function init() {
             const urlParams = new URLSearchParams(window.location.search);
             semanaActualGlobal = urlParams.get('semana') || "";
             await cargarDatos();
@@ -42,6 +50,9 @@
             try {
                 const querySemana = semanaActualGlobal ? `?semana=${encodeURIComponent(semanaActualGlobal)}` : "";
                 const res = await fetch(`/api/mecanicos/datos${querySemana}`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
                 datosGlobales = await res.json();
 
                 semanaActualGlobal = datosGlobales.semana || semanaActualGlobal;
@@ -53,6 +64,8 @@
             } catch (error) {
                 console.error("Error al cargar mecánicos:", error);
                 alert("Error al obtener los datos de mecánicos.");
+            } finally {
+                ocultarRelojEspera();
             }
         }
 
