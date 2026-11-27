@@ -112,7 +112,7 @@ class ModeloMecanicosWeb:
                 SELECT id, operario, horario, COALESCE(planta, ''), COALESCE(sector, '')
                 FROM mecanicos
                 WHERE semana = %s AND horario IS NOT NULL AND TRIM(horario) != ''
-                ORDER BY horario ASC, operario ASC;
+                ORDER BY id ASC, operario ASC;
             """, (sem_val,))
             filas = cursor.fetchall()
             salida = []

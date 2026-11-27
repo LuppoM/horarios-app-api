@@ -65,7 +65,8 @@
 
             if (!a) return true;
             if (a === p || a === s) return true;
-            if (a.includes(s) || s.includes(a)) return true;
+            if (s && (a.includes(s) || s.includes(a))) return true;
+            if (p && (a.includes(p) || p.includes(a))) return true;
             if (a.includes("chocolat") && (p.includes("chocolat") || s.includes("chocolat"))) return true;
             if (a.includes("golosin") && (p.includes("golosin") || s.includes("golosin"))) return true;
             if (a.includes("vacac") && (p.includes("vacac") || s.includes("vacac"))) return true;
@@ -82,7 +83,16 @@
                 return;
             }
 
-            const asignados = datosGlobales.asignados || [];
+            const asignados = Array.isArray(datosGlobales.asignados) ? [...datosGlobales.asignados] : [];
+
+            asignados.sort((x, y) => {
+                const idX = parseInt(x[0], 10);
+                const idY = parseInt(y[0], 10);
+                if (!Number.isNaN(idX) && !Number.isNaN(idY) && idX !== idY) {
+                    return idX - idY;
+                }
+                return String(x[1] || "").localeCompare(String(y[1] || ""), "es");
+            });
 
             sectores.forEach(secObj => {
                 const nombreSector = String(secObj.sector || "").trim();
