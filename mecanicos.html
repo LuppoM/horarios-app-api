@@ -51,6 +51,27 @@
             }
         }
 
+        function normalizarTexto(val) {
+            return String(val ?? "")
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, " ");
+        }
+
+        function coincidePlantaOSector(valAsig, plantaCard, sectorCard) {
+            const a = normalizarTexto(valAsig);
+            const p = normalizarTexto(plantaCard);
+            const s = normalizarTexto(sectorCard);
+
+            if (!a) return true;
+            if (a === p || a === s) return true;
+            if (a.includes(s) || s.includes(a)) return true;
+            if (a.includes("chocolat") && (p.includes("chocolat") || s.includes("chocolat"))) return true;
+            if (a.includes("golosin") && (p.includes("golosin") || s.includes("golosin"))) return true;
+            if (a.includes("vacac") && (p.includes("vacac") || s.includes("vacac"))) return true;
+            return false;
+        }
+
         function renderizarUI() {
             const grid = document.getElementById('gridContenedor');
             grid.innerHTML = "";
@@ -94,14 +115,20 @@
 
                     card.appendChild(blockDiv);
 
+                    const turnoNorm = normalizarTexto(turnoLimpio);
+
                     const asignadosEnBloque = asignados.filter(a => {
-                        const horAsig = String(a[2] || "").trim();
-                        const planAsig = String(a[3] || "").trim().toLowerCase();
-                        return horAsig === turnoLimpio && (
-                            !planAsig ||
-                            planAsig === plantaSector.toLowerCase() ||
-                            planAsig === nombreSector.toLowerCase()
-                        );
+                        const horAsig = normalizarTexto(a[2]);
+                        if (horAsig !== turnoNorm) return false;
+
+                        const planAsig = a[3];
+                        const secAsig = a[4];
+
+                        if (secAsig && normalizarTexto(secAsig)) {
+                            return coincidePlantaOSector(secAsig, plantaSector, nombreSector);
+                        }
+
+                        return coincidePlantaOSector(planAsig, plantaSector, nombreSector);
                     });
 
                     asignadosEnBloque.forEach(a => {
@@ -176,11 +203,12 @@
             document.querySelectorAll('.horario-block').forEach(bloque => {
                 const horario = bloque.dataset.horario;
                 const planta = bloque.dataset.planta;
+                const sector = bloque.dataset.sector;
 
                 bloque.querySelectorAll('.fila-operario').forEach(fila => {
                     const idOp = fila.querySelector('.input-id-box').value;
                     if (idOp) {
-                        registros.push([parseInt(idOp, 10), horario, planta]);
+                        registros.push([parseInt(idOp, 10), horario, planta, sector]);
                     }
                 });
             });
