@@ -27,7 +27,14 @@ class ModMoiModel:
 
     TABLAS_AREA_MOI = ("mecanicos", "analistascalidad", "depositomp", "depositopt", "depositomp_finde")
     TODAS_LAS_TABLAS = ("modymoi", "mecanicos", "analistascalidad", "depositomp", "depositopt", "depositomp_finde")
-    VISTAS_DEPOSITOMP_FINDE = {"depositompfinde", "deposito mp fin de semana", "dp fin de semana"}
+    VISTAS_DEPOSITOMP_FINDE = {
+        "depositompfinde",
+        "depositomp_finde",
+        "deposito mp finde",
+        "deposito mp fin de semana",
+        "depósito mp fin de semana",
+        "dp fin de semana",
+    }
 
     COLUMNAS_CONSOLIDADO = [
         "id",
@@ -56,10 +63,15 @@ class ModMoiModel:
         if not area:
             return True  # Compatibilidad si no se envía área
         return str(area).strip().lower() in {"produccion", "producción"}
+
     def _es_rrhh(self, area=None):
         if not area:
             return False
-        return str(area).strip().lower() in {"rrhh", "recursos humanos", "recursoshumanos"}
+        val = str(area).strip().lower()
+        return val in {"rrhh", "rr.hh.", "rr.hh", "recursos humanos", "recursoshumanos"} or "rrhh" in val or "recursos humanos" in val
+
+    def _puede_ver_consolidado_total(self, area=None):
+        return self._es_admin(area) or self._es_rrhh(area)
 
     def _es_vista_depositomp_finde(self, vista=None):
         if not vista:
@@ -74,8 +86,6 @@ class ModMoiModel:
             return "modymoi"
         clave = str(area).strip().lower()
         return self.MAPA_TABLA_POR_AREA.get(clave, "modymoi")
-    def _puede_ver_consolidado_total(self, area=None):
-        return self._es_admin(area) or self._es_rrhh(area)
 
     def obtener_numero_semana_personalizado(self, fecha=None):
         return self._modelo_principal.obtener_numero_semana_personalizado(fecha)
@@ -226,7 +236,7 @@ class ModMoiModel:
                 cursor.close()
 
     def _obtener_datos_todas_las_areas(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
-        """Unifica las 5 tablas (modymoi + 4 áreas MOI) exclusivamente para admin."""
+        """Unifica las 5 tablas (modymoi + 4 áreas MOI) para admin y rrhh."""
         columnas = list(self.COLUMNAS_CONSOLIDADO)
 
         cursor = None
@@ -487,9 +497,9 @@ class ModMoiModel:
         return self._obtener_datos_tabla_area_moi("depositopt", filtro_columna, filtro_valor, semana_actual)
 
     def obtener_datos_finde(self, filtro_columna=None, filtro_valor=None, semana_actual=None, area=None):
-        """Consulta modymoi_finde únicamente si el usuario es producción o admin."""
+        """Consulta modymoi_finde únicamente si el usuario es producción, admin o rrhh."""
         columnas = ["id", "id_operario", "operario", "semana", "dia", "horario", "sector", "planta"]
-        if area and not (self._es_admin(area) or self._es_produccion(area)):
+        if area and not (self._puede_ver_consolidado_total(area) or self._es_produccion(area)):
             return columnas, []
 
         cursor = None
