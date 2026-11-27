@@ -76,25 +76,50 @@
                 .replace(/\s+/g, " ");
         }
 
-        function normalizarHorario(val) {
-            return normalizarTexto(val)
-                .replace(/\s*-\s*/g, " a ")
-                .replace(/\s+a\s+/g, " a ");
+        function limpiarId(cadena) {
+            return String(cadena || "").replace(/[^a-zA-Z0-9]/g, "_");
         }
 
-        function coincidePlantaOSector(valAsig, plantaCard, sectorCard) {
-            const a = normalizarTexto(valAsig);
-            const p = normalizarTexto(plantaCard);
-            const s = normalizarTexto(sectorCard);
+        function escaparHtml(str) {
+            return String(str ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+        }
 
-            if (!a) return false;
-            if (a === p || a === s) return true;
-            if (s && (a.includes(s) || s.includes(a))) return true;
-            if (p && (a.includes(p) || p.includes(a))) return true;
-            if (a.includes("chocolat") && (p.includes("chocolat") || s.includes("chocolat"))) return true;
-            if (a.includes("golosin") && (p.includes("golosin") || s.includes("golosin"))) return true;
-            if (a.includes("vacac") && (p.includes("vacac") || s.includes("vacac"))) return true;
-            return false;
+        function buscarContenedorBloque(horarioAsig, plantaAsig, sectorAsig) {
+            const bloques = [...document.querySelectorAll('.horario-block')];
+            const horNorm = normalizarTexto(horarioAsig);
+            const secNorm = normalizarTexto(sectorAsig);
+            const plaNorm = normalizarTexto(plantaAsig);
+
+            // 1. Coincidencia exacta por sector + horario
+            let match = bloques.find(b =>
+                normalizarTexto(b.dataset.horario) === horNorm &&
+                secNorm &&
+                normalizarTexto(b.dataset.sector) === secNorm
+            );
+            if (match) return match.querySelector('.rows-container');
+
+            // 2. Coincidencia por palabra clave de sector/planta + horario
+            match = bloques.find(b => {
+                if (normalizarTexto(b.dataset.horario) !== horNorm) return false;
+                const bSec = normalizarTexto(b.dataset.sector);
+                const bPla = normalizarTexto(b.dataset.planta);
+
+                if (secNorm && (bSec.includes(secNorm) || secNorm.includes(bSec))) return true;
+                if (plaNorm && (bPla.includes(plaNorm) || bSec.includes(plaNorm))) return true;
+                if ((secNorm.includes("chocolat") || plaNorm.includes("chocolat")) && bSec.includes("chocolat")) return true;
+                if ((secNorm.includes("golosin") || plaNorm.includes("golosin")) && bSec.includes("golosin")) return true;
+                if ((secNorm.includes("vacac") || plaNorm.includes("vacac")) && bSec.includes("vacac")) return true;
+                return false;
+            });
+            if (match) return match.querySelector('.rows-container');
+
+            // 3. Respaldo: primer bloque con ese mismo horario
+            match = bloques.find(b => normalizarTexto(b.dataset.horario) === horNorm);
+            return match ? match.querySelector('.rows-container') : null;
         }
 
         function renderizarUI() {
@@ -106,16 +131,6 @@
                 grid.innerHTML = `<p style="padding:20px; color:#555;">No hay sectores configurados en la base de datos para este módulo.</p>`;
                 return;
             }
-
-            const asignados = Array.isArray(datosGlobales.asignados) ? [...datosGlobales.asignados] : [];
-            asignados.sort((x, y) => {
-                const idX = parseInt(x[0], 10);
-                const idY = parseInt(y[0], 10);
-                if (!Number.isNaN(idX) && !Number.isNaN(idY) && idX !== idY) {
-                    return idX - idY;
-                }
-                return String(x[1] || "").localeCompare(String(y[1] || ""), "es");
-            });
 
             sectores.forEach(secObj => {
                 const nombreSector = String(secObj.sector || "").trim();
@@ -147,40 +162,86 @@
                     `;
 
                     card.appendChild(blockDiv);
-
-                    const turnoNorm = normalizarHorario(turnoLimpio);
-                    const asignadosEnBloque = asignados.filter(a => {
-                        const horAsig = normalizarHorario(a[2]);
-                        if (horAsig !== turnoNorm) return false;
-
-                        const planAsig = a[3];
-                        const secAsig = a[4];
-
-                        if (secAsig && normalizarTexto(secAsig)) {
-                            return coincidePlantaOSector(secAsig, plantaSector, nombreSector);
-                        }
-                        return coincidePlantaOSector(planAsig, plantaSector, nombreSector);
-                    });
-
-                    asignadosEnBloque.forEach(a => {
-                        agregarFilaOperario(idContRows, a[0], a[1]);
-                    });
                 });
 
                 grid.appendChild(card);
             });
+
+            const asignados = Array.isArray(datosGlobales.asignados) ? [...datosGlobales.asignados] : [];
+            asignados.sort((x, y) => {
+                const idX = parseInt(x[0], 10);
+                const idY = parseInt(y[0], 10);
+                if (!Number.isNaN(idX) && !Number.isNaN(idY) && idX !== idY) {
+                    return idX - idY;
+                }
+                return String(x[1] || "").localeCompare(String(y[1] || ""), "es");
+            });
+
+            asignados.forEach(([idVal, operarioVal, horarioVal, plantaVal, sectorVal]) => {
+                if (!horarioVal) return;
+                const container = buscarContenedorBloque(horarioVal, plantaVal, sectorVal);
+                if (container) {
+                    agregarFilaOperario(container.id, idVal, operarioVal);
+                }
+            });
+
+            actualizarOpcionesSelects();
         }
 
-        function limpiarId(cadena) {
-            return String(cadena || "").replace(/[^a-zA-Z0-9]/g, "_");
+        function poblarSelectMecanico(selectOp, inputId, idInicial = "", nombreInicial = "") {
+            const idActual = String(inputId.value || idInicial || selectOp.getAttribute('data-id-inicial') || "").trim();
+            const nombreActual = String(nombreInicial || selectOp.getAttribute('data-operario-inicial') || "").trim();
+            const nombreNorm = normalizarTexto(nombreActual);
+
+            selectOp.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
+
+            let encontrado = false;
+            let idResuelto = "";
+
+            mecanicosDisponibles.forEach(([id, nombre]) => {
+                const nombreLimpio = String(nombre || "").trim();
+                if (!nombreLimpio) return;
+
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = nombreLimpio;
+
+                const coincideId = idActual !== "" && String(id).trim() === idActual;
+                const coincideNombre = nombreNorm !== "" && normalizarTexto(nombreLimpio) === nombreNorm;
+
+                if (coincideId || coincideNombre) {
+                    opt.selected = true;
+                    encontrado = true;
+                    idResuelto = id;
+                }
+                selectOp.appendChild(opt);
+            });
+
+            if (!encontrado && nombreActual) {
+                const opt = document.createElement('option');
+                opt.value = idActual || nombreActual;
+                opt.textContent = nombreActual;
+                opt.selected = true;
+                selectOp.appendChild(opt);
+                idResuelto = idActual || "";
+            }
+
+            if (idResuelto !== "") {
+                selectOp.value = idResuelto;
+                inputId.value = idResuelto;
+            } else if (idActual !== "") {
+                inputId.value = idActual;
+            }
         }
 
-        function escaparHtml(str) {
-            return String(str ?? "")
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;");
+        function actualizarOpcionesSelects() {
+            document.querySelectorAll('.fila-operario').forEach(fila => {
+                const inputId = fila.querySelector('.input-id-box');
+                const selectOp = fila.querySelector('.select-operario-mecanico');
+                if (inputId && selectOp) {
+                    poblarSelectMecanico(selectOp, inputId);
+                }
+            });
         }
 
         function agregarFilaOperario(idContRows, idVal = "", nombreVal = "") {
@@ -198,34 +259,21 @@
 
             const selectOp = document.createElement('select');
             selectOp.className = "select-operario-mecanico";
-            selectOp.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
-
-            let seleccionadoId = "";
-            const idBuscado = String(idVal ?? "").trim();
-            const nombreBuscado = normalizarTexto(nombreVal);
-
-            mecanicosDisponibles.forEach(([id, nombre]) => {
-                const opt = document.createElement('option');
-                opt.value = id;
-                opt.textContent = nombre;
-
-                const coincideId = idBuscado !== "" && String(id).trim() === idBuscado;
-                const coincideNombre = nombreBuscado !== "" && normalizarTexto(nombre) === nombreBuscado;
-
-                if (coincideId || coincideNombre) {
-                    opt.selected = true;
-                    seleccionadoId = id;
-                }
-                selectOp.appendChild(opt);
-            });
-
-            if (seleccionadoId !== "") {
-                selectOp.value = seleccionadoId;
-                inputId.value = seleccionadoId;
+            if (idVal !== "" && idVal !== null && idVal !== undefined) {
+                selectOp.setAttribute('data-id-inicial', String(idVal).trim());
+            }
+            if (nombreVal) {
+                selectOp.setAttribute('data-operario-inicial', String(nombreVal).trim());
             }
 
             selectOp.onchange = (e) => {
-                inputId.value = e.target.value;
+                const valSel = e.target.value;
+                inputId.value = valSel;
+                const optSel = selectOp.options[selectOp.selectedIndex];
+                if (optSel && optSel.textContent) {
+                    selectOp.setAttribute('data-operario-inicial', optSel.textContent.trim());
+                }
+                selectOp.setAttribute('data-id-inicial', String(valSel || "").trim());
             };
 
             const btnEliminar = document.createElement('button');
@@ -239,6 +287,7 @@
             filaDiv.appendChild(btnEliminar);
 
             container.appendChild(filaDiv);
+            poblarSelectMecanico(selectOp, inputId, idVal, nombreVal);
         }
 
         async function guardarMecanicos() {
