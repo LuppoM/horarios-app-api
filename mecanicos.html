@@ -78,6 +78,12 @@
                 .replace(/\s+/g, " ");
         }
 
+        function normalizarHorario(val) {
+            return normalizarTexto(val)
+                .replace(/\s*-\s*/g, " a ")
+                .replace(/\s+a\s+/g, " a ");
+        }
+
         function limpiarId(cadena) {
             return String(cadena || "").replace(/[^a-zA-Z0-9]/g, "_");
         }
@@ -100,38 +106,50 @@
 
         function buscarContenedorBloque(horarioAsig, plantaAsig, sectorAsig) {
             const bloques = [...document.querySelectorAll('.horario-block')];
-            const horNorm = normalizarTexto(horarioAsig);
+            const horNorm = normalizarHorario(horarioAsig);
             const secNorm = normalizarTexto(sectorAsig);
             const plaNorm = normalizarTexto(plantaAsig);
             const destinoAsig = clasificarDestino(plantaAsig, sectorAsig);
 
             // 1. Coincidencia exacta por sector + horario
             let match = bloques.find(b =>
-                normalizarTexto(b.dataset.horario) === horNorm &&
+                normalizarHorario(b.dataset.horario) === horNorm &&
                 secNorm &&
                 normalizarTexto(b.dataset.sector) === secNorm
             );
             if (match) return match.querySelector('.rows-container');
 
-            // 2. Coincidencia por destino clasificado (chocolates / golosinas / vacaciones) + horario
-            if (destinoAsig) {
-                match = bloques.find(b =>
-                    normalizarTexto(b.dataset.horario) === horNorm &&
-                    clasificarDestino(b.dataset.planta, b.dataset.sector) === destinoAsig
-                );
-                if (match) return match.querySelector('.rows-container');
-            }
-
-            // 3. Coincidencia por planta + horario
+            // 2. Coincidencia por planta + horario
             if (plaNorm) {
                 match = bloques.find(b =>
-                    normalizarTexto(b.dataset.horario) === horNorm &&
+                    normalizarHorario(b.dataset.horario) === horNorm &&
                     normalizarTexto(b.dataset.planta) === plaNorm
                 );
                 if (match) return match.querySelector('.rows-container');
             }
 
-            return null;
+            // 3. Coincidencia por destino clasificado (chocolates / golosinas / vacaciones) + horario
+            if (destinoAsig) {
+                match = bloques.find(b =>
+                    normalizarHorario(b.dataset.horario) === horNorm &&
+                    clasificarDestino(b.dataset.planta, b.dataset.sector) === destinoAsig
+                );
+                if (match) return match.querySelector('.rows-container');
+            }
+
+            // 4. Coincidencia parcial por texto de sector o planta + horario
+            match = bloques.find(b => {
+                if (normalizarHorario(b.dataset.horario) !== horNorm) return false;
+                const bSec = normalizarTexto(b.dataset.sector);
+                const bPla = normalizarTexto(b.dataset.planta);
+                return (secNorm && (bSec.includes(secNorm) || secNorm.includes(bSec))) ||
+                       (plaNorm && (bPla.includes(plaNorm) || bSec.includes(plaNorm)));
+            });
+            if (match) return match.querySelector('.rows-container');
+
+            // 5. Respaldo por horario para no perder el registro en pantalla
+            match = bloques.find(b => normalizarHorario(b.dataset.horario) === horNorm);
+            return match ? match.querySelector('.rows-container') : null;
         }
 
         function renderizarUI() {
