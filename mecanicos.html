@@ -96,48 +96,34 @@
                 .replace(/"/g, "&quot;");
         }
 
-        function clasificarDestino(plantaVal, sectorVal) {
-            const combinado = `${normalizarTexto(sectorVal)} ${normalizarTexto(plantaVal)}`.trim();
-            if (combinado.includes("vacac")) return "vacaciones";
-            if (combinado.includes("golosin")) return "golosinas";
-            if (combinado.includes("chocolat")) return "chocolates";
-            return "";
+        function clavePlantaOSector(plantaVal, sectorVal) {
+            const texto = `${normalizarTexto(sectorVal)} ${normalizarTexto(plantaVal)}`.trim();
+            if (texto.includes("vacac")) return "vacaciones";
+            if (texto.includes("golosin")) return "golosinas";
+            if (texto.includes("chocolat")) return "chocolates";
+            return limpiarId(normalizarTexto(sectorVal || plantaVal));
         }
 
-        function buscarContenedorBloque(horarioAsig, plantaAsig, sectorAsig) {
+        function idContenedorTurno(plantaVal, sectorVal, horarioVal) {
+            const clave = clavePlantaOSector(plantaVal, sectorVal);
+            const turno = limpiarId(normalizarHorario(horarioVal));
+            return `cont_${clave}_${turno}`;
+        }
+
+        function buscarContenedorConsolidado(horarioVal, plantaVal, sectorVal) {
+            const idDirecto = idContenedorTurno(plantaVal, sectorVal, horarioVal);
+            const directo = document.getElementById(idDirecto);
+            if (directo) return directo;
+
+            const horNorm = normalizarHorario(horarioVal);
+            const clave = clavePlantaOSector(plantaVal, sectorVal);
             const bloques = [...document.querySelectorAll('.horario-block')];
-            const horNorm = normalizarHorario(horarioAsig);
-            const secNorm = normalizarTexto(sectorAsig);
-            const plaNorm = normalizarTexto(plantaAsig);
-            const destinoAsig = clasificarDestino(plantaAsig, sectorAsig);
 
-            // 1. Coincidencia exacta por sector + horario
-            let match = bloques.find(b =>
+            const match = bloques.find(b =>
                 normalizarHorario(b.dataset.horario) === horNorm &&
-                secNorm &&
-                normalizarTexto(b.dataset.sector) === secNorm
+                clavePlantaOSector(b.dataset.planta, b.dataset.sector) === clave
             );
-            if (match) return match.querySelector('.rows-container');
-
-            // 2. Coincidencia por destino (chocolates / golosinas / vacaciones) + horario
-            if (destinoAsig) {
-                match = bloques.find(b =>
-                    normalizarHorario(b.dataset.horario) === horNorm &&
-                    clasificarDestino(b.dataset.planta, b.dataset.sector) === destinoAsig
-                );
-                if (match) return match.querySelector('.rows-container');
-            }
-
-            // 3. Coincidencia por planta + horario
-            if (plaNorm) {
-                match = bloques.find(b =>
-                    normalizarHorario(b.dataset.horario) === horNorm &&
-                    normalizarTexto(b.dataset.planta) === plaNorm
-                );
-                if (match) return match.querySelector('.rows-container');
-            }
-
-            return null;
+            return match ? match.querySelector('.rows-container') : null;
         }
 
         function renderizarUI() {
@@ -163,7 +149,7 @@
                     const turnoLimpio = String(horario || "").trim();
                     if (!turnoLimpio) return;
 
-                    const idContRows = `container_${limpiarId(nombreSector)}_${limpiarId(turnoLimpio)}`;
+                    const idContRows = idContenedorTurno(plantaSector, nombreSector, turnoLimpio);
 
                     const blockDiv = document.createElement('div');
                     blockDiv.className = "horario-block turno-box";
@@ -197,7 +183,7 @@
 
             asignados.forEach(([idVal, operarioVal, horarioVal, plantaVal, sectorVal]) => {
                 if (!horarioVal) return;
-                const container = buscarContenedorBloque(horarioVal, plantaVal, sectorVal);
+                const container = buscarContenedorConsolidado(horarioVal, plantaVal, sectorVal);
                 if (container) {
                     agregarFilaOperario(container.id, idVal, operarioVal);
                 }
