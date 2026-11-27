@@ -107,9 +107,14 @@ class ModeloMecanicosWeb:
     def obtener_asignaciones_semana(self, semana):
         cursor = self.conexion_db.cursor()
         try:
+            if hasattr(self.conexion_db, "rollback"):
+                self.conexion_db.rollback()
+
             sem_val = int(semana) if str(semana).isdigit() else semana
             cursor.execute("""
-                SELECT id, operario, horario, COALESCE(planta, ''), COALESCE(sector, '')
+                SELECT id, operario, horario,
+                       COALESCE(planta, '') AS planta,
+                       COALESCE(sector, '') AS sector
                 FROM mecanicos
                 WHERE semana = %s
                   AND horario IS NOT NULL

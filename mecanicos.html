@@ -146,6 +146,8 @@
                 return String(x[1] || "").localeCompare(String(y[1] || ""), "es");
             });
 
+            const bloquesCreados = [];
+
             sectores.forEach(secObj => {
                 const nombreSector = String(secObj.sector || "").trim();
                 const plantaSector = String(secObj.planta || nombreSector).trim();
@@ -176,26 +178,34 @@
                     `;
 
                     card.appendChild(blockDiv);
-
-                    const turnoNorm = normalizarTexto(turnoLimpio);
-                    const asignadosEnBloque = asignados.filter(a => {
-                        const horAsig = normalizarTexto(a[2]);
-                        if (horAsig !== turnoNorm) return false;
-
-                        const planAsig = normalizarTexto(a[3]);
-                        const secAsig = normalizarTexto(a[4]);
-                        const destino = secAsig || planAsig;
-
-                        if (!destino) return false;
-                        return coincidePlantaOSector(destino, plantaSector, nombreSector);
-                    });
-
-                    asignadosEnBloque.forEach(a => {
-                        agregarFilaOperario(idContRows, a[0], a[1]);
+                    bloquesCreados.push({
+                        idContRows,
+                        turnoLimpio,
+                        plantaSector,
+                        nombreSector
                     });
                 });
 
                 grid.appendChild(card);
+            });
+
+            bloquesCreados.forEach(bloque => {
+                const turnoNorm = normalizarTexto(bloque.turnoLimpio);
+                const asignadosEnBloque = asignados.filter(a => {
+                    const horAsig = normalizarTexto(a[2]);
+                    if (horAsig !== turnoNorm) return false;
+
+                    const planAsig = normalizarTexto(a[3]);
+                    const secAsig = normalizarTexto(a[4]);
+                    const destino = secAsig || planAsig;
+
+                    if (!destino) return false;
+                    return coincidePlantaOSector(destino, bloque.plantaSector, bloque.nombreSector);
+                });
+
+                asignadosEnBloque.forEach(a => {
+                    agregarFilaOperario(bloque.idContRows, a[0], a[1]);
+                });
             });
         }
 
