@@ -63,7 +63,7 @@
             const p = normalizarTexto(plantaCard);
             const s = normalizarTexto(sectorCard);
 
-            if (!a) return true;
+            if (!a) return false;
             if (a === p || a === s) return true;
             if (s && (a.includes(s) || s.includes(a))) return true;
             if (p && (a.includes(p) || p.includes(a))) return true;
@@ -84,7 +84,6 @@
             }
 
             const asignados = Array.isArray(datosGlobales.asignados) ? [...datosGlobales.asignados] : [];
-
             asignados.sort((x, y) => {
                 const idX = parseInt(x[0], 10);
                 const idY = parseInt(y[0], 10);
@@ -126,7 +125,6 @@
                     card.appendChild(blockDiv);
 
                     const turnoNorm = normalizarTexto(turnoLimpio);
-
                     const asignadosEnBloque = asignados.filter(a => {
                         const horAsig = normalizarTexto(a[2]);
                         if (horAsig !== turnoNorm) return false;
@@ -137,7 +135,6 @@
                         if (secAsig && normalizarTexto(secAsig)) {
                             return coincidePlantaOSector(secAsig, plantaSector, nombreSector);
                         }
-
                         return coincidePlantaOSector(planAsig, plantaSector, nombreSector);
                     });
 

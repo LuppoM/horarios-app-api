@@ -111,7 +111,9 @@ class ModeloMecanicosWeb:
             cursor.execute("""
                 SELECT id, operario, horario, COALESCE(planta, ''), COALESCE(sector, '')
                 FROM mecanicos
-                WHERE semana = %s AND horario IS NOT NULL AND TRIM(horario) != ''
+                WHERE semana = %s
+                  AND horario IS NOT NULL
+                  AND TRIM(horario) != ''
                 ORDER BY id ASC, operario ASC;
             """, (sem_val,))
             filas = cursor.fetchall()
