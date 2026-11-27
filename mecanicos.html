@@ -76,6 +76,12 @@
                 .replace(/\s+/g, " ");
         }
 
+        function normalizarHorario(val) {
+            return normalizarTexto(val)
+                .replace(/\s*-\s*/g, " a ")
+                .replace(/\s+a\s+/g, " a ");
+        }
+
         function coincidePlantaOSector(valAsig, plantaCard, sectorCard) {
             const a = normalizarTexto(valAsig);
             const p = normalizarTexto(plantaCard);
@@ -142,9 +148,9 @@
 
                     card.appendChild(blockDiv);
 
-                    const turnoNorm = normalizarTexto(turnoLimpio);
+                    const turnoNorm = normalizarHorario(turnoLimpio);
                     const asignadosEnBloque = asignados.filter(a => {
-                        const horAsig = normalizarTexto(a[2]);
+                        const horAsig = normalizarHorario(a[2]);
                         if (horAsig !== turnoNorm) return false;
 
                         const planAsig = a[3];
@@ -187,23 +193,36 @@
             const inputId = document.createElement('input');
             inputId.type = "text";
             inputId.className = "input-id-box";
-            inputId.value = idVal;
+            inputId.value = idVal ?? "";
             inputId.readOnly = true;
 
             const selectOp = document.createElement('select');
             selectOp.className = "select-operario-mecanico";
             selectOp.innerHTML = `<option value="">-- Seleccione Operario --</option>`;
 
+            let seleccionadoId = "";
+            const idBuscado = String(idVal ?? "").trim();
+            const nombreBuscado = normalizarTexto(nombreVal);
+
             mecanicosDisponibles.forEach(([id, nombre]) => {
                 const opt = document.createElement('option');
                 opt.value = id;
                 opt.textContent = nombre;
-                if (parseInt(id, 10) === parseInt(idVal, 10) || String(nombre).trim() === String(nombreVal).trim()) {
+
+                const coincideId = idBuscado !== "" && String(id).trim() === idBuscado;
+                const coincideNombre = nombreBuscado !== "" && normalizarTexto(nombre) === nombreBuscado;
+
+                if (coincideId || coincideNombre) {
                     opt.selected = true;
-                    inputId.value = id;
+                    seleccionadoId = id;
                 }
                 selectOp.appendChild(opt);
             });
+
+            if (seleccionadoId !== "") {
+                selectOp.value = seleccionadoId;
+                inputId.value = seleccionadoId;
+            }
 
             selectOp.onchange = (e) => {
                 inputId.value = e.target.value;
@@ -262,6 +281,6 @@
         }
 
         window.onload = init;
-    </script>
+</script>
 </body>
 </html>
