@@ -1413,11 +1413,18 @@ def api_mecanicos_datos(semana: Optional[str] = ""):
     modelo = ModeloMecanicosWeb()
     modelo_base = modeloprincipal()
     try:
-        if not semana or semana.lower() == "none" or semana.strip() == "":
-            semana = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+        semana_limpia = str(semana or "").strip()
+        if not semana_limpia or semana_limpia.lower() == "none":
+            try:
+                if hasattr(modelo_base, "obtener_numero_semana_personalizado"):
+                    semana_limpia = str(modelo_base.obtener_numero_semana_personalizado(date.today()))
+                else:
+                    semana_limpia = str(date.today().isocalendar()[1])
+            except Exception:
+                semana_limpia = str(date.today().isocalendar()[1])
 
         mecanicos_disponibles = modelo.obtener_mecanicos_disponibles()
-        asignados = modelo.obtener_asignaciones_semana(semana)
+        asignados = modelo.obtener_asignaciones_semana(semana_limpia)
         sectores_raw = modelo.obtener_sectores_mantenimiento()
 
         cache_turnos = {}
@@ -1439,7 +1446,7 @@ def api_mecanicos_datos(semana: Optional[str] = ""):
             })
 
         return {
-            "semana": semana,
+            "semana": semana_limpia,
             "disponibles": mecanicos_disponibles,
             "asignados": asignados,
             "sectores": sectores_info,
@@ -1448,7 +1455,6 @@ def api_mecanicos_datos(semana: Optional[str] = ""):
         modelo.cerrar_conexion()
         if hasattr(modelo_base, "cerrar_conexion"):
             modelo_base.cerrar_conexion()
-
 
 @app.post("/api/mecanicos/guardar")
 async def api_mecanicos_guardar(request: Request):
