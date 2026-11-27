@@ -125,7 +125,22 @@
             );
             return match ? match.querySelector('.rows-container') : null;
         }
+        function coincidePlantaOSector(destino, plantaSector, nombreSector) {
+            const destNorm = normalizarTexto(destino);
+            const plaNorm = normalizarTexto(plantaSector);
+            const secNorm = normalizarTexto(nombreSector);
 
+            if (destNorm.includes("vacac") || secNorm.includes("vacac")) {
+                return destNorm.includes("vacac") && secNorm.includes("vacac");
+            }
+            if (destNorm.includes("golosin") || secNorm.includes("golosin") || plaNorm.includes("golosin")) {
+                return destNorm.includes("golosin") && (secNorm.includes("golosin") || plaNorm.includes("golosin"));
+            }
+            if (destNorm.includes("chocolat") || secNorm.includes("chocolat") || plaNorm.includes("chocolat")) {
+                return destNorm.includes("chocolat") && (secNorm.includes("chocolat") || plaNorm.includes("chocolat"));
+            }
+            return destNorm === secNorm || destNorm === plaNorm;
+        }
         function renderizarUI() {
             const grid = document.getElementById('gridContenedor');
             grid.innerHTML = "";
