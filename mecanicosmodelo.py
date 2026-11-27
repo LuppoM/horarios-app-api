@@ -109,18 +109,27 @@ class ModeloMecanicosWeb:
         try:
             sem_val = int(semana) if str(semana).isdigit() else semana
             cursor.execute("""
-                SELECT id, operario, horario, COALESCE(planta, '')
+                SELECT id, operario, horario, COALESCE(planta, ''), COALESCE(sector, '')
                 FROM mecanicos
                 WHERE semana = %s AND horario IS NOT NULL AND TRIM(horario) != ''
                 ORDER BY horario ASC, operario ASC;
             """, (sem_val,))
             filas = cursor.fetchall()
-            return [
-                [f[0], f[1], f[2], f[3]]
-                if not isinstance(f, dict)
-                else [f["id"], f["operario"], f["horario"], f.get("planta") or ""]
-                for f in filas
-            ]
+            salida = []
+            for f in filas:
+                if isinstance(f, dict):
+                    id_op = f["id"]
+                    op = f["operario"]
+                    hor = f["horario"]
+                    pla = f.get("planta") or ""
+                    sec = self._resolver_sector_mecanicos(pla, f.get("sector"))
+                else:
+                    id_op, op, hor = f[0], f[1], f[2]
+                    pla = f[3] if len(f) > 3 else ""
+                    sec_raw = f[4] if len(f) > 4 else ""
+                    sec = self._resolver_sector_mecanicos(pla, sec_raw)
+                salida.append([id_op, op, hor, pla, sec])
+            return salida
         finally:
             try:
                 cursor.close()
