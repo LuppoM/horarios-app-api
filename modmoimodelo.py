@@ -116,81 +116,8 @@ class ModMoiModel:
                 datos.append(fila_lst[:7])
         return datos
 
-    def obtener_datos(self, filtro_columna=None, filtro_valor=None, semana_actual=None, area=None, vista="Semana"):
-        """
-        Selecciona la consulta según el usuario (area) y la vista:
-        - produccion -> modymoi (Semana) o modymoi_finde (Fin de Semana)
-        - mantenimiento -> mecanicos
-        - calidad -> analistascalidad
-        - depositomp -> depositomp (Depositomp) o depositomp_finde (DepositompFinde)
-        - depositopt -> depositopt
-        - admin / rrhh -> modymoi_finde (Fin de Semana), tabla específica o las tablas principales unificadas (Semana)
-        """
-        vista_norm = str(vista or "Semana").strip().lower()
-        tabla = self._resolver_tabla_por_area(area)
-
-        # 1. Vista Fin de Semana (Producción): habilitada para Producción, Admin y RRHH
-        if vista_norm == "fin de semana":
-            if self._puede_ver_consolidado_total(area) or self._es_produccion(area):
-                return self.obtener_datos_finde(
-                    filtro_columna=filtro_columna,
-                    filtro_valor=filtro_valor,
-                    semana_actual=semana_actual,
-                    area=area,
-                )
-            return self._obtener_datos_tabla_area_moi(
-                nombre_tabla=tabla,
-                filtro_columna=filtro_columna,
-                filtro_valor=filtro_valor,
-                semana_actual=semana_actual,
-            )
-
-        # 2. Vista Deposito MP Fin de Semana: habilitada para Deposito MP, Admin y RRHH
-        if self._es_vista_depositomp_finde(vista_norm):
-            if self._puede_ver_consolidado_total(area) or tabla == "depositomp":
-                return self.obtener_datos_deposito_mp_finde(
-                    filtro_columna=filtro_columna,
-                    filtro_valor=filtro_valor,
-                    semana_actual=semana_actual,
-                )
-            return list(self.COLUMNAS_CONSOLIDADO), []
-
-        # 3. Usuario Admin / RRHH: puede consultar una vista específica o todas juntas
-        if tabla == "ALL":
-            vistas_especificas_admin = {
-                "mecanicos": "mecanicos",
-                "mecánicos": "mecanicos",
-                "calidad": "analistascalidad",
-                "depositomp": "depositomp",
-                "deposito mp": "depositomp",
-                "deposito materia prima": "depositomp",
-                "depositopt": "depositopt",
-                "deposito pt": "depositopt",
-                "deposito producto terminado": "depositopt",
-            }
-            if vista_norm in vistas_especificas_admin:
-                return self._obtener_datos_tabla_area_moi(
-                    nombre_tabla=vistas_especificas_admin[vista_norm],
-                    filtro_columna=filtro_columna,
-                    filtro_valor=filtro_valor,
-                    semana_actual=semana_actual,
-                )
-            return self._obtener_datos_todas_las_areas(
-                filtro_columna=filtro_columna,
-                filtro_valor=filtro_valor,
-                semana_actual=semana_actual,
-            )
-
-        # 4. Usuarios de áreas MOI (mantenimiento, calidad, depositomp, depositopt)
-        if tabla != "modymoi":
-            return self._obtener_datos_tabla_area_moi(
-                nombre_tabla=tabla,
-                filtro_columna=filtro_columna,
-                filtro_valor=filtro_valor,
-                semana_actual=semana_actual,
-            )
-
-        # 5. Usuario Producción -> tabla modymoi
+    def _obtener_datos_modymoi(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
+        """Consulta únicamente la tabla modymoi (Producción)."""
         cursor = None
         columnas = list(self.COLUMNAS_CONSOLIDADO)
         try:
@@ -221,7 +148,7 @@ class ModMoiModel:
                 params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY operario ASC"
-            cursor.execute(query_base, params)
+            cursor.execute(query_base, params if params else None)
 
             filas = cursor.fetchall()
             return columnas, self._formatear_filas_consolidado(filas)
@@ -235,8 +162,89 @@ class ModMoiModel:
             if cursor:
                 cursor.close()
 
+    def obtener_datos(self, filtro_columna=None, filtro_valor=None, semana_actual=None, area=None, vista="Semana"):
+        """
+        Selecciona la consulta según el usuario (area) y la vista:
+        - produccion -> modymoi (Semana) o modymoi_finde (Fin de Semana)
+        - mantenimiento -> mecanicos
+        - calidad -> analistascalidad
+        - depositomp -> depositomp (Depositomp) o depositomp_finde (DepositompFinde)
+        - depositopt -> depositopt
+        - admin / rrhh -> modymoi (Semana), modymoi_finde (Fin de Semana) o tabla específica según la vista
+        """
+        vista_norm = str(vista or "Semana").strip().lower()
+        tabla = self._resolver_tabla_por_area(area)
+
+        # 1. Vista Fin de Semana (Producción): habilitada para Producción, Admin y RRHH
+        if vista_norm == "fin de semana":
+            if self._puede_ver_consolidado_total(area) or self._es_produccion(area):
+                return self.obtener_datos_finde(
+                    filtro_columna=filtro_columna,
+                    filtro_valor=filtro_valor,
+                    semana_actual=semana_actual,
+                    area=area,
+                )
+            return self._obtener_datos_tabla_area_moi(
+                nombre_tabla=tabla,
+                filtro_columna=filtro_columna,
+                filtro_valor=filtro_valor,
+                semana_actual=semana_actual,
+            )
+
+        # 2. Vista Deposito MP Fin de Semana: habilitada para Deposito MP, Admin y RRHH
+        if self._es_vista_depositomp_finde(vista_norm):
+            if self._puede_ver_consolidado_total(area) or tabla == "depositomp":
+                return self.obtener_datos_deposito_mp_finde(
+                    filtro_columna=filtro_columna,
+                    filtro_valor=filtro_valor,
+                    semana_actual=semana_actual,
+                )
+            return list(self.COLUMNAS_CONSOLIDADO), []
+
+        # 3. Usuario Admin / RRHH: consulta cada vista por separado (Semana consulta solo modymoi)
+        if tabla == "ALL":
+            vistas_especificas_admin = {
+                "mecanicos": "mecanicos",
+                "mecánicos": "mecanicos",
+                "calidad": "analistascalidad",
+                "depositomp": "depositomp",
+                "deposito mp": "depositomp",
+                "deposito materia prima": "depositomp",
+                "depositopt": "depositopt",
+                "deposito pt": "depositopt",
+                "deposito producto terminado": "depositopt",
+            }
+            if vista_norm in vistas_especificas_admin:
+                return self._obtener_datos_tabla_area_moi(
+                    nombre_tabla=vistas_especificas_admin[vista_norm],
+                    filtro_columna=filtro_columna,
+                    filtro_valor=filtro_valor,
+                    semana_actual=semana_actual,
+                )
+            return self._obtener_datos_modymoi(
+                filtro_columna=filtro_columna,
+                filtro_valor=filtro_valor,
+                semana_actual=semana_actual,
+            )
+
+        # 4. Usuarios de áreas MOI (mantenimiento, calidad, depositomp, depositopt)
+        if tabla != "modymoi":
+            return self._obtener_datos_tabla_area_moi(
+                nombre_tabla=tabla,
+                filtro_columna=filtro_columna,
+                filtro_valor=filtro_valor,
+                semana_actual=semana_actual,
+            )
+
+        # 5. Usuario Producción -> tabla modymoi
+        return self._obtener_datos_modymoi(
+            filtro_columna=filtro_columna,
+            filtro_valor=filtro_valor,
+            semana_actual=semana_actual,
+        )
+
     def _obtener_datos_todas_las_areas(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
-        """Unifica las 5 tablas (modymoi + 4 áreas MOI) para admin y rrhh."""
+        """Unifica las 5 tablas (modymoi + 4 áreas MOI)."""
         columnas = list(self.COLUMNAS_CONSOLIDADO)
 
         cursor = None
@@ -336,7 +344,7 @@ class ModMoiModel:
                     params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY operario ASC"
-            cursor.execute(query_base, params)
+            cursor.execute(query_base, params if params else None)
 
             filas = cursor.fetchall()
             return columnas, self._formatear_filas_consolidado(filas)
@@ -405,7 +413,7 @@ class ModMoiModel:
                     params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY operario ASC"
-            cursor.execute(query_base, params)
+            cursor.execute(query_base, params if params else None)
 
             filas = cursor.fetchall()
             return columnas, self._formatear_filas_consolidado(filas)
@@ -558,7 +566,7 @@ class ModMoiModel:
                 params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY m.operario ASC, f.dia ASC"
-            cursor.execute(query_base, params)
+            cursor.execute(query_base, params if params else None)
 
             filas = cursor.fetchall()
 
@@ -759,12 +767,6 @@ class ModMoiModel:
                 res_prod = cursor.fetchone()
                 mod_total = int(res_prod[0] or 0) if res_prod else 0
                 moi_total = int(res_prod[1] or 0) if res_prod else 0
-
-                for t_moi in ("mecanicos", "analistascalidad", "depositomp", "depositopt"):
-                    cursor.execute(f"SELECT COUNT(*) FROM {t_moi};")
-                    r = cursor.fetchone()
-                    moi_total += int(r[0] or 0) if r else 0
-
                 return (mod_total, moi_total)
 
             if tabla_usuario != "modymoi":
