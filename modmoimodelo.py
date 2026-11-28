@@ -429,40 +429,41 @@ class ModMoiModel:
             cursor = self.conexion_db.cursor()
             query_base = """
                 SELECT 
-                    id,
+                    f.id,
                     'MOI' AS calificacion_mano_obra,
-                    operario,
-                    COALESCE(semana::text, '') AS semana,
-                    COALESCE(turno::text, '') AS "Horario",
-                    COALESCE(sector::text, '') AS "Sector",
+                    COALESCE(NULLIF(TRIM(f.operario::text), ''), d.operario::text, '') AS operario,
+                    COALESCE(f.semana::text, '') AS semana,
+                    COALESCE(f.turno::text, '') AS "Horario",
+                    COALESCE(f.sector::text, '') AS "Sector",
                     CASE
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE ''
+                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE COALESCE(d.planta::text, '')
                     END AS "Planta"
-                FROM depositomp_finde
+                FROM depositomp_finde f
+                LEFT JOIN depositomp d ON f.operario_id = d.id
                 WHERE 1=1
             """
             params = []
 
             if filtro_columna and filtro_valor:
                 col_map = {
-                    "id": "id",
-                    "operario": "operario",
-                    "semana": "semana",
-                    "horario": "turno",
-                    "horario_semana": "turno",
-                    "sector": "sector",
-                    "sector_semana": "sector",
+                    "id": "f.id",
+                    "operario": "COALESCE(NULLIF(TRIM(f.operario::text), ''), d.operario::text, '')",
+                    "semana": "f.semana",
+                    "horario": "f.turno",
+                    "horario_semana": "f.turno",
+                    "sector": "f.sector",
+                    "sector_semana": "f.sector",
                     "planta": """CASE
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE ''
+                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE COALESCE(d.planta::text, '')
                     END""",
                     "planta_semana": """CASE
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE ''
+                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE COALESCE(d.planta::text, '')
                     END""",
                 }
                 col_filtro = col_map.get(filtro_columna.lower())
@@ -479,7 +480,7 @@ class ModMoiModel:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
             print(f"Error al consultar depositomp_finde en Supabase: {e}")
-            return columnas, []
+            raise
         finally:
             if cursor:
                 cursor.close()
