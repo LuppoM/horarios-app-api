@@ -435,11 +435,14 @@ class ModMoiModel:
                     COALESCE(semana::text, '') AS semana,
                     COALESCE(turno::text, '') AS horario,
                     COALESCE(sector::text, '') AS sector,
-                    CASE
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE ''
-                    END AS planta
+                    COALESCE(
+                        NULLIF(TRIM(planta::text), ''),
+                        CASE
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                            ELSE ''
+                        END
+                    ) AS planta
                 FROM depositomp_finde
                 WHERE 1=1
             """
@@ -455,16 +458,22 @@ class ModMoiModel:
                     "horario_semana": "COALESCE(turno::text, '')",
                     "sector": "COALESCE(sector::text, '')",
                     "sector_semana": "COALESCE(sector::text, '')",
-                    "planta": """CASE
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE ''
-                    END""",
-                    "planta_semana": """CASE
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE ''
-                    END""",
+                    "planta": """COALESCE(
+                        NULLIF(TRIM(planta::text), ''),
+                        CASE
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                            ELSE ''
+                        END
+                    )""",
+                    "planta_semana": """COALESCE(
+                        NULLIF(TRIM(planta::text), ''),
+                        CASE
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                            ELSE ''
+                        END
+                    )""",
                 }
                 col_filtro = col_map.get(filtro_columna.lower())
                 if col_filtro:
