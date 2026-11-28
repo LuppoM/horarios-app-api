@@ -429,46 +429,35 @@ class ModMoiModel:
             cursor = self.conexion_db.cursor()
             query_base = """
                 SELECT 
-                    f.id,
+                    id,
                     'MOI' AS calificacion_mano_obra,
-                    COALESCE(NULLIF(TRIM(f.operario::text), ''), d.operario::text, '') AS operario,
-                    COALESCE(f.semana::text, '') AS semana,
-                    COALESCE(f.turno::text, '') AS "Horario",
-                    COALESCE(f.sector::text, '') AS "Sector",
+                    COALESCE(operario::text, '') AS operario,
+                    COALESCE(semana::text, '') AS semana,
+                    COALESCE(turno::text, '') AS "Horario",
+                    COALESCE(sector::text, '') AS "Sector",
                     CASE
-                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE COALESCE(d.planta::text, '')
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE ''
                     END AS "Planta"
-                FROM depositomp_finde f
-                LEFT JOIN depositomp d ON f.operario_id = d.id
+                FROM depositomp_finde
                 WHERE 1=1
             """
             params = []
 
             if filtro_columna and filtro_valor:
                 col_map = {
-                    "id": "f.id",
-                    "operario": "COALESCE(NULLIF(TRIM(f.operario::text), ''), d.operario::text, '')",
-                    "semana": "f.semana",
-                    "horario": "f.turno",
-                    "horario_semana": "f.turno",
-                    "sector": "f.sector",
-                    "sector_semana": "f.sector",
-                    "planta": """CASE
-                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE COALESCE(d.planta::text, '')
-                    END""",
-                    "planta_semana": """CASE
-                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                        WHEN UPPER(COALESCE(f.sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
-                        ELSE COALESCE(d.planta::text, '')
-                    END""",
+                    "id": "id",
+                    "operario": "operario",
+                    "semana": "semana",
+                    "horario": "turno",
+                    "horario_semana": "turno",
+                    "sector": "sector",
+                    "sector_semana": "sector",
                 }
                 col_filtro = col_map.get(filtro_columna.lower())
                 if col_filtro:
-                    query_base += f" AND ({col_filtro})::text ILIKE %s"
+                    query_base += f" AND {col_filtro}::text ILIKE %s"
                     params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY operario ASC"
@@ -483,7 +472,7 @@ class ModMoiModel:
             raise
         finally:
             if cursor:
-                cursor.close()
+                cursor.close() 
 
     def obtener_datos_mecanicos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         return self._obtener_datos_tabla_area_moi("mecanicos", filtro_columna, filtro_valor, semana_actual)
