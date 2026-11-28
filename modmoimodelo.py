@@ -438,8 +438,8 @@ class ModMoiModel:
                     COALESCE(
                         NULLIF(TRIM(planta::text), ''),
                         CASE
-                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%%CHOCOLATES%%' THEN 'Chocolate'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%%GOLOSINAS%%' THEN 'Golosinas'
                             ELSE ''
                         END
                     ) AS planta
@@ -461,16 +461,16 @@ class ModMoiModel:
                     "planta": """COALESCE(
                         NULLIF(TRIM(planta::text), ''),
                         CASE
-                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%%CHOCOLATES%%' THEN 'Chocolate'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%%GOLOSINAS%%' THEN 'Golosinas'
                             ELSE ''
                         END
                     )""",
                     "planta_semana": """COALESCE(
                         NULLIF(TRIM(planta::text), ''),
                         CASE
-                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
-                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%%CHOCOLATES%%' THEN 'Chocolate'
+                            WHEN UPPER(COALESCE(sector::text, '')) LIKE '%%GOLOSINAS%%' THEN 'Golosinas'
                             ELSE ''
                         END
                     )""",
@@ -481,7 +481,7 @@ class ModMoiModel:
                     params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY operario ASC"
-            cursor.execute(query_base, params)
+            cursor.execute(query_base, params if params else None)
 
             filas = cursor.fetchall()
             datos = []
