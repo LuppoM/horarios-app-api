@@ -433,13 +433,13 @@ class ModMoiModel:
                     'MOI' AS calificacion_mano_obra,
                     COALESCE(operario::text, '') AS operario,
                     COALESCE(semana::text, '') AS semana,
-                    COALESCE(turno::text, '') AS "Horario",
-                    COALESCE(sector::text, '') AS "Sector",
+                    COALESCE(turno::text, '') AS horario,
+                    COALESCE(sector::text, '') AS sector,
                     CASE
                         WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
                         WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
                         ELSE ''
-                    END AS "Planta"
+                    END AS planta
                 FROM depositomp_finde
                 WHERE 1=1
             """
@@ -448,23 +448,52 @@ class ModMoiModel:
             if filtro_columna and filtro_valor:
                 col_map = {
                     "id": "id",
-                    "operario": "operario",
-                    "semana": "semana",
-                    "horario": "turno",
-                    "horario_semana": "turno",
-                    "sector": "sector",
-                    "sector_semana": "sector",
+                    "calificacion_mano_obra": "'MOI'",
+                    "operario": "COALESCE(operario::text, '')",
+                    "semana": "COALESCE(semana::text, '')",
+                    "horario": "COALESCE(turno::text, '')",
+                    "horario_semana": "COALESCE(turno::text, '')",
+                    "sector": "COALESCE(sector::text, '')",
+                    "sector_semana": "COALESCE(sector::text, '')",
+                    "planta": """CASE
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE ''
+                    END""",
+                    "planta_semana": """CASE
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%CHOCOLATES%' THEN 'Chocolate'
+                        WHEN UPPER(COALESCE(sector::text, '')) LIKE '%GOLOSINAS%' THEN 'Golosinas'
+                        ELSE ''
+                    END""",
                 }
                 col_filtro = col_map.get(filtro_columna.lower())
                 if col_filtro:
-                    query_base += f" AND {col_filtro}::text ILIKE %s"
+                    query_base += f" AND ({col_filtro})::text ILIKE %s"
                     params.append("%" + str(filtro_valor) + "%")
 
             query_base += " ORDER BY operario ASC"
             cursor.execute(query_base, params)
 
             filas = cursor.fetchall()
-            return columnas, self._formatear_filas_consolidado(filas)
+            datos = []
+            for f in filas:
+                if isinstance(f, dict):
+                    datos.append([
+                        f.get("id"),
+                        f.get("calificacion_mano_obra", "MOI"),
+                        f.get("operario", ""),
+                        f.get("semana", ""),
+                        f.get("horario") if "horario" in f else f.get("Horario", ""),
+                        f.get("sector") if "sector" in f else f.get("Sector", ""),
+                        f.get("planta") if "planta" in f else f.get("Planta", ""),
+                    ])
+                else:
+                    fila_lst = list(f)
+                    while len(fila_lst) < 7:
+                        fila_lst.append("")
+                    datos.append(fila_lst[:7])
+
+            return columnas, datos
         except Exception as e:
             if hasattr(self.conexion_db, 'rollback'):
                 self.conexion_db.rollback()
@@ -472,7 +501,7 @@ class ModMoiModel:
             raise
         finally:
             if cursor:
-                cursor.close() 
+                cursor.close()
 
     def obtener_datos_mecanicos(self, filtro_columna=None, filtro_valor=None, semana_actual=None):
         return self._obtener_datos_tabla_area_moi("mecanicos", filtro_columna, filtro_valor, semana_actual)
